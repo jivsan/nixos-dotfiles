@@ -1,0 +1,63 @@
+* {
+  font-family: "JetBrainsMono Nerd Font";
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+
+/* The bar itself: translucent so Hyprland's layer blur frosts it.
+   Keep the alpha < 1 or the blur has nothing to show through. */
+window#waybar {
+  background: rgba(26, 27, 38, 0.45);
+  color: #c8d3f5;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* module pills */
+#workspaces,
+#window,
+#clock,
+#cpu,
+#memory,
+#network,
+#tray {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 2px 12px;
+  margin: 4px 0;
+}
+
+#workspaces { padding: 2px 4px; }
+#workspaces button {
+  padding: 0 8px;
+  margin: 2px 2px;
+  color: #6c7393;
+  border-radius: 10px;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+#workspaces button.active {
+  color: #16161e;
+  background: linear-gradient(135deg, #2de2e6, #ff4fa3);
+}
+#workspaces button:hover {
+  color: #c8d3f5;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#window { color: #828bb8; background: transparent; }
+
+#clock {
+  color: #2de2e6;
+  font-weight: 700;
+  padding: 2px 18px;
+}
+
+#cpu     { color: #c8d3f5; }
+#memory  { color: #c099ff; }
+#network { color: #82aaff; }
+#network.disconnected { color: #ff4fa3; }
+#tray    { background: transparent; }

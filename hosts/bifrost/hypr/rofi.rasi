@@ -1,0 +1,59 @@
+/* Frosted glass launcher — the rofi layer is blurred by hyprland.lua */
+* {
+    bg:        rgba(26, 27, 38, 0.55);
+    bg-alt:    rgba(255, 255, 255, 0.05);
+    fg:        #c8d3f5;
+    fg-dim:    #6c7393;
+    accent:    #2de2e6;
+    accent2:   #ff4fa3;
+    background-color: transparent;
+    text-color: @fg;
+    font: "JetBrainsMono Nerd Font 13";
+}
+
+window {
+    transparency: "real";
+    background-color: @bg;
+    border: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    width: 640px;
+    location: center;
+    padding: 0;
+}
+
+mainbox { padding: 18px; spacing: 14px; }
+
+inputbar {
+    background-color: @bg-alt;
+    border-radius: 12px;
+    padding: 12px 16px;
+    spacing: 10px;
+    children: [ prompt, entry ];
+}
+prompt { text-color: @accent; }
+entry  { placeholder: "Search…"; placeholder-color: @fg-dim; }
+
+listview {
+    lines: 8;
+    columns: 1;
+    spacing: 4px;
+    scrollbar: false;
+    fixed-height: false;
+}
+
+element {
+    padding: 10px 14px;
+    border-radius: 10px;
+    spacing: 12px;
+}
+element normal normal { background-color: transparent; text-color: @fg; }
+element alternate normal { background-color: transparent; text-color: @fg; }
+element selected normal {
+    background-color: @bg-alt;
+    text-color: @accent;
+    border: 0px 0px 0px 3px;
+    border-color: @accent2;
+}
+element-icon { size: 22px; vertical-align: 0.5; }
+element-text { vertical-align: 0.5; }

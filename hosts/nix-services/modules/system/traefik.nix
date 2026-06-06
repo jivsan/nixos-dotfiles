@@ -1,0 +1,298 @@
+{ ... }:
+
+{
+  services.traefik = {
+    enable = true;
+
+    # ─── Static config: entrypoints, API, providers, metrics ───
+    staticConfigOptions = {
+      api = {
+        dashboard = true;
+        insecure = false;
+      };
+
+      entryPoints = {
+        web = {
+          address = ":80";
+          http.redirections.entryPoint = {
+            to = "websecure";
+            scheme = "https";
+          };
+        };
+
+        websecure = {
+          address = ":443";
+        };
+
+        metrics = {
+          address = "127.0.0.1:8082";
+        };
+      };
+
+      metrics.prometheus = {
+        entryPoint = "metrics";
+        addEntryPointsLabels = true;
+        addRoutersLabels = true;
+        addServicesLabels = true;
+      };
+
+      log.level = "INFO";
+      accessLog = {};
+    };
+
+    # ─── Dynamic config: routers, services, middleware, TLS ───
+    dynamicConfigOptions = {
+      tls = {
+        stores.default.defaultCertificate = {
+          certFile = "/var/lib/acme/oryxserver.org/cert.pem";
+          keyFile = "/var/lib/acme/oryxserver.org/key.pem";
+        };
+
+        certificates = [
+          {
+            certFile = "/var/lib/acme/oryxserver.org/cert.pem";
+            keyFile = "/var/lib/acme/oryxserver.org/key.pem";
+            stores = [ "default" ];
+          }
+        ];
+      };
+
+      http = {
+        routers = {
+          dashboard = {
+            rule = "Host(`traefik.oryxserver.org`)";
+            service = "api@internal";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          immich = {
+            rule = "Host(`immich.oryxserver.org`)";
+            service = "immich";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          nextcloud = {
+            rule = "Host(`nextcloud.oryxserver.org`)";
+            service = "nextcloud";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [
+              "lan-only"
+              "nextcloud-redirect"
+              "nextcloud-headers"
+            ];
+          };
+
+          truenas = {
+            rule = "Host(`truenas.oryxserver.org`)";
+            service = "truenas";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          openwebui = {
+            rule = "Host(`openwebui.oryxserver.org`)";
+            service = "openwebui";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          comfyui = {
+            rule = "Host(`comfyui.oryxserver.org`)";
+            service = "comfyui";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          crafty = {
+            rule = "Host(`crafty.oryxserver.org`)";
+            service = "crafty";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          homepage = {
+            rule = "Host(`home.oryxserver.org`)";
+            service = "homepage";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          paperless = {
+            rule = "Host(`paperless.oryxserver.org`)";
+            service = "paperless";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          grafana = {
+            rule = "Host(`grafana.oryxserver.org`)";
+            service = "grafana";
+            entryPoints = [ "websecure" ];
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          nexterm = {
+            rule = "Host(`nexterm.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "nexterm";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+          scrutiny = {
+            rule = "Host(`scrutiny.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "scrutiny";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
+        };
+
+        services = {
+          immich = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:2283"; }
+              ];
+            };
+          };
+
+          nextcloud = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:8081"; }
+              ];
+            };
+          };
+
+          truenas = {
+            loadBalancer = {
+              servers = [
+                { url = "https://10.0.0.6"; }
+              ];
+              serversTransport = "insecure";
+            };
+          };
+
+          openwebui = {
+            loadBalancer = {
+              servers = [
+                { url = "http://10.0.0.15:3000"; }
+              ];
+            };
+          };
+
+          comfyui = {
+            loadBalancer = {
+              servers = [
+                { url = "http://10.0.0.15:8188"; }
+              ];
+            };
+          };
+
+          crafty = {
+            loadBalancer = {
+              servers = [
+                { url = "https://127.0.0.1:8443"; }
+              ];
+              serversTransport = "insecure";
+            };
+          };
+
+          homepage = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:3004"; }
+              ];
+            };
+          };
+
+          paperless = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:8010"; }
+              ];
+            };
+          };
+
+          grafana = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:3002"; }
+              ];
+            };
+          };
+          nexterm = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:6989"; }
+              ];
+            };
+          };
+          scrutiny = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:8080"; }
+              ];
+            };
+          };
+        };
+
+        serversTransports = {
+          insecure = {
+            insecureSkipVerify = true;
+          };
+        };
+
+        middlewares = {
+          lan-only = {
+            ipAllowList.sourceRange = [
+              "10.0.0.0/24"
+              "100.64.0.0/10"
+              "127.0.0.1/32"
+            ];
+          };
+
+          nextcloud-redirect = {
+            redirectRegex = {
+              regex = "^https://([^/]+)/.well-known/(card|cal)dav";
+              replacement = "https://$1/remote.php/dav";
+              permanent = true;
+            };
+          };
+
+          nextcloud-headers = {
+            headers = {
+              customRequestHeaders = {
+                X-Forwarded-Proto = "https";
+              };
+
+              customResponseHeaders = {
+                "Strict-Transport-Security" = "max-age=15552000; includeSubDomains";
+              };
+
+              referrerPolicy = "no-referrer";
+            };
+          };
+        };
+      };
+    };
+  };
+
+  systemd.services.traefik.serviceConfig.SupplementaryGroups = [ "traefik" ];
+
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
+}

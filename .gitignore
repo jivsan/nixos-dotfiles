@@ -1,0 +1,29 @@
+# Nix build artifacts
+result
+result-*
+.direnv/
+*.drv
+
+# Secrets — never commit these (use file paths to /var/lib/secrets instead)
+secrets.nix
+*.secret.nix
+*.secret
+*.env
+.env
+*.pem
+*.key
+id_ed25519
+id_rsa
+cloudflare-dns-token
+
+# Editor / OS noise
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode/
+.idea/
+
+# Local-only overrides
+local.nix
+*.local.nix
