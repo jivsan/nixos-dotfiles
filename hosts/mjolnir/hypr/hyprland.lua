@@ -36,6 +36,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("hypridle")
     hl.exec_cmd(
         "awww-daemon & sleep 1 && awww img /home/christina/.config/hypr/wall.png --transition-type grow --transition-pos 0.1,0.9 --transition-fps 60")
+    hl.exec_cmd("alacritty --class scratchpad", { workspace = "special:scratch", float = true, size = "60% 60%" })
     -- no wayvnc here: this is a local GPU session, not the remote VM
 end)
 
@@ -142,6 +143,8 @@ hl.bind(main_mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 hl.bind("Print", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | swappy -f -"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("grim - | wl-copy"))
 hl.bind("SUPER + S", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"))
+hl.bind(main_mod .. " + A", hl.dsp.workspace.toggle_special("scratch"))
+hl.bind("ALT + Tab", hl.dsp.exec_cmd("rofi -show window -theme /home/christina/.config/hypr/rofi.rasi"))
 
 
 --------------------------------
