@@ -35,7 +35,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("mako")
     hl.exec_cmd("hypridle")
     hl.exec_cmd(
-    "awww-daemon & sleep 1 && awww img /home/christina/.config/hypr/wall.png --transition-type grow --transition-pos 0.1,0.9 --transition-fps 60")
+        "awww-daemon & sleep 1 && awww img /home/christina/.config/hypr/wall.png --transition-type grow --transition-pos 0.1,0.9 --transition-fps 60")
     -- no wayvnc here: this is a local GPU session, not the remote VM
 end)
 
@@ -139,6 +139,8 @@ hl.bind(main_mod .. " + TAB", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(main_mod .. " + SHIFT + TAB", hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(main_mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(main_mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+hl.bind("Print", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | swappy -f -"))
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd("grim - | wl-copy"))
 
 
 --------------------------------
