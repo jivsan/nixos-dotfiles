@@ -61,3 +61,5 @@ window#waybar {
 #network { color: #82aaff; }
 #network.disconnected { color: #ff4fa3; }
 #tray    { background: transparent; }
+#custom-gpu { color: #8bffb0; }
+#custom-gpu.gpu-hot { color: #ff4fa3; }

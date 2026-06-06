@@ -9,7 +9,7 @@
 
   "modules-left": ["hyprland/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
-  "modules-right": ["cpu", "memory", "network", "tray"],
+  "modules-right": ["pulseaudio", "cpu", "memory", "custom/gpu", "network", "tray", "custom/power"],
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -34,6 +34,13 @@
 
   "cpu":    { "format": "\udb80\udccb {usage}%", "interval": 2 },
   "memory": { "format": "\uf035b {percentage}%", "interval": 5 },
+  "custom/gpu": {
+    "exec": "/home/christina/.config/waybar/gpu.sh",
+    "return-type": "json",
+    "interval": 3,
+    "format": "{}",
+    "on-click": "alacritty -e nvtop"
+  },
   "network": {
     "format-ethernet": "\udb83\udf18 {ipaddr}",
     "format-disconnected": "\udb83\udf19",
