@@ -7,7 +7,7 @@ let
 in
 {
   systemd.tmpfiles.rules = [
-    "d /var/lib/nextcloud-db 0700 999 999 -"
+    "d /var/lib/nextcloud-db 0700 70 70 -"   # alpine postgres runs as uid/gid 70
   ];
 
   virtualisation.oci-containers.containers = {
