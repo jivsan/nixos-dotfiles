@@ -75,7 +75,6 @@
       nixosConfigurations = {
         mjolnir      = mkHost ./hosts/mjolnir/default.nix      ./hosts/mjolnir/home.nix;
         nix-services = mkHost ./hosts/nix-services/default.nix ./hosts/nix-services/home.nix;
-        bifrost      = mkHost ./hosts/bifrost/default.nix      ./hosts/bifrost/home.nix;
       };
     };
 }

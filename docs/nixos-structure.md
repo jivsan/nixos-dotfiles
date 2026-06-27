@@ -1,12 +1,15 @@
 # nixos-dotfiles — Structure Reference
 
 Declarative NixOS configuration for all of Christina's machines, managed from a single
-flake. Primary workstation is `mjolnir`; the Proxmox VMs are deployed and managed
-remotely from it. Pushed to GitHub (`jivsan/nixos-dotfiles`) and a self-hosted Forgejo.
+flake. Primary workstation is `mjolnir`; the Proxmox VM is deployed and managed remotely
+from it. Pushed to GitHub (`jivsan/nixos-dotfiles`) and a self-hosted Forgejo.
 
 - **nixpkgs:** stable `nixos-26.05` (Yarara) · home-manager `release-26.05`
 - **stateVersion:** `25.11` (pinned in `modules/system/nix.nix`)
 - **git user:** `jivsan`
+
+> The homelab network these hosts run on — VLANs, the `bifrost` Arista core switch,
+> pfSense, Pi-hole — is documented in the [README](../README.md) and `network/`.
 
 ## Hosts in this flake
 
@@ -14,7 +17,6 @@ remotely from it. Pushed to GitHub (`jivsan/nixos-dotfiles`) and a self-hosted F
 |----------------|----------------------------------------------|----------------------------------------------------|---------|
 | `mjolnir`      | Workstation / daily driver                   | Ryzen 9 5900X, RTX 4060 Ti                         | oxwm (X11, default) **+** Hyprland (Wayland), pick at `ly` |
 | `nix-services` | Headless self-hosted services VM (Proxmox)   | Reached over LAN / Tailscale                        | none (server) |
-| `bifrost`      | Hyprland remote-workstation VM (Proxmox)     | virtio-gpu, accessed via wayvnc → Remmina over Tailscale/LAN | Hyprland (Wayland) |
 
 Build any host with:
 
@@ -26,7 +28,7 @@ sudo nixos-rebuild switch --flake ~/nixos-dotfiles#<host>
 
 ```
 nixos-dotfiles/
-├── flake.nix                  # entry point — inputs + parameterized mkHost + 3 hosts
+├── flake.nix                  # entry point — inputs + parameterized mkHost + hosts
 ├── flake.lock
 ├── configuration.nix          # mjolnir's umbrella: imports the shared modules/system/*
 ├── home.nix                   # shared/mjolnir home: imports modules/home/*
@@ -41,13 +43,6 @@ nixos-dotfiles/
 │   │   │                            #   hyprlock.conf, hypridle.conf, wall.png, powermenu.sh
 │   │   ├── waybar/                  # config.jsonc, style.css
 │   │   └── mako/                    # config
-│   │
-│   ├── bifrost/
-│   │   ├── default.nix              # cherry-picks shared modules (NO configuration.nix)
-│   │   ├── home.nix
-│   │   ├── hardware-configuration.nix
-│   │   ├── modules/home/{hyprland.nix, terminal.nix}
-│   │   ├── hypr/  waybar/  mako/    # same shape as mjolnir's
 │   │
 │   └── nix-services/
 │       ├── default.nix              # cherry-picks shared modules (NO configuration.nix)
@@ -66,6 +61,10 @@ nixos-dotfiles/
 │   ├── alacritty/  nvim/  rofi/  qtile/     # symlinked into ~/.config via xdg.nix
 │   └── dwm/  st/  dmenu/                     # suckless C sources, built via suckless.nix
 │
+├── network/                    # homelab network — Arista EOS + pfSense (not NixOS)
+│   ├── bifrost-arista-core.cfg
+│   └── pfsense-vlan-setup.md
+│
 └── docs/                       # this file lives here
 ```
 
@@ -73,7 +72,7 @@ nixos-dotfiles/
 
 **`modules/system/`** — shared OS-level modules. A host gets them either via
 `configuration.nix` (mjolnir's umbrella imports the lot) or by importing individual ones
-(the VMs cherry-pick to stay lean and headless).
+(the headless VM cherry-picks to stay lean).
 
 ```
 boot  dconf  desktop  fonts  locale  nas  network-identity  networking  nix
@@ -130,7 +129,6 @@ the suckless tools.
 nixosConfigurations = {
   mjolnir      = mkHost ./hosts/mjolnir/default.nix      ./hosts/mjolnir/home.nix;
   nix-services = mkHost ./hosts/nix-services/default.nix ./hosts/nix-services/home.nix;
-  bifrost      = mkHost ./hosts/bifrost/default.nix      ./hosts/bifrost/home.nix;
 };
 ```
 
@@ -143,17 +141,17 @@ pulls in every shared `modules/system/*`), then layers on the `modules/apps/*` b
 `tailscale.nix`, and `modules/system/hyprland.nix`. Its home file imports the shared
 `home.nix` plus the host-local Hyprland home module.
 
-**Cherry-pick (nix-services, bifrost).** These deliberately do **not** import
-`configuration.nix` (that would drag in `desktop.nix` = X11/oxwm/`ly`). Instead they import
-just the shared system modules they need (e.g. `boot`, `locale`, `networking`, `nix`,
-`users`, `tailscale`) and add their own host-local modules. This keeps server/headless
-hosts lean.
+**Cherry-pick (nix-services).** The headless host deliberately does **not** import
+`configuration.nix` (that would drag in `desktop.nix` = X11/oxwm/`ly`). Instead it imports
+just the shared system modules it needs (e.g. `boot`, `locale`, `networking`, `nix`,
+`users`, `tailscale`) and adds its own host-local modules. This keeps the server lean and
+headless. (Future headless NixOS hosts — e.g. `mimir` — follow the same pattern.)
 
 ## Hyprland setup
 
 Added as a clean, modular layer that coexists with oxwm without affecting it.
 
-**`modules/system/hyprland.nix`** (reusable, imported by mjolnir and bifrost): enables
+**`modules/system/hyprland.nix`** (reusable, currently imported by mjolnir): enables
 `programs.hyprland` with the pinned `v0.55.0` package + portal, `programs.hyprlock` + its
 PAM service, the `hyprland.cachix.org` substituter, and exposes the `hyprexpo` plugin `.so`
 path as `$HYPREXPO_PLUGIN`.
@@ -171,8 +169,6 @@ Session behaviour:
 - **mjolnir** — oxwm (default) and Hyprland are both `ly` sessions; cycle the session field
   at the login screen. Hyprland uses NVIDIA env vars + hardware cursors; `hyprexpo`
   workspace overview on `Super+\``.
-- **bifrost** — Hyprland-only; autostarts `wayvnc` (reachable on `:5900` over Tailscale, and
-  LAN). Software-rendered (llvmpipe), so blur/animation are the perf dial.
 
 Hyprland userland (per-host home module): `waybar awww mako hypridle cliphist wl-clipboard
 grim slurp swappy` (+ `rofi` from shared `programs.nix`, `hyprlock` from the system module).
@@ -219,7 +215,9 @@ behaviour because `home.stateVersion` is < `26.05`. Silence with
 
 ## Conventions
 
-- **Naming:** Norse-themed (`mjolnir`, `bifrost`); `nix-` prefix for service VMs.
+- **Naming:** Norse-themed (`mjolnir`); `nix-` prefix for service VMs. The wider homelab
+  shares the theme — the Arista core switch is `bifrost`, the Proxmox host `hella`, the
+  NAS `odyn`, the AI box `mimir` (see the README network section).
 - **Hyprland version** pinned to `v0.55.0` via the flake; don't make it follow `nixpkgs`
   (that loses the cachix binary cache and risks Mesa/EGL mismatches).
 - **Headless hosts** cherry-pick shared modules; only `mjolnir` uses the
