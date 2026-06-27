@@ -95,22 +95,6 @@
             middlewares = [ "lan-only" ];
           };
 
-          openwebui = {
-            rule = "Host(`openwebui.oryxserver.org`)";
-            service = "openwebui";
-            entryPoints = [ "websecure" ];
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
-          comfyui = {
-            rule = "Host(`comfyui.oryxserver.org`)";
-            service = "comfyui";
-            entryPoints = [ "websecure" ];
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
           crafty = {
             rule = "Host(`crafty.oryxserver.org`)";
             service = "crafty";
@@ -181,25 +165,9 @@
           truenas = {
             loadBalancer = {
               servers = [
-                { url = "https://10.0.0.6"; }
+                { url = "https://10.0.20.6"; }
               ];
               serversTransport = "insecure";
-            };
-          };
-
-          openwebui = {
-            loadBalancer = {
-              servers = [
-                { url = "http://10.0.0.15:3000"; }
-              ];
-            };
-          };
-
-          comfyui = {
-            loadBalancer = {
-              servers = [
-                { url = "http://10.0.0.15:8188"; }
-              ];
             };
           };
 
@@ -260,7 +228,7 @@
         middlewares = {
           lan-only = {
             ipAllowList.sourceRange = [
-              "10.0.0.0/24"
+              "10.0.20.0/24"
               "100.64.0.0/10"
               "127.0.0.1/32"
             ];

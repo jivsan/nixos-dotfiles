@@ -1,10 +1,10 @@
 # modules/scrutiny.nix
 #
 # Scrutiny hub deployment (web UI + InfluxDB) on NixOS via podman.
-# The collector runs separately on TrueNAS (10.0.0.6) and pushes
+# The collector runs separately on TrueNAS (10.0.20.6) and pushes
 # SMART data to this host on port 8080.
 #
-# Web UI:  http://10.0.0.17:8080
+# Web UI:  http://10.0.20.17:8080
 
 { config, pkgs, lib, ... }:
 
@@ -105,7 +105,7 @@ in
   };
 
   ############################################################
-  # Firewall — allow the TrueNAS collector at 10.0.0.6
+  # Firewall — allow the TrueNAS collector at 10.0.20.6
   ############################################################
   networking.firewall.allowedTCPPorts = [ 8080 ];
 }

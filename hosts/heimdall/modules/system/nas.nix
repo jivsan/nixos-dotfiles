@@ -17,55 +17,55 @@ in
 {
   # ── Immich ──
   fileSystems."/mnt/nas/immich-upload" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/immich/upload";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/immich/upload";
     fsType = "nfs";
     options = commonOpts;
   };
   # ── Nextcloud ──
   fileSystems."/mnt/nas/nextcloud" = {
-    device = "10.0.0.6:/mnt/vault/nextcloud";
+    device = "10.0.20.6:/mnt/vault/nextcloud";
     fsType = "nfs";
     options = commonOpts ++ [ "ro" ];
   };
   fileSystems."/mnt/nas/nextcloud-app" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/nextcloud/app";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/nextcloud/app";
     fsType = "nfs";
     options = commonOpts;
   };
   fileSystems."/mnt/nas/nextcloud-data" = {
-    device = "10.0.0.6:/mnt/vault/nextcloud";
+    device = "10.0.20.6:/mnt/vault/nextcloud";
     fsType = "nfs";
     options = commonOpts;
   };
   # ── Crafty ──
   fileSystems."/mnt/nas/crafty-config" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/crafty/config";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/config";
     fsType = "nfs";
     options = commonOpts;
   };
   fileSystems."/mnt/nas/crafty-backups" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/crafty/backups";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/backups";
     fsType = "nfs";
     options = commonOpts;
   };
   fileSystems."/mnt/nas/crafty-logs" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/crafty/logs";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/logs";
     fsType = "nfs";
     options = commonOpts;
   };
   fileSystems."/mnt/nas/crafty-import" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/crafty/import";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/import";
     fsType = "nfs";
     options = commonOpts;
   };
   fileSystems."/mnt/nas/crafty-servers" = {
-    device = "10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/crafty/servers";
+    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/servers";
     fsType = "nfs";
     options = commonOpts;
   };
   # ── nix-services shared app storage ──
   fileSystems."/mnt/nas/nix-services" = {
-    device = "10.0.0.6:/mnt/vault/nix-services";
+    device = "10.0.20.6:/mnt/vault/nix-services";
     fsType = "nfs";
     options = commonOpts;
   };

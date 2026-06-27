@@ -27,7 +27,7 @@
     ./modules/system/scrutiny.nix
   ];
 
-  networking.hostName = "nix-services";
+  networking.hostName = "heimdall";
   networking.useDHCP = false;
   networking.interfaces.ens18.ipv4.addresses = [{
     address = "10.0.20.17";

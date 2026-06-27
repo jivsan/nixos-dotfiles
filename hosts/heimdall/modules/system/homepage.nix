@@ -81,40 +81,12 @@ let
             description: Minecraft server control
             ping: https://crafty.oryxserver.org
 
-    - Intelligence:
-        - Open WebUI:
-            icon: open-webui.png
-            href: https://openwebui.oryxserver.org
-            description: Local AI chat interface
-            ping: https://openwebui.oryxserver.org
-
-        - ComfyUI:
-            icon: comfyui.png
-            href: https://comfyui.oryxserver.org
-            description: Image generation workflows
-            ping: https://comfyui.oryxserver.org
-
-        - nix-oryx:
-            icon: nixos.png
-            href: https://openwebui.oryxserver.org
-            description: AI workload VM
-
-        - Model Lab:
-            icon: ollama.png
-            href: https://openwebui.oryxserver.org
-            description: LLM experiments
-
     - Infrastructure:
         - TrueNAS:
             icon: truenas.png
             href: https://truenas.oryxserver.org
             description: Storage, datasets, NFS
             ping: https://truenas.oryxserver.org
-
-        - Proxmox Thor:
-            icon: proxmox.png
-            href: https://thor.oryxserver.org:8006
-            description: Proxmox node thor
 
         - Proxmox Hella:
             icon: proxmox.png
@@ -123,12 +95,12 @@ let
 
         - pfSense:
             icon: pfsense.png
-            href: https://10.0.0.1
+            href: https://10.0.20.1
             description: Firewall and routing
 
         - Pi-hole:
             icon: pi-hole.png
-            href: http://10.0.0.4/admin
+            href: http://10.0.20.4/admin
             description: DNS and ad blocking
 
     - Operations:
@@ -162,7 +134,7 @@ let
           hour12: false
 
     - resources:
-        label: nix-services
+        label: heimdall
         cpu: true
         memory: true
         disk: /
@@ -175,12 +147,9 @@ let
 
   bookmarksYaml = pkgs.writeText "homepage-bookmarks.yaml" ''
     - Quick Ops:
-        - nix-services SSH:
+        - heimdall SSH:
             - icon: terminal.png
-              href: ssh://christina@10.0.0.17
-        - nix-oryx SSH:
-            - icon: terminal.png
-              href: ssh://christina@10.0.0.15
+              href: ssh://christina@10.0.20.17
         - Tailscale Machines:
             - icon: tailscale.png
               href: https://login.tailscale.com/admin/machines

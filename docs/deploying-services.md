@@ -1,10 +1,10 @@
-# Deploying services on nix-services
+# Deploying services on heimdall
 
-How to add a new containerized service to nix-services using NixOS's `virtualisation.oci-containers` (podman). This is the same pattern used for immich, nextcloud, and crafty.
+How to add a new containerized service to heimdall using NixOS's `virtualisation.oci-containers` (podman). This is the same pattern used for immich, nextcloud, and crafty.
 
 ## Mental model
 
-Each service is a `.nix` module under `hosts/nix-services/modules/system/`. The module declares:
+Each service is a `.nix` module under `hosts/heimdall/modules/system/`. The module declares:
 
 1. The container(s) to run
 2. Volumes/mounts (NFS or local)
@@ -14,18 +14,18 @@ Each service is a `.nix` module under `hosts/nix-services/modules/system/`. The 
 6. Firewall rules
 
 Then you:
-- Add the module to `hosts/nix-services/default.nix` imports
-- Add a Traefik route in `hosts/nix-services/modules/system/traefik.nix`
+- Add the module to `hosts/heimdall/default.nix` imports
+- Add a Traefik route in `hosts/heimdall/modules/system/traefik.nix`
 - Add a Pi-hole DNS record
-- Push to GitHub, pull on nix-services, rebuild
+- Push to GitHub, pull on heimdall, rebuild
 
 That's it.
 
 ## Workflow at a glance
 
 ```
-┌─ on mjolnir ─────────────────┐    ┌─ on nix-services ────┐
-│ 1. Edit hosts/nix-services/  │    │ 5. git pull          │
+┌─ on mjolnir ─────────────────┐    ┌─ on heimdall ────────┐
+│ 1. Edit hosts/heimdall/      │    │ 5. git pull          │
 │    modules/system/myapp.nix  │    │ 6. nixos-rebuild     │
 │ 2. Add to default.nix import │ →  │ 7. verify podman ps  │
 │ 3. Add Traefik route         │    │ 8. test in browser   │
@@ -33,7 +33,7 @@ That's it.
 └──────────────────────────────┘    └──────────────────────┘
 
 In Pi-hole:
-  9. Add DNS record: myapp.oryxserver.org → 10.0.0.17
+  9. Add DNS record: myapp.oryxserver.org → 10.0.20.17
 ```
 
 ## Anatomy of a service module
@@ -41,7 +41,7 @@ In Pi-hole:
 This is a complete, working pattern — copy and adjust:
 
 ```nix
-# hosts/nix-services/modules/system/myapp.nix
+# hosts/heimdall/modules/system/myapp.nix
 { pkgs, ... }:
 let
   # Always pin to a SHA, never use :latest or :stable for production services
@@ -157,13 +157,13 @@ environmentFiles = [ "/var/lib/secrets/myapp.env" ];
 
 Copy the template from "Anatomy" above. Save as:
 ```
-hosts/nix-services/modules/system/myapp.nix
+hosts/heimdall/modules/system/myapp.nix
 ```
 
 ### 6. Register it in default.nix
 
 ```bash
-nano hosts/nix-services/default.nix
+nano hosts/heimdall/default.nix
 ```
 
 Add to the imports list:
@@ -177,7 +177,7 @@ imports = [
 ### 7. Add Traefik route (if HTTP-based)
 
 ```bash
-nano hosts/nix-services/modules/system/traefik.nix
+nano hosts/heimdall/modules/system/traefik.nix
 ```
 
 In `dynamicConfigOptions.http.routers`:
@@ -215,22 +215,22 @@ myapp.loadBalancer = {
 ```bash
 cd ~/nixos-dotfiles
 
-nix-instantiate --parse hosts/nix-services/modules/system/myapp.nix > /dev/null && echo OK
-nix-instantiate --parse hosts/nix-services/modules/system/traefik.nix > /dev/null && echo OK
+nix-instantiate --parse hosts/heimdall/modules/system/myapp.nix > /dev/null && echo OK
+nix-instantiate --parse hosts/heimdall/modules/system/traefik.nix > /dev/null && echo OK
 
 git status
-git add hosts/nix-services/
-git commit -m "nix-services: add myapp"
+git add hosts/heimdall/
+git commit -m "heimdall: add myapp"
 git push origin main
 ```
 
-### 9. Deploy on nix-services
+### 9. Deploy on heimdall
 
 ```bash
-ssh christina@10.0.0.17
+ssh christina@10.0.20.17
 cd ~/nixos-dotfiles
 git pull origin main
-sudo nixos-rebuild switch --flake .#nix-services
+sudo nixos-rebuild switch --flake .#heimdall
 ```
 
 Watch the output. New units should be listed. If you don't see `podman-myapp.service` in "starting the following units", the container didn't get registered. Run rebuild again — sometimes the second rebuild kicks things in. If still missing, check that the module is actually imported.
@@ -246,7 +246,7 @@ sudo systemctl status podman-myapp --no-pager | head -10
 ### 11. Add Pi-hole DNS
 
 In Pi-hole admin → Local DNS → DNS Records:
-- `myapp.oryxserver.org` → `10.0.0.17`
+- `myapp.oryxserver.org` → `10.0.20.17`
 
 ### 12. Test
 
@@ -254,13 +254,13 @@ In Pi-hole admin → Local DNS → DNS Records:
 
 ## Adding NFS mounts
 
-If your service needs data on odyn (10.0.0.6):
+If your service needs data on odyn (10.0.20.6):
 
-Edit `hosts/nix-services/modules/system/nas.nix`:
+Edit `hosts/heimdall/modules/system/nas.nix`:
 
 ```nix
 fileSystems."/mnt/nas/myapp-data" = {
-  device = "10.0.0.6:/mnt/vault/path/to/data";
+  device = "10.0.20.6:/mnt/vault/path/to/data";
   fsType = "nfs";
   options = commonOpts;   # or commonOpts ++ [ "ro" ] for read-only
 };
@@ -449,7 +449,7 @@ sudo systemctl restart podman-myapp
 # Hard: stop, remove, let nixos restart
 sudo systemctl stop podman-myapp
 sudo podman rm myapp
-sudo nixos-rebuild switch --flake .#nix-services
+sudo nixos-rebuild switch --flake .#heimdall
 ```
 
 ### Container can't reach another container by name
@@ -486,7 +486,7 @@ systemctl status mnt-nas-myapp-data.mount
 ls /mnt/nas/myapp-data
 ```
 
-`x-systemd.automount` makes the mount lazy — it triggers when something accesses the path. If `ls` fails, check the export is allowed for `10.0.0.0/24` in odyn.
+`x-systemd.automount` makes the mount lazy — it triggers when something accesses the path. If `ls` fails, check the export is allowed for `10.0.20.0/24` in odyn.
 
 ## Storing secrets
 
@@ -513,14 +513,14 @@ Either is a future improvement. Plain files work fine for a homelab.
 - [ ] Image pinned with SHA digest
 - [ ] Storage decision: local SSD or NFS?
 - [ ] Secrets in `/var/lib/secrets/`
-- [ ] Module in `hosts/nix-services/modules/system/<name>.nix`
+- [ ] Module in `hosts/heimdall/modules/system/<name>.nix`
 - [ ] Module imported in `default.nix`
 - [ ] Traefik route added (if HTTP)
 - [ ] Pi-hole DNS record added
 - [ ] Firewall ports opened in module
 - [ ] Parse-check passes
 - [ ] Committed and pushed to GitHub
-- [ ] Pulled and rebuilt on nix-services
+- [ ] Pulled and rebuilt on heimdall
 - [ ] `podman ps` shows container running
 - [ ] Logs look clean
 - [ ] Browser test passes
@@ -529,9 +529,9 @@ Either is a future improvement. Plain files work fine for a homelab.
 
 | Service | Module | Pattern |
 |---|---|---|
-| immich | `hosts/nix-services/modules/system/immich.nix` | Multi-container (server + db + redis) on shared network, NFS data, Traefik HTTP |
-| nextcloud | `hosts/nix-services/modules/system/nextcloud.nix` | Multi-container, NFS for app + data, Traefik HTTP with custom middleware |
-| crafty | `hosts/nix-services/modules/system/crafty.nix` | Single container, NFS data, mixed Traefik HTTPS + raw TCP/UDP ports |
-| odyn proxy | `hosts/nix-services/modules/system/traefik.nix` | No container — just a Traefik route to an external HTTPS backend |
+| immich | `hosts/heimdall/modules/system/immich.nix` | Multi-container (server + db + redis) on shared network, NFS data, Traefik HTTP |
+| nextcloud | `hosts/heimdall/modules/system/nextcloud.nix` | Multi-container, NFS for app + data, Traefik HTTP with custom middleware |
+| crafty | `hosts/heimdall/modules/system/crafty.nix` | Single container, NFS data, mixed Traefik HTTPS + raw TCP/UDP ports |
+| odyn proxy | `hosts/heimdall/modules/system/traefik.nix` | No container — just a Traefik route to an external HTTPS backend |
 
 When adding something new, find the closest match and copy from there.

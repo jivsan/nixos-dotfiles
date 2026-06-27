@@ -25,20 +25,10 @@
       {
         job_name = "node";
         static_configs = [
-          { targets = [ "localhost:9100" ];      labels = { host = "nix-services"; }; }
-          { targets = [ "10.0.0.2:9100" ];       labels = { host = "thor"; }; }
-          { targets = [ "10.0.0.3:9100" ];       labels = { host = "hella"; }; }
-          { targets = [ "10.0.0.15:9100" ];      labels = { host = "nix-oryx"; }; }
-          { targets = [ "10.0.0.6:9100" ];       labels = { host = "truenas"; }; }
+          { targets = [ "localhost:9100" ];      labels = { host = "heimdall"; }; }
+          { targets = [ "10.0.20.10:9100" ];     labels = { host = "hella"; }; }
+          { targets = [ "10.0.20.6:9100" ];      labels = { host = "truenas"; }; }
         ];
-      }
-      # === GPU metrics on nix-oryx ===
-      {
-        job_name = "gpu";
-        static_configs = [{
-          targets = [ "10.0.0.15:9835" ];
-          labels = { host = "nix-oryx"; };
-        }];
       }
       # === Postgres exporters ===
       {
@@ -58,7 +48,7 @@
       {
         job_name = "pfsense";
         static_configs = [{
-          targets = [ "10.0.0.1:9273" ];
+          targets = [ "10.0.20.1:9273" ];
           labels = {
             host = "pfsense";
             role = "firewall";

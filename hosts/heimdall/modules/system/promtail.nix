@@ -24,7 +24,7 @@
           max_age = "12h";
           labels = {
             job = "systemd-journal";
-            host = "nix-services";
+            host = "heimdall";
           };
         };
         relabel_configs = [

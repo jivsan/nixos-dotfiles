@@ -16,7 +16,7 @@ from it. Pushed to GitHub (`jivsan/nixos-dotfiles`) and a self-hosted Forgejo.
 | Host           | Role                                         | Hardware / Access                                  | Desktop |
 |----------------|----------------------------------------------|----------------------------------------------------|---------|
 | `mjolnir`      | Workstation / daily driver                   | Ryzen 9 5900X, RTX 4060 Ti                         | oxwm (X11, default) **+** Hyprland (Wayland), pick at `ly` |
-| `nix-services` | Headless self-hosted services VM (Proxmox)   | Reached over LAN / Tailscale                        | none (server) |
+| `heimdall`     | Headless self-hosted services VM (Proxmox)   | Reached over LAN / Tailscale                        | none (server) |
 
 Build any host with:
 
@@ -44,7 +44,7 @@ nixos-dotfiles/
 │   │   ├── waybar/                  # config.jsonc, style.css
 │   │   └── mako/                    # config
 │   │
-│   └── nix-services/
+│   └── heimdall/
 │       ├── default.nix              # cherry-picks shared modules (NO configuration.nix)
 │       ├── home.nix
 │       ├── hardware-configuration.nix
@@ -61,9 +61,8 @@ nixos-dotfiles/
 │   ├── alacritty/  nvim/  rofi/  qtile/     # symlinked into ~/.config via xdg.nix
 │   └── dwm/  st/  dmenu/                     # suckless C sources, built via suckless.nix
 │
-├── network/                    # homelab network — Arista EOS + pfSense (not NixOS)
-│   ├── bifrost-arista-core.cfg
-│   └── pfsense-vlan-setup.md
+├── network/                    # homelab network — Arista EOS core switch config (not NixOS)
+│   └── bifrost-arista-core.cfg
 │
 └── docs/                       # this file lives here
 ```
@@ -127,8 +126,8 @@ the suckless tools.
 
 ```nix
 nixosConfigurations = {
-  mjolnir      = mkHost ./hosts/mjolnir/default.nix      ./hosts/mjolnir/home.nix;
-  nix-services = mkHost ./hosts/nix-services/default.nix ./hosts/nix-services/home.nix;
+  mjolnir  = mkHost ./hosts/mjolnir/default.nix  ./hosts/mjolnir/home.nix;
+  heimdall = mkHost ./hosts/heimdall/default.nix ./hosts/heimdall/home.nix;
 };
 ```
 
@@ -141,7 +140,7 @@ pulls in every shared `modules/system/*`), then layers on the `modules/apps/*` b
 `tailscale.nix`, and `modules/system/hyprland.nix`. Its home file imports the shared
 `home.nix` plus the host-local Hyprland home module.
 
-**Cherry-pick (nix-services).** The headless host deliberately does **not** import
+**Cherry-pick (heimdall).** The headless host deliberately does **not** import
 `configuration.nix` (that would drag in `desktop.nix` = X11/oxwm/`ly`). Instead it imports
 just the shared system modules it needs (e.g. `boot`, `locale`, `networking`, `nix`,
 `users`, `tailscale`) and adds its own host-local modules. This keeps the server lean and
@@ -177,9 +176,9 @@ Common Hyprland keybinds: `Super+Return` terminal, `Super+D` rofi, `Super+V` cli
 history, `Super+L` lock, `Super+Escape` power menu, `Print` region screenshot, `Super+\``
 overview.
 
-## nix-services — self-hosted stack
+## heimdall — self-hosted stack
 
-Host-local service modules under `hosts/nix-services/modules/system/`:
+Host-local service modules under `hosts/heimdall/modules/system/`:
 
 ```
 acme  blackbox-exporter  crafty  grafana  homepage  immich  loki  nas  nextcloud

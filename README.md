@@ -11,7 +11,7 @@ on a VLAN-segmented homelab network behind an Arista core switch.
 | Host           | Role                                            | Desktop                                   |
 |----------------|-------------------------------------------------|-------------------------------------------|
 | `mjolnir`      | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
-| `nix-services` | Headless self-hosted services VM (Proxmox, on `hella`) | —                                  |
+| `heimdall`     | Headless self-hosted services VM (Proxmox, on `hella`) | —                                  |
 
 > These are the **NixOS** hosts in this flake. The homelab also runs non-NixOS
 > infrastructure — the Arista switch, pfSense, TrueNAS, a Pi-hole LXC — described in the
@@ -61,7 +61,7 @@ git clone https://github.com/jivsan/nixos-dotfiles ~/nixos-dotfiles
 cd ~/nixos-dotfiles
 
 # build a host
-sudo nixos-rebuild switch --flake .#mjolnir      # or #nix-services
+sudo nixos-rebuild switch --flake .#mjolnir      # or #heimdall
 
 # after changing flake inputs
 nix flake lock
@@ -94,7 +94,7 @@ the shared modules it needs. Full breakdown in [`docs/nixos-structure.md`](docs/
   selectable `ly` sessions, fully isolated; switching has no side effects.
 - **Hyprland in Lua** (0.55), frosted-glass Tokyo Night theme, live-editable configs via
   out-of-store symlinks (edit → hot-reload, no rebuild).
-- **Self-hosted stack** on `nix-services` — Immich, Nextcloud, Paperless, Crafty, behind
+- **Self-hosted stack** on `heimdall` — Immich, Nextcloud, Paperless, Crafty, behind
   Traefik with a Prometheus/Loki/Grafana monitoring setup.
 - **VLAN-segmented network** behind the `bifrost` Arista core — trusted / storage / IoT
   separation, pfSense router-on-a-stick, Pi-hole DNS, IoT firewalled off the trusted side.
@@ -104,6 +104,5 @@ the shared modules it needs. Full breakdown in [`docs/nixos-structure.md`](docs/
 
 - [`docs/nixos-structure.md`](docs/nixos-structure.md) — repository structure & how hosts are assembled
 - [`docs/deploying-services.md`](docs/deploying-services.md) — adding/deploying self-hosted services
-- [`docs/nix-services-docs.md`](docs/nix-services-docs.md) — the services VM in detail
+- [`docs/heimdall-docs.md`](docs/heimdall-docs.md) — the services VM in detail
 - [`network/bifrost-arista-core.cfg`](network/bifrost-arista-core.cfg) — Arista EOS core switch config
-- [`network/pfsense-vlan-setup.md`](network/pfsense-vlan-setup.md) — pfSense VLAN + firewall runbook

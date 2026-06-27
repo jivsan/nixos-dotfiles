@@ -1,14 +1,19 @@
-# nix-services
+# heimdall
 
 Homelab services VM — the home for stateful self-hosted services, replacing the old Talos
 k8s cluster. Runs on Proxmox host `hella` (the remaining Proxmox node since `thor` was
 decommissioned). Storage lives on `odyn`, the TrueNAS box.
 
+> Renamed from `nix-services` during a clean rebuild — the old VM's network stack was
+> corrupted by a VLAN re-IP and was unrecoverable. Same role, same static IP, same NFS
+> data (the data lives on odyn, so nothing was lost). See
+> [`build-notes/HEIMDALL-BUILD.md`](build-notes/HEIMDALL-BUILD.md) for the build/handoff brief.
+
 ## Specs
 
-- **Hostname:** `nix-services`
+- **Hostname:** `heimdall`
 - **Host:** Proxmox node `hella`
-- **IP:** `10.0.0.17` (static reservation in pfSense)
+- **IP:** `10.0.20.17` (static, baked into the NixOS config; outside the VLAN 20 DHCP pool)
 - **Resources:** 6 vCPU / 16 GB RAM (likely over-provisioned for current load — could trim)
 - **OS:** NixOS 26.05 (flake-managed; `stateVersion = "25.11"`)
 - **Workloads:** mix of native NixOS services (Traefik, Grafana, Prometheus, Loki) and
@@ -16,15 +21,19 @@ decommissioned). Storage lives on `odyn`, the TrueNAS box.
 
 ## Storage — odyn (TrueNAS)
 
-All persistent data is on `odyn` at `10.0.0.6`, ZFS pool `vault`, mounted over NFS. See
-`hosts/nix-services/modules/system/nas.nix`. Key mounts:
+All persistent data is on `odyn` at `10.0.20.6`, ZFS pool `vault`, mounted over NFS. See
+`hosts/heimdall/modules/system/nas.nix`. Key mounts:
 
 ```
-10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/immich/upload   → Immich photos
-10.0.0.6:/mnt/vault/nextcloud                          → Nextcloud files
-10.0.0.6:/mnt/vault/nfs-pvc-kubernetes/crafty/*        → Crafty config/backups/servers/…
-10.0.0.6:/mnt/vault/nix-services                       → service data
+10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/immich/upload   → Immich photos
+10.0.20.6:/mnt/vault/nextcloud                          → Nextcloud files
+10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/*        → Crafty config/backups/servers/…
+10.0.20.6:/mnt/vault/nix-services                       → service data (dataset kept its old name)
 ```
+
+> The `/mnt/vault/nix-services` dataset on odyn keeps its original name even though the host
+> is now `heimdall` — renaming the host doesn't rename the NFS export. Local mount stays
+> `/mnt/nas/nix-services` (grafana backups + paperless base live under it).
 
 ## Services running
 
@@ -46,18 +55,18 @@ Exact subdomains live in that file — the pattern is `<service>.oryxserver.org`
 | blackbox-exporter | native | HTTPS probes |
 | Nexterm | podman | SSH/remote-access manager |
 | Scrutiny | native | drive health (collector runs on odyn, pushes here) |
-| Odyn UI proxy | route | `https://truenas.oryxserver.org` → `https://10.0.0.6` (insecure transport) |
+| Odyn UI proxy | route | `https://truenas.oryxserver.org` → `https://10.0.20.6` (insecure transport) |
 
 ## Architecture
 
 ```
              ┌─────────────────────────────────┐
              │ Pi-hole DNS                     │
-             │ *.oryxserver.org → 10.0.0.17    │
+             │ *.oryxserver.org → 10.0.20.17   │
              └───────────────┬─────────────────┘
                              │
              ┌───────────────▼─────────────────┐
-             │ nix-services (10.0.0.17, on hella)
+             │ heimdall (10.0.20.17, on hella) │
              │ ┌─────────────────────────────┐ │
              │ │ Traefik :80 → :443 redirect │ │
              │ │   wildcard *.oryxserver.org │ │
@@ -70,7 +79,7 @@ Exact subdomains live in that file — the pattern is `<service>.oryxserver.org`
              └───────────────┬─────────────────┘
                              │ NFS (RO/RW)
              ┌───────────────▼─────────────────┐
-             │ odyn — TrueNAS (10.0.0.6)       │
+             │ odyn — TrueNAS (10.0.20.6)      │
              │ pool "vault"                    │
              │ /mnt/vault/nextcloud            │
              │ /mnt/vault/nfs-pvc-kubernetes/  │
@@ -80,7 +89,7 @@ Exact subdomains live in that file — the pattern is `<service>.oryxserver.org`
 ## Module layout
 
 ```
-hosts/nix-services/
+hosts/heimdall/
 ├── default.nix                     # cherry-picks shared modules + the service modules
 ├── hardware-configuration.nix
 ├── home.nix                        # minimal
@@ -123,16 +132,20 @@ Cert at `/var/lib/acme/oryxserver.org/`. Auto-renews via systemd timer.
 
 1. Write a Nix module if it's a container.
 2. Add a Traefik router + service in `traefik.nix`.
-3. Add a Pi-hole DNS entry: `<service>.oryxserver.org` → `10.0.0.17`.
+3. Add a Pi-hole DNS entry: `<service>.oryxserver.org` → `10.0.20.17`.
 4. Push, pull on the host, rebuild.
+
+See [`deploying-services.md`](deploying-services.md) for the full walkthrough.
 
 ## Migration history
 
 ### Immich (from k8s, 2026-04-29)
 - pgvecto-rs Postgres + Redis + immich-server; 7,337 assets restored from `pg_dump`.
 - Photos on odyn NFS at `/mnt/vault/nfs-pvc-kubernetes/immich/upload`.
-- ⚠️ **ML backend was on `nix-oryx` (10.0.0.15) — now decommissioned.** Immich ML needs
-  re-pointing (run locally on nix-services, or disable smart-search) since that host is gone.
+- ⚠️ **ML backend was on `nix-oryx` (`10.0.0.15`) — now decommissioned.** The
+  `IMMICH_MACHINE_LEARNING_URL` is commented out in `immich.nix`, so smart search / face
+  detection are off until ML is re-hosted on the new NixOS AI box (to be configured from
+  mjolnir, like heimdall) and re-pointed.
 
 ### Nextcloud (from k8s, 2026-04-29)
 - postgres:16-alpine + redis:alpine + nextcloud:stable; 137 tables restored from `pg_dump`.
@@ -143,9 +156,9 @@ Cert at `/var/lib/acme/oryxserver.org/`. Auto-renews via systemd timer.
 
 ```bash
 # pull + apply
-ssh christina@10.0.0.17
+ssh christina@10.0.20.17
 cd ~/nixos-dotfiles && git pull origin main
-sudo nixos-rebuild switch --flake .#nix-services
+sudo nixos-rebuild switch --flake .#heimdall
 
 # restart one container
 sudo systemctl restart podman-<container-name>
@@ -173,13 +186,19 @@ sudo systemctl start acme-order-renew-oryxserver.org.service
 - **Odyn backend has a self-signed cert:** Traefik needs
   `serversTransports.insecure.insecureSkipVerify = true` to accept it.
 - **Nextcloud `trusted_domains`:** reachable via `https://nextcloud.oryxserver.org` only;
-  `http://10.0.0.17:8081` is rejected.
+  `http://10.0.20.17:8081` is rejected.
 
-## Decommissioned dependencies to clean up
+## Decommissioned dependencies (cleaned up in the heimdall rebuild)
 
-Since `thor` (Proxmox node) and `nix-oryx` (its AI VM) are gone, these references are dead:
+`thor` (Proxmox node) and `nix-oryx` (its AI VM, `10.0.0.15`) are gone. Their references were
+removed during the rename:
 
-- `prometheus.nix` — scrape targets `10.0.0.2` (thor) and `10.0.0.15` (nix-oryx) + the GPU
-  metrics block will show as down; remove them.
-- `homepage.nix` — the "Proxmox Thor" and "nix-oryx" tiles point at dead hosts.
-- `immich.nix` — the ML backend comment/endpoint references nix-oryx.
+- `prometheus.nix` — dropped the `thor` (`10.0.0.2`) and `nix-oryx` (`10.0.0.15`) node
+  targets and the GPU-metrics job.
+- `homepage.nix` — removed the `Intelligence` section (Open WebUI / ComfyUI / nix-oryx /
+  Model Lab tiles) and the `Proxmox Thor` tile.
+- `traefik.nix` — removed the `openwebui` and `comfyui` routers + services.
+- `immich.nix` — ML URL commented out (see Migration history above).
+
+These AI workloads are slated to return on a new NixOS **AI box**, configured from mjolnir
+the same way heimdall is.

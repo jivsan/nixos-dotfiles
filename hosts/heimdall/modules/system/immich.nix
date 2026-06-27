@@ -5,8 +5,10 @@ let
   pgvectorImage = "tensorchord/pgvecto-rs@sha256:36218719c673b38adc1d4034b3666bae780bfffb17a250973b6108a9f11cd5d4";
   redisImage = "redis:alpine";
 
-  # ML lives on nix-oryx (P100 + 1070)
-  mlUrl = "http://10.0.0.15:3003";
+  # ML backend was on nix-oryx (now decommissioned). To be re-hosted on the new
+  # NixOS AI box (configured from mjolnir, like heimdall) and re-pointed here.
+  # Smart search / face detection stay off until then.
+  # mlUrl = "http://<ai-box>:3003";
 
   # Path containers will see for uploads (immich expects /usr/src/app/upload)
   uploadHostPath = "/mnt/nas/immich-upload";
@@ -74,7 +76,7 @@ in
         DB_DATABASE_NAME = "immich";
         DB_USERNAME = "immich";
         REDIS_HOSTNAME = "immich-redis";
-        IMMICH_MACHINE_LEARNING_URL = mlUrl;
+        # IMMICH_MACHINE_LEARNING_URL = mlUrl;   # re-enable once the AI box is up
 
         # Suppress upgrade nag if version drifts later
         IMMICH_VERSION_CHECK = "false";

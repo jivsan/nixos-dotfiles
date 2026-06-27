@@ -73,8 +73,8 @@
         ];
       };
       nixosConfigurations = {
-        mjolnir      = mkHost ./hosts/mjolnir/default.nix      ./hosts/mjolnir/home.nix;
-        nix-services = mkHost ./hosts/nix-services/default.nix ./hosts/nix-services/home.nix;
+        mjolnir  = mkHost ./hosts/mjolnir/default.nix  ./hosts/mjolnir/home.nix;
+        heimdall = mkHost ./hosts/heimdall/default.nix ./hosts/heimdall/home.nix;
       };
     };
 }
