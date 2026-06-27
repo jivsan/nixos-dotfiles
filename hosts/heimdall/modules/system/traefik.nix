@@ -44,13 +44,13 @@
     dynamicConfigOptions = {
       tls = {
         stores.default.defaultCertificate = {
-          certFile = "/var/lib/acme/oryxserver.org/cert.pem";
+          certFile = "/var/lib/acme/oryxserver.org/fullchain.pem";
           keyFile = "/var/lib/acme/oryxserver.org/key.pem";
         };
 
         certificates = [
           {
-            certFile = "/var/lib/acme/oryxserver.org/cert.pem";
+            certFile = "/var/lib/acme/oryxserver.org/fullchain.pem";
             keyFile = "/var/lib/acme/oryxserver.org/key.pem";
             stores = [ "default" ];
           }
