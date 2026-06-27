@@ -3,13 +3,12 @@
   imports = [
     ./hardware-configuration.nix
 
-    # Shared modules from your existing setup
     ../../modules/system/boot.nix
     ../../modules/system/locale.nix
     ../../modules/system/nix.nix
     ../../modules/system/users.nix
     ../../modules/system/tailscale.nix
-    
+
     ./modules/system/acme.nix
     ./modules/system/traefik.nix
     ./modules/system/nas.nix
@@ -20,7 +19,7 @@
     ./modules/system/paperless.nix
     ./modules/system/grafana.nix
     ./modules/system/prometheus.nix
-    ./modules/system/loki.nix  
+    ./modules/system/loki.nix
 #   ./modules/system/promtail.nix
     ./modules/system/postgres-exporter.nix
     ./modules/system/blackbox-exporter.nix
@@ -30,7 +29,12 @@
 
   networking.hostName = "nix-services";
   networking.useDHCP = false;
-  networking.interfaces.ens18.useDHCP = true;
+  networking.interfaces.ens18.ipv4.addresses = [{
+    address = "10.0.20.17";
+    prefixLength = 24;
+  }];
+  networking.defaultGateway = "10.0.20.1";
+  networking.nameservers = [ "10.0.20.4" ];   # Pi-hole — so *.oryxserver.org local records resolve
   networking.firewall.enable = true;
 
   services.openssh = {
