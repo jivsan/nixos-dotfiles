@@ -42,6 +42,7 @@ let
           path: /etc/grafana/provisioning/dashboards-json
     EOF
     cp ${./switch-dashboard.json} $out/dashboards-json/switch.json
+    cp ${./pfsense-geomap-dashboard.json} $out/dashboards-json/pfsense-geomap.json
   '';
 in
 {

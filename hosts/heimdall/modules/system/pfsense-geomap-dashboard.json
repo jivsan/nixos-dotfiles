@@ -1,0 +1,126 @@
+{
+  "uid": "pfsense-geomap",
+  "title": "pfSense — blocked inbound traffic map",
+  "tags": ["network", "pfsense", "firewall", "geoip"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "geomap",
+      "title": "Blocked inbound sources",
+      "datasource": { "type": "influxdb", "uid": "influxdb" },
+      "gridPos": { "h": 18, "w": 18, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-YlRd" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "view": { "id": "zero", "lat": 20, "lon": 0, "zoom": 2 },
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showScale": false,
+          "showMeasure": false,
+          "showDebug": false
+        },
+        "basemap": { "type": "default", "name": "Layer 0", "config": {} },
+        "tooltip": { "mode": "details" },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Blocked sources",
+            "location": {
+              "mode": "coords",
+              "latitude": "latitude",
+              "longitude": "longitude"
+            },
+            "config": {
+              "style": {
+                "size": { "field": "count", "fixed": 5, "min": 4, "max": 30 },
+                "color": { "field": "count", "fixed": "dark-red" },
+                "opacity": 0.6,
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/circle.svg" },
+                "textConfig": { "fontSize": 12, "textAlign": "center", "textBaseline": "middle" }
+              },
+              "showLegend": true
+            },
+            "tooltip": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "influxdb", "uid": "influxdb" },
+          "query": "SELECT sum(\"count\") AS \"count\", last(\"latitude\") AS \"latitude\", last(\"longitude\") AS \"longitude\" FROM \"fw_geo\" WHERE $timeFilter GROUP BY \"city\", \"country\"",
+          "rawQuery": true,
+          "resultFormat": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total blocked (window)",
+      "datasource": { "type": "influxdb", "uid": "influxdb" },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "orientation": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "influxdb", "uid": "influxdb" },
+          "query": "SELECT sum(\"count\") FROM \"fw_geo\" WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "rawQuery": true,
+          "resultFormat": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Top blocked sources",
+      "datasource": { "type": "influxdb", "uid": "influxdb" },
+      "gridPos": { "h": 12, "w": 6, "x": 18, "y": 6 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "blocks", "desc": true }]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "influxdb", "uid": "influxdb" },
+          "query": "SELECT sum(\"count\") AS \"blocks\" FROM \"fw_geo\" WHERE $timeFilter GROUP BY \"country\", \"city\"",
+          "rawQuery": true,
+          "resultFormat": "table"
+        }
+      ]
+    }
+  ]
+}
