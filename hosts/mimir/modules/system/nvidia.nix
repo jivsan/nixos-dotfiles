@@ -9,7 +9,9 @@
 
   hardware.nvidia = {
     modesetting.enable = true;
-    open = true;            # open kernel modules (Turing/RTX 20-series+). Set false for older GPUs.
+    open = false;           # proprietary modules. GTX 1070 is Pascal — the OPEN modules only
+                            # support Turing (RTX 20-series)+ and never bind on Pascal. Set true
+                            # only once this box gets a Turing-or-newer GPU.
     nvidiaSettings = false; # headless — no settings GUI
     package = config.boot.kernelPackages.nvidiaPackages.stable;
   };
