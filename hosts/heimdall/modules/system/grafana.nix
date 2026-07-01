@@ -20,6 +20,15 @@ let
         url: http://host.containers.internal:3100
         uid: loki
         editable: false
+      - name: InfluxDB
+        type: influxdb
+        access: proxy
+        url: http://host.containers.internal:8086
+        database: pfsense
+        uid: influxdb
+        isDefault: false
+        jsonData:
+          timeInterval: "10s"
     EOF
     cat > $out/dashboards/dashboards.yaml <<'EOF'
     apiVersion: 1
