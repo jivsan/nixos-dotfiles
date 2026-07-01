@@ -47,7 +47,8 @@ trusted gear from IoT, with a private storage VLAN that never touches the router
 | Et1   | pfSense                      | trunk (native 20, +50 tagged) |
 | Et2–3 | `hella` (Proxmox)            | LACP `Po1`, trunk 20+50       |
 | Et4–5 | `odyn` (TrueNAS)             | LACP `Po2`, trunk 20+30       |
-| Et6–7 | `mimir` (NixOS AI)           | LACP `Po3`, trunk 20+30       |
+| Et6   | `mimir` (NixOS AI)           | access, VLAN 20 (single 10G)  |
+| Et7   | *spare* (future mimir 2nd NIC) | shutdown                    |
 | Et8   | `mjolnir`                    | access, VLAN 20 (10G)         |
 | Et9   | TP-Link (IoT/Wi-Fi switch)   | access, VLAN 50               |
 | Et10  | `hella` onboard (management) | access, VLAN 20               |
