@@ -3,7 +3,7 @@ let
   grafanaBackupDir = "/mnt/nas/nix-services/grafana-backups";
 
   grafanaProvisioning = pkgs.runCommand "grafana-provisioning" {} ''
-    mkdir -p $out/datasources $out/dashboards
+    mkdir -p $out/datasources $out/dashboards $out/dashboards-json
     cat > $out/datasources/datasources.yaml <<'EOF'
     apiVersion: 1
     datasources:
@@ -21,6 +21,18 @@ let
         uid: loki
         editable: false
     EOF
+    cat > $out/dashboards/dashboards.yaml <<'EOF'
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /etc/grafana/provisioning/dashboards-json
+    EOF
+    cp ${./switch-dashboard.json} $out/dashboards-json/switch.json
   '';
 in
 {

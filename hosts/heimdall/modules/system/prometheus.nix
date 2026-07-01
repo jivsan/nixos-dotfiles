@@ -55,6 +55,17 @@
           };
         }];
       }
+      # === Arista switch (bifrost) via local Telegraf SNMP poller ===
+      {
+        job_name = "switch";
+        static_configs = [{
+          targets = [ "127.0.0.1:9274" ];
+          labels = {
+            host = "bifrost";
+            role = "switch";
+          };
+        }];
+      }
       # === Blackbox: HTTPS endpoint health ===
       {
         job_name = "blackbox-https";
