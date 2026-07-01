@@ -21,6 +21,7 @@
     ./modules/system/prometheus.nix
     ./modules/system/switch-snmp.nix
     ./modules/system/influxdb.nix
+    ./modules/system/pfsense-geoip.nix
     ./modules/system/loki.nix
 #   ./modules/system/promtail.nix
     ./modules/system/postgres-exporter.nix
