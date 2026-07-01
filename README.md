@@ -12,6 +12,7 @@ on a VLAN-segmented homelab network behind an Arista core switch.
 |----------------|-------------------------------------------------|-------------------------------------------|
 | `mjolnir`      | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
 | `heimdall`     | Headless self-hosted services VM (Proxmox, on `hella`) | —                                  |
+| `mimir`        | Headless AI box (5950X, RTX 3090) — Ollama, Open-WebUI, ComfyUI, Immich-ML (VLAN 20, 10.0.20.18) | — |
 
 > These are the **NixOS** hosts in this flake. The homelab also runs non-NixOS
 > infrastructure — the Arista switch, pfSense, TrueNAS, a Pi-hole LXC — described in the
