@@ -7,11 +7,12 @@
     ../../modules/system/boot.nix
     ../../modules/system/locale.nix
     ../../modules/system/nix.nix
-    ../../modules/system/users.nix       # christina + SSH key + passwordless sudo
+    ../../modules/system/users.nix       # christina + SSH key
     ../../modules/system/tailscale.nix
 
     # ── mimir-local: AI / GPU stack ──
     ./modules/system/nvidia.nix
+    ./modules/system/storage.nix
     ./modules/system/immich-ml.nix
     ./modules/system/ollama.nix
     ./modules/system/open-webui.nix
