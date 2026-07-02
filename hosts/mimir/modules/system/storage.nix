@@ -17,6 +17,8 @@
   boot.zfs.extraPools = [ "scratch" ];
   # boot.zfs.extraPools = [ "scratch" "brunnr" ];   # ← when the SAS mirror exists
 
+  boot.kernelParams = [ "zfs.zfs_arc_max=8589934592" ];
+
   # ── housekeeping ──────────────────────────────────────────────────────
   services.zfs.trim.enable = true;      # periodic TRIM (SSD stripe)
   services.zfs.autoScrub = {
