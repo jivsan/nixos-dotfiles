@@ -10,10 +10,17 @@
   hardware.nvidia = {
     modesetting.enable = true;
     open = false;           # proprietary modules. GTX 1070 is Pascal — the OPEN modules only
-                            # support Turing (RTX 20-series)+ and never bind on Pascal. Set true
-                            # only once this box gets a Turing-or-newer GPU.
+                            # support Turing (RTX 20-series)+ and never bind on Pascal.
+                            # Flip to true when the 3090 goes in (open modules are the
+                            # mainline path for Ampere on the 59x drivers).
     nvidiaSettings = false; # headless — no settings GUI
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+
+    # ── STOPGAP: GTX 1070 (Pascal) ────────────────────────────────────────
+    # NVIDIA dropped Maxwell/Pascal/Volta after the 580 branch, so
+    # nvidiaPackages.stable (595.x) ignores the card ("No NVIDIA GPU found").
+    # TODO: revert to `stable` when the RTX 3090 arrives.
+    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
+    # package = config.boot.kernelPackages.nvidiaPackages.stable;   # ← 3090
   };
 
   # Userspace GL/compute libraries (CUDA + containers need these)
