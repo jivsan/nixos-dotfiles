@@ -29,6 +29,7 @@
     ./modules/system/nexterm.nix
     ./modules/system/scrutiny.nix
     ./modules/system/obsidian.nix
+    ./modules/system/huginn.nix
   ];
 
   networking.hostName = "heimdall";
