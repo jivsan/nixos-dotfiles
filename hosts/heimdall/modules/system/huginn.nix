@@ -46,7 +46,7 @@ let
   # Graphify: install the tool + its Claude Code skill into the agent HOME.
   graphifySetup = pkgs.writeShellApplication {
     name = "huginn-graphify-setup";
-    runtimeInputs = [ pkgs.uv pkgs.python312 pkgs.git pkgs.coreutils ];
+    runtimeInputs = [ pkgs.uv pkgs.git pkgs.coreutils ];
     text = ''
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
@@ -60,7 +60,7 @@ let
   # Graphify: rebuild the knowledge graph from the vault via the /graphify skill.
   graphifyBuild = pkgs.writeShellApplication {
     name = "huginn-graphify-build";
-    runtimeInputs = [ pkgs.claude-code pkgs.uv pkgs.python312 pkgs.git pkgs.coreutils ];
+    runtimeInputs = [ pkgs.claude-code pkgs.uv pkgs.git pkgs.coreutils ];
     text = ''
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
@@ -122,7 +122,7 @@ in
   # claude-code is unfree; allow just it — heimdall otherwise stays fully free.
   nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "claude-code" ];
 
-  environment.systemPackages = [ pkgs.claude-code pkgs.uv pkgs.python312 ];
+  environment.systemPackages = [ pkgs.claude-code pkgs.uv ];
 
   # graphify's tree-sitter wheels are prebuilt binaries → need the ld shim on NixOS.
   programs.nix-ld.enable = true;
