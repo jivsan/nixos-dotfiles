@@ -26,6 +26,7 @@
     ../../modules/apps/remote-desktop.nix
     ../../modules/system/tailscale.nix
     ../../modules/system/hyprland.nix      # Hyprland session (additive; oxwm untouched)
+    ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture` (terminal ↔ knowledge base)
   ];
 
   networking.hostName = "mjolnir";
