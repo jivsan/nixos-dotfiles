@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>muninn // brain</title>
+<style>
+  :root { --pink:#ff4fa3; --cyan:#2de2e6; --bg:#05060f; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); overflow:hidden;
+    font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace; color:#cdd6f4; }
+  #graph { position:fixed; inset:0; }
+  #hud { position:fixed; top:18px; left:18px; width:340px; max-height:calc(100vh - 36px);
+    display:flex; flex-direction:column; gap:12px; pointer-events:none; z-index:10; }
+  .card { background:rgba(10,12,24,.72); border:1px solid rgba(45,226,230,.18);
+    border-radius:14px; padding:14px 16px; backdrop-filter:blur(8px);
+    box-shadow:0 0 40px rgba(255,79,163,.08); pointer-events:auto; }
+  h1 { margin:0; font-size:20px; letter-spacing:.5px;
+    background:linear-gradient(90deg,var(--pink),var(--cyan)); -webkit-background-clip:text;
+    background-clip:text; color:transparent; }
+  .sub { font-size:11px; color:#7a86b6; margin-top:2px; }
+  .stats { display:flex; gap:18px; margin-top:10px; }
+  .stat b { font-size:22px; color:#fff; } .stat span { font-size:10px; color:#7a86b6; display:block; }
+  .status { display:flex; align-items:center; gap:8px; font-size:11px; color:#9aa5d6; margin-top:10px; }
+  .pulse { width:9px; height:9px; border-radius:50%; background:var(--cyan);
+    box-shadow:0 0 0 var(--cyan); animation:p 1.8s infinite; }
+  @keyframes p { 0%{box-shadow:0 0 0 0 rgba(45,226,230,.5)} 70%{box-shadow:0 0 0 10px rgba(45,226,230,0)} 100%{box-shadow:0 0 0 0 rgba(45,226,230,0)} }
+  #feed { overflow-y:auto; font-size:11.5px; line-height:1.5; }
+  #feed::-webkit-scrollbar{ width:6px } #feed::-webkit-scrollbar-thumb{ background:rgba(255,79,163,.3); border-radius:3px }
+  .li { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); animation:fade .5s ease; word-break:break-word; }
+  @keyframes fade { from{opacity:0; transform:translateX(-6px)} to{opacity:1} }
+  .job { color:var(--pink); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .sep { margin:10px 0 4px; font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--cyan); }
+  .legend { font-size:10px; color:#7a86b6; margin-top:8px; display:flex; flex-wrap:wrap; gap:8px 12px; }
+  .legend i { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle; }
+</style>
+<script src="//unpkg.com/3d-force-graph"></script>
+</head>
+<body>
+<div id="graph"></div>
+<div id="hud">
+  <div class="card">
+    <h1>muninn // brain</h1>
+    <div class="sub">agentic OS · live knowledge graph</div>
+    <div class="stats">
+      <div class="stat"><b id="c-notes">–</b><span>notes</span></div>
+      <div class="stat"><b id="c-links">–</b><span>links</span></div>
+    </div>
+    <div class="status"><span class="pulse"></span> huginn online · updated <span id="stamp">–</span></div>
+    <div class="legend">
+      <span><i style="background:#ff4fa3"></i>MOC</span>
+      <span><i style="background:#2de2e6"></i>inbox</span>
+      <span><i style="background:#39d0ff"></i>journal</span>
+      <span><i style="background:#8a7dff"></i>resources</span>
+      <span><i style="background:#5ad1a0"></i>areas</span>
+      <span><i style="background:#ffffff"></i>fresh (24h)</span>
+    </div>
+  </div>
+  <div class="card" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+    <div class="sep" style="margin-top:0">agent activity</div>
+    <div id="feed">connecting…</div>
+  </div>
+</div>
+<script>
+  const FOLDER = { MOCs:'#ff4fa3', root:'#ff8ac4', _inbox:'#2de2e6', journal:'#39d0ff', Resources:'#8a7dff', Areas:'#5ad1a0' };
+  const colorFor = n => n.recent ? '#ffffff' : (FOLDER[n.folder] || '#7f8cff');
+  const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  const Graph = ForceGraph3D()(document.getElementById('graph'))
+    .backgroundColor('#05060f')
+    .showNavInfo(false)
+    .nodeLabel(n => `${n.id}  ·  ${n.folder}`)
+    .nodeVal(n => n.val)
+    .nodeRelSize(4)
+    .nodeColor(colorFor)
+    .nodeOpacity(0.92)
+    .linkColor(() => 'rgba(130,150,220,0.16)')
+    .linkWidth(0.5)
+    .linkDirectionalParticles(2)
+    .linkDirectionalParticleWidth(1.3)
+    .linkDirectionalParticleSpeed(0.006)
+    .linkDirectionalParticleColor(() => '#2de2e6')
+    .warmupTicks(40);
+
+  const controls = Graph.controls();
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.7;
+
+  // preserve node positions across refreshes so new notes fly in instead of resetting
+  const nodeById = new Map();
+  async function refreshGraph() {
+    try {
+      const data = await (await fetch('graph.json?_=' + Date.now())).json();
+      const nodes = data.nodes.map(n => {
+        const ex = nodeById.get(n.id);
+        if (ex) { Object.assign(ex, n); return ex; }
+        nodeById.set(n.id, n); return n;
+      });
+      const ids = new Set(data.nodes.map(n => n.id));
+      for (const k of [...nodeById.keys()]) if (!ids.has(k)) nodeById.delete(k);
+      Graph.graphData({ nodes, links: data.links });
+    } catch (e) {}
+  }
+
+  const feed = document.getElementById('feed');
+  async function refreshActivity() {
+    try {
+      const a = await (await fetch('activity.json?_=' + Date.now())).json();
+      document.getElementById('c-notes').textContent = a.counts.notes;
+      document.getElementById('c-links').textContent = a.counts.links;
+      document.getElementById('stamp').textContent = new Date(a.generated * 1000).toLocaleTimeString();
+      feed.innerHTML =
+        a.log.slice().reverse().map(x => `<div class="li"><span class="job">${esc(x.job)}</span> ${esc(x.line)}</div>`).join('')
+        + '<div class="sep">recent notes</div>'
+        + a.recent.map(r => `<div class="li"><span class="dot" style="background:${FOLDER[r.folder]||'#7f8cff'}"></span>${esc(r.id)}</div>`).join('');
+    } catch (e) {}
+  }
+
+  refreshGraph(); refreshActivity();
+  setInterval(refreshGraph, 12000);
+  setInterval(refreshActivity, 4000);
+  setTimeout(() => Graph.zoomToFit(900, 70), 1600);
+  window.addEventListener('resize', () => { Graph.width(innerWidth); Graph.height(innerHeight); });
+</script>
+</body>
+</html>

@@ -30,6 +30,7 @@
     ./modules/system/scrutiny.nix
     ./modules/system/obsidian.nix
     ./modules/system/huginn.nix
+    ./modules/system/brain.nix
   ];
 
   networking.hostName = "heimdall";

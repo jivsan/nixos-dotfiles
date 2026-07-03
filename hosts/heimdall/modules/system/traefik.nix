@@ -151,6 +151,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          brain = {
+            rule = "Host(`brain.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "brain";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -229,6 +237,13 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:3000"; }
+              ];
+            };
+          };
+          brain = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:8090"; }
               ];
             };
           };
