@@ -50,8 +50,9 @@ let
     text = ''
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
-      # isolated install of the graphify CLI (PyPI package is 'graphifyy')
-      uv tool install --force graphifyy
+      # isolated install of the graphify CLI (PyPI package is 'graphifyy');
+      # [mcp] extra pulls in the `mcp` package so graphify-mcp can serve over MCP.
+      uv tool install --force "graphifyy[mcp]"
       # register the /graphify Claude Code skill under $HOME/.claude/skills/graphify
       graphify install || true
     '';
