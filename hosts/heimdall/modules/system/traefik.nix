@@ -143,6 +143,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          obsidian = {
+            rule = "Host(`obsidian.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "obsidian";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -214,6 +222,13 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:8080"; }
+              ];
+            };
+          };
+          obsidian = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:3000"; }
               ];
             };
           };
