@@ -27,7 +27,7 @@
   @keyframes p { 0%{box-shadow:0 0 0 0 rgba(45,226,230,.5)} 70%{box-shadow:0 0 0 10px rgba(45,226,230,0)} 100%{box-shadow:0 0 0 0 rgba(45,226,230,0)} }
   #feed { overflow-y:auto; font-size:11.5px; line-height:1.5; }
   #feed::-webkit-scrollbar{ width:6px } #feed::-webkit-scrollbar-thumb{ background:rgba(255,79,163,.3); border-radius:3px }
-  .li { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); animation:fade .5s ease; word-break:break-word; }
+  .li { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); word-break:break-word; }
   @keyframes fade { from{opacity:0; transform:translateX(-6px)} to{opacity:1} }
   .job { color:var(--pink); }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
@@ -89,9 +89,13 @@
 
   // preserve node positions across refreshes so new notes fly in instead of resetting
   const nodeById = new Map();
+  let lastGraphGen = -1, lastActGen = -1;
+
   async function refreshGraph() {
     try {
       const data = await (await fetch('graph.json?_=' + Date.now())).json();
+      if (data.generated === lastGraphGen) return;   // unchanged → don't disturb the simulation
+      lastGraphGen = data.generated;
       const nodes = data.nodes.map(n => {
         const ex = nodeById.get(n.id);
         if (ex) { Object.assign(ex, n); return ex; }
@@ -100,6 +104,7 @@
       const ids = new Set(data.nodes.map(n => n.id));
       for (const k of [...nodeById.keys()]) if (!ids.has(k)) nodeById.delete(k);
       Graph.graphData({ nodes, links: data.links });
+      setTimeout(() => Graph.zoomToFit(700, 80), 600);
     } catch (e) {}
   }
 
@@ -107,6 +112,8 @@
   async function refreshActivity() {
     try {
       const a = await (await fetch('activity.json?_=' + Date.now())).json();
+      if (a.generated === lastActGen) return;        // gate on real change → no flicker
+      lastActGen = a.generated;
       document.getElementById('c-notes').textContent = a.counts.notes;
       document.getElementById('c-links').textContent = a.counts.links;
       document.getElementById('stamp').textContent = new Date(a.generated * 1000).toLocaleTimeString();
@@ -118,9 +125,8 @@
   }
 
   refreshGraph(); refreshActivity();
-  setInterval(refreshGraph, 12000);
-  setInterval(refreshActivity, 4000);
-  setTimeout(() => Graph.zoomToFit(900, 70), 1600);
+  setInterval(refreshGraph, 8000);
+  setInterval(refreshActivity, 5000);
   window.addEventListener('resize', () => { Graph.width(innerWidth); Graph.height(innerHeight); });
 </script>
 </body>
