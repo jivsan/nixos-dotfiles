@@ -69,9 +69,37 @@ let
       logdir="${vault}/agents/logs"; mkdir -p "$logdir"
       {
         echo "[$(date -Iseconds)] huginn/graphify build start"
-        claude -p "/graphify ." --dangerously-skip-permissions
+        claude -p "/graphify ." --model "${model}" --dangerously-skip-permissions
         echo "[$(date -Iseconds)] huginn/graphify build done → graphify-out/"
       } 2>&1 | tee -a "$logdir/graphify.log"
+    '';
+  };
+
+  # Graphify: (re)build the DOTFILES repo graph → the graph both the MCP and the
+  # brain read from /var/lib/huginn/graphs/dotfiles/graph.json.
+  graphifyRepo = pkgs.writeShellApplication {
+    name = "huginn-graphify-repo";
+    runtimeInputs = [ pkgs.claude-code pkgs.uv pkgs.git pkgs.coreutils ];
+    text = ''
+      export HOME="${agentHome}"
+      export PATH="${localBin}:$PATH"
+      src="${agentHome}/graph-src"
+      dst="${agentHome}/graphs/dotfiles"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir" "$dst"
+      {
+        echo "[$(date -Iseconds)] huginn/graphify-repo start"
+        rm -rf "$src"
+        git clone --depth 1 https://github.com/jivsan/nixos-dotfiles "$src"
+        cd "$src" || exit 1
+        claude -p "/graphify ." --model "${model}" --dangerously-skip-permissions
+        if [ -f graphify-out/graph.json ]; then
+          cp -f graphify-out/graph.json "$dst/graph.json"
+          cp -f graphify-out/GRAPH_REPORT.md "$dst/GRAPH_REPORT.md" 2>/dev/null || true
+          echo "[$(date -Iseconds)] huginn/graphify-repo done → $dst/graph.json ($(wc -c < "$dst/graph.json") bytes)"
+        else
+          echo "[$(date -Iseconds)] huginn/graphify-repo FAILED — no graph.json produced"; exit 1
+        fi
+      } 2>&1 | tee -a "$logdir/graphify-repo.log"
     '';
   };
 
@@ -132,6 +160,8 @@ in
   # claude-code + graphify state (their HOME) off christina's real home dir.
   systemd.tmpfiles.rules = [
     "d ${agentHome} 0750 christina users -"
+    "d ${agentHome}/graphs 0750 christina users -"
+    "d ${agentHome}/graphs/dotfiles 0750 christina users -"
   ];
 
   # ── note agents ──
@@ -208,6 +238,27 @@ in
       OnCalendar = "*-*-* 23:30:00";   # after the nightly digest
       Persistent = true;
       RandomizedDelaySec = "10m";
+    };
+  };
+
+  # ── graphify: the dotfiles repo graph (feeds the graphify-mcp + the brain) ──
+  systemd.services."huginn-graphify-repo" = {
+    description = "huginn: rebuild the dotfiles knowledge graph (MCP + brain)";
+    after = [ "network-online.target" "huginn-graphify-setup.service" ];
+    wants = [ "network-online.target" ];
+    requires = [ "huginn-graphify-setup.service" ];
+    unitConfig.RequiresMountsFor = vault;
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${graphifyRepo}/bin/huginn-graphify-repo";
+    };
+  };
+  systemd.timers."huginn-graphify-repo" = {
+    description = "huginn dotfiles-graph rebuild schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Sun *-*-* 04:00:00";   # weekly; code changes less often
+      Persistent = true;
+      RandomizedDelaySec = "30m";
     };
   };
 }

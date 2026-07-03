@@ -45,6 +45,7 @@
     <div class="sub">agentic OS · live knowledge graph</div>
     <div class="stats">
       <div class="stat"><b id="c-notes">–</b><span>notes</span></div>
+      <div class="stat"><b id="c-code">–</b><span>code</span></div>
       <div class="stat"><b id="c-links">–</b><span>links</span></div>
     </div>
     <div class="status"><span class="pulse"></span> huginn online · updated <span id="stamp">–</span></div>
@@ -54,6 +55,7 @@
       <span><i style="background:#39d0ff"></i>journal</span>
       <span><i style="background:#8a7dff"></i>resources</span>
       <span><i style="background:#5ad1a0"></i>areas</span>
+      <span><i style="background:linear-gradient(90deg,#ff4fa3,#2de2e6,#ffd166)"></i>code (community)</span>
       <span><i style="background:#ffffff"></i>fresh (24h)</span>
     </div>
   </div>
@@ -64,24 +66,25 @@
 </div>
 <script>
   const FOLDER = { MOCs:'#ff4fa3', root:'#ff8ac4', _inbox:'#2de2e6', journal:'#39d0ff', Resources:'#8a7dff', Areas:'#5ad1a0' };
-  const colorFor = n => n.recent ? '#ffffff' : (FOLDER[n.folder] || '#7f8cff');
+  const colorFor = n => (n.recent && n.source === 'note') ? '#ffffff' : (n.color || FOLDER[n.folder] || '#7f8cff');
   const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
   const Graph = ForceGraph3D()(document.getElementById('graph'))
     .backgroundColor('#05060f')
     .showNavInfo(false)
-    .nodeLabel(n => `${n.id}  ·  ${n.folder}`)
+    .nodeLabel(n => (n.label || n.id) + (n.source === 'code' ? '  ·  code' : ''))
     .nodeVal(n => n.val)
-    .nodeRelSize(4)
+    .nodeRelSize(3)
     .nodeColor(colorFor)
     .nodeOpacity(0.92)
-    .linkColor(() => 'rgba(130,150,220,0.16)')
-    .linkWidth(0.5)
-    .linkDirectionalParticles(2)
-    .linkDirectionalParticleWidth(1.3)
+    .linkColor(() => 'rgba(130,150,220,0.10)')
+    .linkWidth(0.4)
+    .linkDirectionalParticles(1)
+    .linkDirectionalParticleWidth(1.1)
     .linkDirectionalParticleSpeed(0.006)
     .linkDirectionalParticleColor(() => '#2de2e6')
-    .warmupTicks(40);
+    .warmupTicks(40)
+    .cooldownTime(8000);
 
   const controls = Graph.controls();
   controls.autoRotate = true;
@@ -115,6 +118,7 @@
       if (a.generated === lastActGen) return;        // gate on real change → no flicker
       lastActGen = a.generated;
       document.getElementById('c-notes').textContent = a.counts.notes;
+      document.getElementById('c-code').textContent = a.counts.code ?? 0;
       document.getElementById('c-links').textContent = a.counts.links;
       document.getElementById('stamp').textContent = new Date(a.generated * 1000).toLocaleTimeString();
       feed.innerHTML =
