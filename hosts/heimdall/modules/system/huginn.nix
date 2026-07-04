@@ -79,24 +79,29 @@ let
 
   # Graphify: (re)build the DOTFILES repo graph → the graph both the MCP and the
   # brain read from /var/lib/huginn/graphs/dotfiles/graph.json.
+  # NO Claude: `graphify update` extracts the code offline (tree-sitter, no LLM),
+  # then `graphify label` names the communities using whatever LLM backend the env
+  # selects. With ONLY the OpenRouter (OpenAI-compatible) vars present, Graphify's
+  # auto-detect picks the openai backend → MiniMax-M3. No key → offline graph only.
   graphifyRepo = pkgs.writeShellApplication {
     name = "huginn-graphify-repo";
-    runtimeInputs = [ pkgs.claude-code pkgs.uv pkgs.git pkgs.coreutils ];
+    runtimeInputs = [ pkgs.uv pkgs.git pkgs.coreutils ];
     text = ''
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
-      # fresh-clone extraction runs >10min; without this, claude -p kills the
-      # graphify background chunks at 600s and no graph.json is ever produced
-      export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
       src="${agentHome}/graph-src"
       dst="${agentHome}/graphs/dotfiles"
       logdir="${vault}/agents/logs"; mkdir -p "$logdir" "$dst"
       {
-        echo "[$(date -Iseconds)] huginn/graphify-repo start"
+        echo "[$(date -Iseconds)] huginn/graphify-repo start (labeling: ''${OPENAI_MODEL:-<offline, none>})"
         rm -rf "$src"
         git clone --depth 1 https://github.com/jivsan/nixos-dotfiles "$src"
         cd "$src" || exit 1
-        claude -p "/graphify ." --model "${model}" --dangerously-skip-permissions
+        graphify update .            # extract code → graph.json (offline, no LLM, no Claude)
+        if [ -n "''${OPENAI_API_KEY:-}" ]; then
+          echo "[$(date -Iseconds)] labeling communities via ''${OPENAI_MODEL:-openai backend}"
+          graphify label . || echo "[$(date -Iseconds)] [warn] label step failed; keeping offline graph"
+        fi
         if [ -f graphify-out/graph.json ]; then
           cp -f graphify-out/graph.json "$dst/graph.json"
           cp -f graphify-out/GRAPH_REPORT.md "$dst/GRAPH_REPORT.md" 2>/dev/null || true
@@ -254,6 +259,10 @@ in
     requires = [ "huginn-graphify-setup.service" ];
     unitConfig.RequiresMountsFor = vault;
     serviceConfig = agentServiceConfig // {
+      # OpenRouter/MiniMax creds ONLY (no ANTHROPIC_API_KEY, so Graphify's
+      # auto-detect picks the openai backend); optional (leading '-') so the job
+      # still builds an offline graph if the file is absent.
+      EnvironmentFile = "-/var/lib/secrets/graphify-openrouter.env";
       ExecStart = "${graphifyRepo}/bin/huginn-graphify-repo";
     };
   };
