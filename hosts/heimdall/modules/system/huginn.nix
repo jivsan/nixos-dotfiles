@@ -51,10 +51,11 @@ let
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
       # isolated install of the graphify CLI (PyPI package is 'graphifyy').
-      # Install `mcp` explicitly with --with: the "graphifyy[mcp]" extra silently
-      # resolves to nothing on some versions, leaving graphify-mcp unable to serve
-      # (ModuleNotFoundError: No module named 'mcp').
-      uv tool install --force graphifyy --with mcp
+      # Install `mcp` (graphify-mcp server) and `openai` (the OpenRouter/MiniMax
+      # labeling backend) explicitly with --with: the "graphifyy[...]" extras
+      # silently resolve to nothing on some versions, so graphify-mcp and
+      # `graphify label` would break.
+      uv tool install --force graphifyy --with mcp --with openai
       # register the /graphify Claude Code skill under $HOME/.claude/skills/graphify
       graphify install || true
     '';
