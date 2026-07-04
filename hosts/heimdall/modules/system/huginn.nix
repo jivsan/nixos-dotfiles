@@ -85,6 +85,9 @@ let
     text = ''
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
+      # fresh-clone extraction runs >10min; without this, claude -p kills the
+      # graphify background chunks at 600s and no graph.json is ever produced
+      export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
       src="${agentHome}/graph-src"
       dst="${agentHome}/graphs/dotfiles"
       logdir="${vault}/agents/logs"; mkdir -p "$logdir" "$dst"
