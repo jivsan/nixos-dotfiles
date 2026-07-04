@@ -60,23 +60,6 @@ let
     '';
   };
 
-  # Graphify: rebuild the knowledge graph from the vault via the /graphify skill.
-  graphifyBuild = pkgs.writeShellApplication {
-    name = "huginn-graphify-build";
-    runtimeInputs = [ pkgs.claude-code pkgs.uv pkgs.git pkgs.coreutils ];
-    text = ''
-      export HOME="${agentHome}"
-      export PATH="${localBin}:$PATH"
-      cd "${vault}" || exit 1
-      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
-      {
-        echo "[$(date -Iseconds)] huginn/graphify build start"
-        claude -p "/graphify ." --model "${model}" --dangerously-skip-permissions
-        echo "[$(date -Iseconds)] huginn/graphify build done → graphify-out/"
-      } 2>&1 | tee -a "$logdir/graphify.log"
-    '';
-  };
-
   # Graphify: (re)build the DOTFILES repo graph → the graph both the MCP and the
   # brain read from /var/lib/huginn/graphs/dotfiles/graph.json.
   # NO Claude: `graphify update` extracts the code offline (tree-sitter, no LLM),
@@ -228,26 +211,6 @@ in
       Group = "users";
       Environment = [ "HOME=${agentHome}" ];
       ExecStart = "${graphifySetup}/bin/huginn-graphify-setup";
-    };
-  };
-
-  systemd.services."huginn-graphify" = {
-    description = "huginn: rebuild the muninn knowledge graph (graphify)";
-    after = [ "network-online.target" "huginn-graphify-setup.service" ];
-    wants = [ "network-online.target" ];
-    requires = [ "huginn-graphify-setup.service" ];
-    unitConfig.RequiresMountsFor = vault;
-    serviceConfig = agentServiceConfig // {
-      ExecStart = "${graphifyBuild}/bin/huginn-graphify-build";
-    };
-  };
-  systemd.timers."huginn-graphify" = {
-    description = "huginn graphify rebuild schedule";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "*-*-* 23:30:00";   # after the nightly digest
-      Persistent = true;
-      RandomizedDelaySec = "10m";
     };
   };
 
