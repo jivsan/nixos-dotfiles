@@ -159,6 +159,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          comfyui = {
+            rule = "Host(`comfyui.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "comfyui";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -244,6 +252,16 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:8090"; }
+              ];
+            };
+          };
+
+          # ComfyUI runs on mimir (GPU box), reached over the storage VLAN.
+          # WebSockets (progress/preview) pass through Traefik natively.
+          comfyui = {
+            loadBalancer = {
+              servers = [
+                { url = "http://10.0.20.18:8188"; }
               ];
             };
           };
