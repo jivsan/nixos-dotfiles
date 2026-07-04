@@ -41,6 +41,13 @@ RUN git clone --depth 1 --branch ${IMPACT_PACK_VERSION} \
  && pip install --no-cache-dir -c /tmp/constraints.txt \
       -r /app/ComfyUI/custom_nodes/ComfyUI-Impact-Subpack/requirements.txt
 
+# triton (torch's JIT dep) compiles a tiny C module at CUDA init — without a
+# compiler in the image the container dies with "Failed to find C compiler".
+# Separate layer at the end so image rebuilds stay cached and fast.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app/ComfyUI
 EXPOSE 8188
 CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188"]
