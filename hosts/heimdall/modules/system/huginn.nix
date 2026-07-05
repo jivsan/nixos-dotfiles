@@ -97,6 +97,38 @@ let
     '';
   };
 
+  # muninn-ask: MiniMax (OpenRouter) Q&A over the dotfiles graph — NO Claude.
+  # Retrieves graph context via `graphify query`, then synthesises an answer with
+  # the OpenAI-compatible OpenRouter endpoint (OPENAI_* env from the secret file).
+  # Question arrives on stdin; the mjolnir `ask` wrapper runs it via sudo systemd-run
+  # so the secret env is loaded.
+  askBrain = pkgs.writeShellApplication {
+    name = "muninn-ask";
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
+    text = ''
+      q="$(cat)"
+      [ -n "$q" ] || { echo "usage: muninn-ask  (question on stdin)" >&2; exit 1; }
+      : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
+      base="''${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
+      model="''${OPENAI_MODEL:-minimax/minimax-m3}"
+      export HOME=/var/lib/huginn
+      export PATH="/var/lib/huginn/.local/bin:$PATH"
+      ctx="$(graphify query "$q" --graph /var/lib/huginn/graphs/dotfiles/graph.json 2>/dev/null | head -c 7000 || true)"
+      body="$(jq -n --arg m "$model" --arg q "$q" --arg c "$ctx" '{
+        model: $m,
+        messages: [
+          { role: "system", content: "You are muninn, a homelab assistant. Answer using ONLY the knowledge-graph context from a NixOS homelab (hosts: mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box). Be concise and concrete; cite file paths when relevant. If the context lacks the answer, say so plainly." },
+          { role: "user", content: ("Question: " + $q + "\n\n--- knowledge-graph context ---\n" + $c) }
+        ]
+      }')"
+      curl -sS "$base/chat/completions" \
+        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "$body" \
+        | jq -r '.choices[0].message.content // .error.message // "no response"'
+    '';
+  };
+
   inboxPrompt = pkgs.writeText "huginn-inbox-sweep.md" ''
     You are huginn, an automated agent maintaining the "muninn" Obsidian vault.
     Read the vault's CLAUDE.md first and follow it exactly.
@@ -145,7 +177,7 @@ in
   # claude-code is unfree; allow just it — heimdall otherwise stays fully free.
   nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "claude-code" ];
 
-  environment.systemPackages = [ pkgs.claude-code pkgs.uv ];
+  environment.systemPackages = [ pkgs.claude-code pkgs.uv askBrain ];
 
   # graphify's tree-sitter wheels are prebuilt binaries → need the ld shim on NixOS.
   programs.nix-ld.enable = true;

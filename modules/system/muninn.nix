@@ -28,6 +28,19 @@ let
       echo "huginn nudged — it'll file this into a linked note shortly."
     '';
   };
+
+  # ask: MiniMax (OpenRouter) Q&A over the muninn knowledge graph — NO Claude.
+  # Runs muninn-ask on heimdall via sudo systemd-run (loads the OpenRouter secret).
+  ask = pkgs.writeShellApplication {
+    name = "ask";
+    runtimeInputs = [ pkgs.openssh ];
+    text = ''
+      q="$*"
+      [ -n "$q" ] || { echo "usage: ask <question about your homelab / notes>" >&2; exit 1; }
+      printf '%s' "$q" | ssh -o BatchMode=yes -o ConnectTimeout=8 christina@10.0.20.17 \
+        'sudo systemd-run --wait --pipe --quiet --uid=christina --gid=users -p EnvironmentFile=/var/lib/secrets/graphify-openrouter.env -p Environment=HOME=/var/lib/huginn /run/current-system/sw/bin/muninn-ask'
+    '';
+  };
 in
 {
   boot.supportedFilesystems = [ "nfs" ];
@@ -49,5 +62,5 @@ in
     ];
   };
 
-  environment.systemPackages = [ capture ];
+  environment.systemPackages = [ capture ask ];
 }
