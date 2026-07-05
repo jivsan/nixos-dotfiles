@@ -69,26 +69,52 @@
   const colorFor = n => (n.recent && n.source === 'note') ? '#ffffff' : (n.color || FOLDER[n.folder] || '#7f8cff');
   const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
+  // links inherit their source node's community colour → the web reads as coloured strands
+  const linkColor = l => (l.source && l.source.color) || (l.target && l.target.color) || '#5b6bd6';
+  let hoverNode = null;
+  const highlightLinks = new Set();
+
   const Graph = ForceGraph3D()(document.getElementById('graph'))
     .backgroundColor('#05060f')
     .showNavInfo(false)
     .nodeLabel(n => (n.label || n.id) + (n.source === 'code' ? '  ·  code' : ''))
     .nodeVal(n => n.val)
-    .nodeRelSize(3)
-    .nodeColor(colorFor)
-    .nodeOpacity(0.92)
-    .linkColor(() => 'rgba(130,150,220,0.10)')
-    .linkWidth(0.4)
-    .linkDirectionalParticles(1)
-    .linkDirectionalParticleWidth(1.1)
+    .nodeRelSize(4)
+    .nodeResolution(12)
+    .nodeOpacity(0.96)
+    .nodeColor(n => n === hoverNode ? '#ffffff' : colorFor(n))
+    .linkColor(l => highlightLinks.has(l) ? '#ffffff' : linkColor(l))
+    .linkOpacity(0.36)
+    .linkWidth(l => highlightLinks.has(l) ? 2.4 : 0.7)
+    .linkCurvature(0.18)
+    .linkDirectionalParticles(l => highlightLinks.has(l) ? 4 : 1)
+    .linkDirectionalParticleWidth(1.3)
     .linkDirectionalParticleSpeed(0.006)
-    .linkDirectionalParticleColor(() => '#2de2e6')
-    .warmupTicks(40)
-    .cooldownTime(8000);
+    .linkDirectionalParticleColor(l => highlightLinks.has(l) ? '#ffffff' : '#2de2e6')
+    .onNodeHover(node => {
+      if (node === hoverNode) return;
+      hoverNode = node || null;
+      highlightLinks.clear();
+      if (node) for (const l of Graph.graphData().links) {
+        if (l.source === node || l.target === node) highlightLinks.add(l);
+      }
+      document.getElementById('graph').style.cursor = node ? 'pointer' : '';
+      Graph.linkWidth(Graph.linkWidth()).nodeColor(Graph.nodeColor());   // nudge re-render
+    })
+    .onNodeClick(node => {                                               // click = fly to node
+      const d = 90;
+      const r = 1 + d / Math.hypot(node.x || 1, node.y || 1, node.z || 1);
+      Graph.cameraPosition({ x: (node.x||0)*r, y: (node.y||0)*r, z: (node.z||0)*r }, node, 900);
+    })
+    .warmupTicks(60)
+    .cooldownTime(9000);
+
+  // spread the communities apart a little so the strands are legible
+  Graph.d3Force('charge').strength(-42);
 
   const controls = Graph.controls();
   controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.7;
+  controls.autoRotateSpeed = 0.5;
 
   // preserve node positions across refreshes so new notes fly in instead of resetting
   const nodeById = new Map();
