@@ -21,25 +21,26 @@
 #  agents, but Graphify's markdown extraction needs a real API key like the above.)
 let
   vault   = "/mnt/nas/obsidian/muninn";
-  model   = "claude-sonnet-4-6";        # routine jobs; bump to claude-opus-4-8 for heavier reasoning
-  agentHome = "/var/lib/huginn";        # HOME for claude-code + graphify (off christina's real home)
+  agentHome = "/var/lib/huginn";        # HOME for graphify (off christina's real home)
   localBin  = "${agentHome}/.local/bin";
 
-  # Named note-agent runner: $1 = job name (for the log), prompt arrives on stdin.
-  runAgent = pkgs.writeShellApplication {
-    name = "huginn-run";
-    runtimeInputs = [ pkgs.claude-code pkgs.coreutils ];
+  # ── MiniMax LLM helper (OpenRouter, OpenAI-compatible) — the agents' brain ──
+  # $1 = system prompt; user content on stdin; prints the model reply (or empty).
+  llm = pkgs.writeShellApplication {
+    name = "muninn-llm";
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
     text = ''
-      job="''${1:?usage: huginn-run <job-name> (prompt on stdin)}"
-      logdir="${vault}/agents/logs"
-      mkdir -p "$logdir"
-      prompt="$(cat)"
-      cd "${vault}" || exit 1
-      {
-        echo "[$(date -Iseconds)] huginn/$job start (model ${model})"
-        claude -p "$prompt" --model "${model}" --dangerously-skip-permissions
-        echo "[$(date -Iseconds)] huginn/$job done"
-      } 2>&1 | tee -a "$logdir/$job.log"
+      sys="''${1:?system prompt required}"
+      : "''${OPENAI_API_KEY:?OPENAI_API_KEY not set (needs graphify-openrouter.env)}"
+      base="''${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}"
+      mdl="''${OPENAI_MODEL:-minimax/minimax-m3}"
+      user="$(cat)"
+      req="$(jq -n --arg m "$mdl" --arg s "$sys" --arg u "$user" \
+        '{model:$m, temperature:0.2, messages:[{role:"system",content:$s},{role:"user",content:$u}]}')"
+      resp="$(curl -sS --max-time 120 --retry 2 "$base/chat/completions" \
+        -H "Authorization: Bearer $OPENAI_API_KEY" -H "Content-Type: application/json" \
+        -d "$req" 2>/dev/null || true)"
+      printf '%s' "$resp" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true
     '';
   };
 
@@ -129,37 +130,85 @@ let
     '';
   };
 
-  inboxPrompt = pkgs.writeText "huginn-inbox-sweep.md" ''
-    You are huginn, an automated agent maintaining the "muninn" Obsidian vault.
-    Read the vault's CLAUDE.md first and follow it exactly.
+  # ── inbox sweep (MiniMax) — file each _inbox note into a titled, linked note ──
+  inboxSweep = pkgs.writeShellApplication {
+    name = "huginn-inbox-sweep";
+    runtimeInputs = [ llm pkgs.jq pkgs.coreutils ];
+    text = ''
+      : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
+      inbox="${vault}/_inbox"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      today="$(date +%F)"
+      log(){ echo "[$(date -Iseconds)] $*" | tee -a "$logdir/inbox-sweep.log"; }
+      mocs=""
+      for m in "${vault}/MOCs"/*.md; do [ -e "$m" ] && mocs="$mocs, $(basename "$m" .md)"; done
+      mocs="''${mocs#, }"; [ -n "$mocs" ] || mocs="Home MOC"
+      log "inbox-sweep start (minimax)"
+      filed=0
+      shopt -s nullglob
+      for f in "$inbox"/*.md; do
+        bn="$(basename "$f")"
+        [ "$bn" = "README.md" ] && continue
+        raw="$(head -c 8000 "$f")"
+        [ -n "$raw" ] || { log "  ! skip $bn (empty)"; continue; }
+        sys="You file a rough inbox note into an Obsidian vault. Reply with ONLY a JSON object (no code fences, no prose) with keys: title (concise, no slashes or newlines), folder (exactly Areas or Resources), moc (choose the single best from: $mocs), tags (array of 1-4 short lowercase strings), body (the note rewritten as clean markdown, keeping every fact, inventing nothing)."
+        j="$(printf '%s' "$raw" | muninn-llm "$sys" | sed '/^```/d')"
+        if ! printf '%s' "$j" | jq -e 'type=="object"' >/dev/null 2>&1; then
+          log "  ! skip $bn (no JSON from model)"; continue
+        fi
+        title="$(printf '%s' "$j" | jq -r '.title // empty' | tr -d '\r\n' | tr '/' '-' | cut -c1-90)"
+        [ -n "$title" ] || { log "  ! skip $bn (no title)"; continue; }
+        folder="$(printf '%s' "$j" | jq -r 'if .folder=="Areas" then "Areas" else "Resources" end')"
+        moc="$(printf '%s' "$j" | jq -r '.moc // "Home MOC"')"
+        tags="$(printf '%s' "$j" | jq -r '(.tags // []) | map(tostring) | join(", ")')"
+        body="$(printf '%s' "$j" | jq -r '.body // ""')"
+        dest="${vault}/$folder"; mkdir -p "$dest"
+        target="$dest/$title.md"; k=2
+        while [ -e "$target" ]; do target="$dest/$title ($k).md"; k=$((k+1)); done
+        printf -- '---\ntype: note\nstatus: active\ntags: [%s]\ncreated: %s\nagent: huginn\n---\n\n# %s\n\n%s\n\nSee also: [[%s]]\n' \
+          "$tags" "$today" "$title" "$body" "$moc" > "$target"
+        rm -f "$f"
+        log "  + $bn -> $folder/$(basename "$target")  [[$moc]]"
+        filed=$((filed+1))
+      done
+      log "inbox-sweep done ($filed filed)"
+    '';
+  };
 
-    Task — inbox sweep:
-    - Look at the notes in `_inbox/` (ignore README.md and any dotfiles).
-    - For each captured note: give it a clear title, add/repair frontmatter
-      (type, status, tags, created, agent: huginn), tidy the body, wikilink it to
-      at least one relevant MOC in `MOCs/`, then MOVE it out of `_inbox/` into the
-      most fitting folder (Areas/ or Resources/).
-    - If `_inbox/` has nothing actionable, make NO changes at all and stop.
-    - Never modify `.obsidian/`, `_templates/`, `agents/`, `graphify-out/`, or `Home.md`.
-    - Keep edits minimal and factual; never invent content.
-    End with a one-line summary of what you filed.
-  '';
-
-  digestPrompt = pkgs.writeText "huginn-daily-digest.md" ''
-    You are huginn, an automated agent maintaining the "muninn" Obsidian vault.
-    Read the vault's CLAUDE.md first and follow it exactly.
-
-    Task — nightly digest:
-    - Today's date is the real current date (YYYY-MM-DD).
-    - Find notes created or modified today, skipping `.obsidian/`, `agents/`,
-      `_templates/`, `graphify-out/`.
-    - Append to `journal/<YYYY-MM-DD>.md` (create it if missing, with frontmatter
-      type: journal, created, agent: huginn) a section `## huginn digest` with 3-6
-      bullets summarising the day, each wikilinking the note it refers to, plus a
-      trailing wikilink to [[Home MOC]].
-    - If nothing changed today, write a single bullet saying so.
-    End with a one-line summary.
-  '';
+  # ── daily digest (MiniMax) — summarise the day into today's journal note ──
+  dailyDigest = pkgs.writeShellApplication {
+    name = "huginn-daily-digest";
+    runtimeInputs = [ llm pkgs.jq pkgs.coreutils pkgs.findutils pkgs.gnused ];
+    text = ''
+      : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      today="$(date +%F)"
+      journal="${vault}/journal/$today.md"
+      log(){ echo "[$(date -Iseconds)] $*" | tee -a "$logdir/daily-digest.log"; }
+      log "daily-digest start (minimax)"
+      ctx=""; count=0
+      while IFS= read -r f; do
+        name="$(basename "$f" .md)"
+        snip="$(sed '/^---$/,/^---$/d' "$f" 2>/dev/null | tr '\n' ' ' | tr -s ' ' | cut -c1-280)"
+        ctx="$ctx"$'\n'"- [[$name]] :: $snip"
+        count=$((count+1))
+      done < <(find "${vault}" -type f -name '*.md' -newermt "$today 00:00:00" \
+          -not -path '*/.obsidian/*' -not -path '*/agents/*' -not -path '*/_templates/*' \
+          -not -path '*/graphify-out/*' -not -path '*/journal/*' -not -path '*/_inbox/*' \
+          -not -name 'README.md' 2>/dev/null | sort)
+      mkdir -p "${vault}/journal"
+      [ -f "$journal" ] || printf -- '---\ntype: journal\ncreated: %s\nagent: huginn\n---\n\n# %s\n' "$today" "$today" > "$journal"
+      if [ "$count" -eq 0 ]; then
+        digest="- Quiet day — no notes changed."
+      else
+        sys="You are huginn writing a nightly journal digest for an Obsidian vault. From the list of notes touched today, write 3-6 concise markdown bullets summarising the day. Each bullet MUST wikilink the note it refers to using its [[Note Name]] exactly as given. Output only the bullets, no preamble."
+        digest="$(printf '%s' "$ctx" | muninn-llm "$sys")"
+        [ -n "$digest" ] || digest="- ($count notes changed today; digest model returned nothing.)"
+      fi
+      printf '\n## huginn digest (%s)\n%s\n\n[[Home MOC]]\n' "$(date +%H:%M)" "$digest" >> "$journal"
+      log "daily-digest done ($count notes -> journal/$today.md)"
+    '';
+  };
 
   # Common hardening + auth for the LLM-calling jobs.
   agentServiceConfig = {
@@ -167,17 +216,14 @@ let
     User = "christina";
     Group = "users";
     Environment = [ "HOME=${agentHome}" ];
-    EnvironmentFile = "/var/lib/secrets/claude-code.env";
+    EnvironmentFile = "-/var/lib/secrets/graphify-openrouter.env";   # OpenRouter/MiniMax creds
     NoNewPrivileges = true;   # block sudo/setuid escalation despite passwordless-sudo christina
     ProtectHome = true;       # hide /home/christina; HOME is ${agentHome}
     PrivateTmp = true;
   };
 in
 {
-  # claude-code is unfree; allow just it — heimdall otherwise stays fully free.
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "claude-code" ];
-
-  environment.systemPackages = [ pkgs.claude-code pkgs.uv askBrain ];
+  environment.systemPackages = [ pkgs.uv askBrain ];
 
   # graphify's tree-sitter wheels are prebuilt binaries → need the ld shim on NixOS.
   programs.nix-ld.enable = true;
@@ -197,8 +243,7 @@ in
     wants = [ "network-online.target" ];
     unitConfig.RequiresMountsFor = vault;
     serviceConfig = agentServiceConfig // {
-      ExecStart = "${runAgent}/bin/huginn-run inbox-sweep";
-      StandardInput = "file:${inboxPrompt}";
+      ExecStart = "${inboxSweep}/bin/huginn-inbox-sweep";
     };
   };
   systemd.timers."huginn-inbox-sweep" = {
@@ -217,8 +262,7 @@ in
     wants = [ "network-online.target" ];
     unitConfig.RequiresMountsFor = vault;
     serviceConfig = agentServiceConfig // {
-      ExecStart = "${runAgent}/bin/huginn-run daily-digest";
-      StandardInput = "file:${digestPrompt}";
+      ExecStart = "${dailyDigest}/bin/huginn-daily-digest";
     };
   };
   systemd.timers."huginn-daily-digest" = {
