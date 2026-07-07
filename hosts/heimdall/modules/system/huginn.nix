@@ -1,24 +1,26 @@
 { pkgs, lib, ... }:
-# ── huginn — the agent layer over the muninn vault ───────────────────────────
-# Claude Code runs headless on heimdall, cwd = the vault on NFS, editing notes
-# directly (same mount as the container → inotify → live refresh in the app).
+# ── huginn — the MiniMax agent layer over the muninn vault ───────────────────
+# All agents run on OpenRouter/MiniMax (OpenAI-compatible) — NO Claude, NO
+# Anthropic credit. systemd-timer jobs:
+#   • inbox-sweep    — MiniMax turns each _inbox note into a titled, frontmattered,
+#                      MOC-linked note (model returns JSON → shell writes the file);
+#                      also path-triggered (inotify on _inbox) for instant filing
+#   • daily-digest   — MiniMax summarises the day into today's journal note
+#   • graphify-repo  — offline code extraction + MiniMax community labeling (weekly)
+#   • graphify-vault — the NOTES graph: staged copy of the vault's markdown only
+#                      (no .obsidian plugin JS) → /var/lib/huginn/graphs/vault (nightly)
+#   • gardener       — weekly vault hygiene report: orphans, dead links, stale notes
 #
-# Three kinds of job (systemd timers):
-#   • inbox-sweep   — file rough captures out of _inbox/
-#   • daily-digest  — summarise the day into today's journal note
-#   • graphify      — (safishamsi/graphify) rebuild a queryable knowledge graph
-#                     of the whole vault into <vault>/graphify-out (graph.html +
-#                     graph.json + an obsidian/ export). This is the "agentic OS
-#                     + Graphify" workflow from the video.
+# Cross-cutting: every vault-writing agent auto-commits the vault git repo
+# (audit trail, author huginn), and every huginn unit has OnFailure= wired to
+# drop an alert note into _inbox/ so failures surface on the Home dashboard.
 #
-# Runs as `christina` (uid 1000) so writes match the vault's NFS ownership, but
-# hardened (NoNewPrivileges + ProtectHome) so a --dangerously-skip-permissions
-# agent can't use her passwordless sudo or read her real home.
-#
-# Auth — create /var/lib/secrets/claude-code.env (out of git) with:
-#   ANTHROPIC_API_KEY=sk-...       ← recommended: works for BOTH claude-code and graphify
-# (A Claude subscription token, CLAUDE_CODE_OAUTH_TOKEN=..., also drives the note
-#  agents, but Graphify's markdown extraction needs a real API key like the above.)
+# Runs as `christina` (uid 1000, matches the vault's NFS ownership), hardened with
+# NoNewPrivileges + ProtectHome. LLM creds live in the out-of-git secret
+# /var/lib/secrets/graphify-openrouter.env:
+#   OPENAI_API_KEY=<openrouter key>
+#   OPENAI_BASE_URL=https://openrouter.ai/api/v1
+#   OPENAI_MODEL=minimax/minimax-m3
 let
   vault   = "/mnt/nas/obsidian/muninn";
   agentHome = "/var/lib/huginn";        # HOME for graphify (off christina's real home)
@@ -41,6 +43,42 @@ let
         -H "Authorization: Bearer $OPENAI_API_KEY" -H "Content-Type: application/json" \
         -d "$req" 2>/dev/null || true)"
       printf '%s' "$resp" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true
+    '';
+  };
+
+  # ── vault git audit trail — one commit per agent run, author huginn ─────────
+  # No-op if the vault isn't a git repo (bootstrap: git init once, see runbook).
+  vaultCommit = pkgs.writeShellApplication {
+    name = "muninn-vault-commit";
+    runtimeInputs = [ pkgs.git pkgs.coreutils ];
+    text = ''
+      msg="''${1:?commit message required}"
+      cd "${vault}" || exit 0
+      [ -d .git ] || exit 0
+      git add -A
+      git -c user.name=huginn -c user.email=huginn@heimdall \
+        commit -q -m "$msg" || true      # empty tree / nothing changed is fine
+    '';
+  };
+
+  # ── OnFailure alert — drop a note into _inbox so it surfaces on Home + digest ──
+  notify = pkgs.writeShellApplication {
+    name = "huginn-notify";
+    runtimeInputs = [ pkgs.coreutils pkgs.systemd ];
+    text = ''
+      unit="''${1:-unknown-unit}"
+      mkdir -p "${vault}/_inbox"
+      f="${vault}/_inbox/alert-$unit-$(date +%Y%m%d-%H%M%S).md"
+      {
+        echo "huginn alert: $unit FAILED on heimdall at $(date -Iseconds)."
+        echo
+        echo "Recent log lines:"
+        echo '```'
+        journalctl -u "$unit" -n 12 --no-pager -o short-iso 2>/dev/null || echo "(journal not readable)"
+        echo '```'
+        echo
+        echo "Inspect: ssh christina@10.0.20.17 'systemctl status $unit'"
+      } > "$f"
     '';
   };
 
@@ -98,14 +136,53 @@ let
     '';
   };
 
-  # muninn-ask: MiniMax (OpenRouter) Q&A over the dotfiles graph — NO Claude.
-  # Retrieves graph context via `graphify query`, then synthesises an answer with
-  # the OpenAI-compatible OpenRouter endpoint (OPENAI_* env from the secret file).
+  # Graphify: the VAULT graph — the notes' knowledge graph, MiniMax-labeled.
+  # graphify has no exclude flag, so stage ONLY the vault's markdown into a
+  # scratch dir first: without this the graph drowns in .obsidian plugin JS
+  # (the July build was 90% Dataview/Luxon internals).
+  graphifyVault = pkgs.writeShellApplication {
+    name = "huginn-graphify-vault";
+    runtimeInputs = [ pkgs.uv pkgs.rsync pkgs.coreutils ];
+    text = ''
+      export HOME="${agentHome}"
+      export PATH="${localBin}:$PATH"
+      src="${agentHome}/vault-src"
+      dst="${agentHome}/graphs/vault"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir" "$dst"
+      {
+        echo "[$(date -Iseconds)] huginn/graphify-vault start (labeling: ''${OPENAI_MODEL:-<offline, none>})"
+        rm -rf "$src"; mkdir -p "$src"
+        rsync -a --prune-empty-dirs \
+          --exclude='.obsidian' --exclude='.git' --exclude='.trash' \
+          --exclude='graphify-out' --exclude='_templates' --exclude='agents' \
+          --include='*/' --include='*.md' --exclude='*' \
+          "${vault}/" "$src/"
+        cd "$src" || exit 1
+        graphify update .            # offline extraction of the notes, no LLM
+        if [ -n "''${OPENAI_API_KEY:-}" ]; then
+          echo "[$(date -Iseconds)] labeling communities via ''${OPENAI_MODEL:-openai backend}"
+          graphify label . || echo "[$(date -Iseconds)] [warn] label step failed; keeping offline graph"
+        fi
+        if [ -f graphify-out/graph.json ]; then
+          cp -f graphify-out/graph.json "$dst/graph.json"
+          cp -f graphify-out/GRAPH_REPORT.md "$dst/GRAPH_REPORT.md" 2>/dev/null || true
+          echo "[$(date -Iseconds)] huginn/graphify-vault done → $dst/graph.json ($(wc -c < "$dst/graph.json") bytes)"
+        else
+          echo "[$(date -Iseconds)] huginn/graphify-vault FAILED — no graph.json produced"; exit 1
+        fi
+      } 2>&1 | tee -a "$logdir/graphify-vault.log"
+    '';
+  };
+
+  # muninn-ask: MiniMax (OpenRouter) Q&A over BOTH graphs + the recent journal —
+  # NO Claude. Retrieves context via `graphify query` from the dotfiles graph
+  # (code) and the vault graph (notes), plus the last two journal entries, then
+  # synthesises an answer on the OpenAI-compatible OpenRouter endpoint.
   # Question arrives on stdin; the mjolnir `ask` wrapper runs it via sudo systemd-run
   # so the secret env is loaded.
   askBrain = pkgs.writeShellApplication {
     name = "muninn-ask";
-    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils ];
+    runtimeInputs = [ pkgs.curl pkgs.jq pkgs.coreutils pkgs.findutils ];
     text = ''
       q="$(cat)"
       [ -n "$q" ] || { echo "usage: muninn-ask  (question on stdin)" >&2; exit 1; }
@@ -114,12 +191,22 @@ let
       model="''${OPENAI_MODEL:-minimax/minimax-m3}"
       export HOME=/var/lib/huginn
       export PATH="/var/lib/huginn/.local/bin:$PATH"
-      ctx="$(graphify query "$q" --graph /var/lib/huginn/graphs/dotfiles/graph.json 2>/dev/null | head -c 7000 || true)"
-      body="$(jq -n --arg m "$model" --arg q "$q" --arg c "$ctx" '{
+      code_ctx="$(graphify query "$q" --graph /var/lib/huginn/graphs/dotfiles/graph.json 2>/dev/null | head -c 9000 || true)"
+      note_ctx=""
+      if [ -f /var/lib/huginn/graphs/vault/graph.json ]; then
+        note_ctx="$(graphify query "$q" --graph /var/lib/huginn/graphs/vault/graph.json 2>/dev/null | head -c 9000 || true)"
+      fi
+      # the two most recent journal notes — cheap grounding for "what happened lately"
+      jrnl="$(find "${vault}/journal" -maxdepth 1 -name '20*.md' -print0 2>/dev/null \
+        | sort -z | tail -zn 2 | xargs -0 -r cat 2>/dev/null | head -c 4000 || true)"
+      body="$(jq -n --arg m "$model" --arg q "$q" --arg c "$code_ctx" --arg n "$note_ctx" --arg j "$jrnl" '{
         model: $m,
         messages: [
-          { role: "system", content: "You are muninn, a homelab assistant. Answer using ONLY the knowledge-graph context from a NixOS homelab (hosts: mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box). Be concise and concrete; cite file paths when relevant. If the context lacks the answer, say so plainly." },
-          { role: "user", content: ("Question: " + $q + "\n\n--- knowledge-graph context ---\n" + $c) }
+          { role: "system", content: "You are muninn, the memory of a personal homelab + note system. Answer using ONLY the provided context: a NixOS-config knowledge graph (hosts: mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box), a notes knowledge graph from the muninn Obsidian vault, and recent journal entries. Be concise and concrete; cite file paths or [[note names]] when relevant. If the context lacks the answer, say so plainly." },
+          { role: "user", content: ("Question: " + $q
+            + "\n\n--- code graph (nixos-dotfiles) ---\n" + $c
+            + "\n\n--- notes graph (muninn vault) ---\n" + $n
+            + "\n\n--- recent journal ---\n" + $j) }
         ]
       }')"
       curl -sS "$base/chat/completions" \
@@ -133,7 +220,7 @@ let
   # ── inbox sweep (MiniMax) — file each _inbox note into a titled, linked note ──
   inboxSweep = pkgs.writeShellApplication {
     name = "huginn-inbox-sweep";
-    runtimeInputs = [ llm pkgs.jq pkgs.coreutils ];
+    runtimeInputs = [ llm vaultCommit pkgs.jq pkgs.coreutils ];
     text = ''
       : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
       inbox="${vault}/_inbox"
@@ -171,6 +258,7 @@ let
         log "  + $bn -> $folder/$(basename "$target")  [[$moc]]"
         filed=$((filed+1))
       done
+      if [ "$filed" -gt 0 ]; then muninn-vault-commit "huginn: inbox-sweep filed $filed note(s)"; fi
       log "inbox-sweep done ($filed filed)"
     '';
   };
@@ -178,7 +266,7 @@ let
   # ── daily digest (MiniMax) — summarise the day into today's journal note ──
   dailyDigest = pkgs.writeShellApplication {
     name = "huginn-daily-digest";
-    runtimeInputs = [ llm pkgs.jq pkgs.coreutils pkgs.findutils pkgs.gnused ];
+    runtimeInputs = [ llm vaultCommit pkgs.jq pkgs.coreutils pkgs.findutils pkgs.gnused ];
     text = ''
       : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
       logdir="${vault}/agents/logs"; mkdir -p "$logdir"
@@ -198,6 +286,9 @@ let
           -not -name 'README.md' 2>/dev/null | sort)
       mkdir -p "${vault}/journal"
       [ -f "$journal" ] || printf -- '---\ntype: journal\ncreated: %s\nagent: huginn\n---\n\n# %s\n' "$today" "$today" > "$journal"
+      # idempotent: a rerun regenerates today's digest instead of stacking a second
+      # one (digest sections are always the tail of the journal note)
+      sed -i '/^## huginn digest/,$d' "$journal"
       if [ "$count" -eq 0 ]; then
         digest="- Quiet day — no notes changed."
       else
@@ -206,7 +297,24 @@ let
         [ -n "$digest" ] || digest="- ($count notes changed today; digest model returned nothing.)"
       fi
       printf '\n## huginn digest (%s)\n%s\n\n[[Home MOC]]\n' "$(date +%H:%M)" "$digest" >> "$journal"
+      muninn-vault-commit "huginn: daily digest for $today ($count notes)"
       log "daily-digest done ($count notes -> journal/$today.md)"
+    '';
+  };
+
+  # ── gardener (weekly) — vault hygiene: orphans, dead links, stale notes ──
+  # Analysis is offline python; MiniMax only suggests MOC links for orphans.
+  gardener = pkgs.writeShellApplication {
+    name = "huginn-gardener";
+    runtimeInputs = [ vaultCommit pkgs.python3Minimal pkgs.coreutils ];
+    text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      {
+        echo "[$(date -Iseconds)] gardener start (minimax)"
+        python3 ${../../muninn/gardener.py}
+        muninn-vault-commit "huginn: weekly gardener report"
+        echo "[$(date -Iseconds)] gardener done"
+      } 2>&1 | tee -a "$logdir/gardener.log"
     '';
   };
 
@@ -223,7 +331,22 @@ let
   };
 in
 {
-  environment.systemPackages = [ pkgs.uv askBrain ];
+  environment.systemPackages = [ pkgs.uv askBrain vaultCommit ];
+
+  # let huginn-notify quote the failing unit's log lines in its alert note
+  users.users.christina.extraGroups = [ "systemd-journal" ];
+
+  # every huginn job that dies drops an alert note into _inbox (→ Home dashboard)
+  systemd.services."huginn-notify@" = {
+    description = "huginn: file a failure alert for %i into the vault inbox";
+    unitConfig.RequiresMountsFor = vault;
+    serviceConfig = {
+      Type = "oneshot";
+      User = "christina";
+      Group = "users";
+      ExecStart = "${notify}/bin/huginn-notify %i";
+    };
+  };
 
   # graphify's tree-sitter wheels are prebuilt binaries → need the ld shim on NixOS.
   programs.nix-ld.enable = true;
@@ -241,16 +364,34 @@ in
     description = "huginn: sweep the muninn _inbox and file notes";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    unitConfig.RequiresMountsFor = vault;
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${inboxSweep}/bin/huginn-inbox-sweep";
     };
   };
+  # instant filing: fire the sweep when something lands in _inbox. Only sees
+  # writes made through heimdall's NFS client (the hosted Obsidian app, huginn
+  # itself, alert notes) — mjolnir's `capture` writes bypass this inotify, but
+  # capture already ssh-nudges the service directly. The timer below is the
+  # slow safety net for anything both mechanisms miss.
+  systemd.paths."huginn-inbox-sweep" = {
+    description = "huginn: watch _inbox and sweep on change";
+    wantedBy = [ "paths.target" ];
+    unitConfig.RequiresMountsFor = vault;
+    pathConfig = {
+      PathChanged = "${vault}/_inbox";
+      TriggerLimitIntervalSec = "2min";   # coalesce bursts of captures
+      TriggerLimitBurst = 3;
+    };
+  };
   systemd.timers."huginn-inbox-sweep" = {
-    description = "huginn inbox sweep schedule";
+    description = "huginn inbox sweep schedule (fallback; path unit does the real work)";
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnCalendar = "*-*-* 08,10,12,14,16,18,20:15:00";
+      OnCalendar = "*-*-* 08,14,20:15:00";
       Persistent = true;
       RandomizedDelaySec = "5m";
     };
@@ -260,7 +401,10 @@ in
     description = "huginn: append a nightly digest to today's journal note";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    unitConfig.RequiresMountsFor = vault;
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${dailyDigest}/bin/huginn-daily-digest";
     };
@@ -297,7 +441,10 @@ in
     after = [ "network-online.target" "huginn-graphify-setup.service" ];
     wants = [ "network-online.target" ];
     requires = [ "huginn-graphify-setup.service" ];
-    unitConfig.RequiresMountsFor = vault;
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
     serviceConfig = agentServiceConfig // {
       # OpenRouter/MiniMax creds ONLY (no ANTHROPIC_API_KEY, so Graphify's
       # auto-detect picks the openai backend); optional (leading '-') so the job
@@ -313,6 +460,53 @@ in
       OnCalendar = "Sun *-*-* 04:00:00";   # weekly; code changes less often
       Persistent = true;
       RandomizedDelaySec = "30m";
+    };
+  };
+
+  # ── graphify: the vault (notes) graph — the OS's memory, queryable over MCP ──
+  systemd.services."huginn-graphify-vault" = {
+    description = "huginn: rebuild the vault knowledge graph (notes only)";
+    after = [ "network-online.target" "huginn-graphify-setup.service" ];
+    wants = [ "network-online.target" ];
+    requires = [ "huginn-graphify-setup.service" ];
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${graphifyVault}/bin/huginn-graphify-vault";
+    };
+  };
+  systemd.timers."huginn-graphify-vault" = {
+    description = "huginn vault-graph rebuild schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 23:30:00";   # nightly, after the 23:00 digest
+      Persistent = true;
+      RandomizedDelaySec = "5m";
+    };
+  };
+
+  # ── gardener: weekly hygiene report ──
+  systemd.services."huginn-gardener" = {
+    description = "huginn: weekly vault hygiene report (orphans, dead links, stale)";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${gardener}/bin/huginn-gardener";
+    };
+  };
+  systemd.timers."huginn-gardener" = {
+    description = "huginn gardener schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Sat *-*-* 08:30:00";
+      Persistent = true;
+      RandomizedDelaySec = "10m";
     };
   };
 }

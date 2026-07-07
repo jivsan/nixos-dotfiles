@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-# muninn brain — build graph.json + activity.json for the live 3D view.
-# Two sources merged:
+# muninn brain — build graph.json + activity.json for the live dashboard.
+# Two sources merged into the 3D graph:
 #   • the vault's wikilinks (notes)  — fast, from markdown
 #   • the Graphify code graph (repo) — from /var/lib/huginn/graphs/dotfiles/graph.json
 # Code nodes are coloured by Graphify "community" so the graph looks like a brain.
-import os, re, json, time, glob, colorsys
+# activity.json additionally carries the at-a-glance OS state: huginn agent
+# health (systemd timers/services), the inbox queue, today's digest, the vault
+# git log (what huginn did), and hygiene counts.
+import os, re, json, time, glob, colorsys, subprocess
 
 VAULT = "/mnt/nas/obsidian/muninn"
 WWW = "/var/lib/muninn-brain/www"
@@ -108,16 +111,117 @@ for logf in sorted(glob.glob(os.path.join(VAULT, "agents", "logs", "*.log"))):
     try:
         with open(logf, encoding="utf-8", errors="ignore") as fh:
             for line in fh.read().splitlines()[-8:]:
-                log.append({"job": job, "line": line})
+                log.append({"job": job, "line": line, "mtime": int(os.path.getmtime(logf))})
     except OSError:
         pass
+log.sort(key=lambda x: x["mtime"])
 recent = sorted(notes.items(), key=lambda kv: kv[1]["mtime"], reverse=True)[:10]
+
+
+# ── huginn agent health (systemd, unprivileged systemctl show) ──
+def sysprop(unit, *props):
+    try:
+        out = subprocess.run(
+            ["systemctl", "show", "--timestamp=unix", unit, "--"]
+            + [f"-p{p}" for p in props],
+            capture_output=True, text=True, timeout=5).stdout
+        return dict(l.split("=", 1) for l in out.splitlines() if "=" in l)
+    except Exception:
+        return {}
+
+
+def epoch(v):
+    # --timestamp=unix prints "@1751912228"; absent/n-a → 0
+    return int(v[1:]) if v.startswith("@") and v[1:].isdigit() else 0
+
+
+AGENTS = [
+    ("inbox-sweep", "huginn-inbox-sweep"),
+    ("daily-digest", "huginn-daily-digest"),
+    ("graph:vault", "huginn-graphify-vault"),
+    ("graph:repo", "huginn-graphify-repo"),
+    ("gardener", "huginn-gardener"),
+    ("brain-build", "muninn-brain-build"),
+]
+agents = []
+for label, unit in AGENTS:
+    t = sysprop(unit + ".timer", "LastTriggerUSec", "NextElapseUSecRealtime")
+    s = sysprop(unit + ".service", "Result", "ExecMainExitTimestamp", "ActiveState")
+    agents.append({
+        "name": label,
+        "last": epoch(t.get("LastTriggerUSec", "")) or epoch(s.get("ExecMainExitTimestamp", "")),
+        "next": epoch(t.get("NextElapseUSecRealtime", "")),
+        "result": s.get("Result", "unknown"),
+        "active": s.get("ActiveState", "") == "activating",
+    })
+services = []
+for label, unit in [("obsidian", "podman-obsidian.service"), ("nginx", "nginx.service")]:
+    services.append({"name": label,
+                     "ok": sysprop(unit, "ActiveState").get("ActiveState") == "active"})
+
+# ── inbox queue ──
+inbox = []
+for f in sorted(glob.glob(os.path.join(VAULT, "_inbox", "*.md"))):
+    if os.path.basename(f) == "README.md":
+        continue
+    inbox.append({"name": os.path.basename(f)[:-3], "mtime": int(os.path.getmtime(f))})
+
+# ── today's (or latest) digest section from the journal ──
+digest, digest_day = "", ""
+jfiles = sorted(glob.glob(os.path.join(VAULT, "journal", "20*.md")))
+if jfiles:
+    digest_day = os.path.basename(jfiles[-1])[:-3]
+    try:
+        with open(jfiles[-1], encoding="utf-8", errors="ignore") as fh:
+            txt = fh.read()
+        if "## huginn digest" in txt:
+            digest = txt.split("## huginn digest", 1)[1]
+            digest = digest.split("\n", 1)[1] if "\n" in digest else ""
+            digest = digest.replace("[[Home MOC]]", "").strip()[:1200]
+    except OSError:
+        pass
+
+# ── vault git log — the audit trail of what huginn did ──
+gitlog = []
+try:
+    out = subprocess.run(
+        ["git", "-C", VAULT, "log", "-n", "12", "--format=%at%x09%s"],
+        capture_output=True, text=True, timeout=5).stdout
+    for line in out.splitlines():
+        ts, _, subj = line.partition("\t")
+        gitlog.append({"t": int(ts), "msg": subj})
+except Exception:
+    pass
+
+# ── hygiene: orphans = filed notes with no MOC wikilink (golden rule #1) ──
+moc_names = {n for n, m in notes.items() if m["folder"] == "MOCs"}
+orphans = 0
+for name, meta in notes.items():
+    if meta["folder"] not in ("Areas", "Resources", "root"):
+        continue
+    if name in ("CLAUDE", "Home", "README", "Gardener Report"):
+        continue
+    try:
+        with open(os.path.join(VAULT, meta["rel"]), encoding="utf-8", errors="ignore") as fh:
+            targets = {m.group(1).strip().split("/")[-1] for m in WIKILINK.finditer(fh.read())}
+    except OSError:
+        continue
+    if not (targets & moc_names):
+        orphans += 1
+
 with open(os.path.join(WWW, "activity.json"), "w") as fh:
     json.dump({
         "generated": int(now),
-        "counts": {"notes": len(notes), "code": code_nodes, "links": len(links)},
+        "counts": {"notes": len(notes), "code": code_nodes, "links": len(links),
+                   "mocs": len(moc_names), "inbox": len(inbox), "orphans": orphans},
+        "agents": agents,
+        "services": services,
+        "inbox": inbox[:12],
+        "digest": {"day": digest_day, "text": digest},
+        "gitlog": gitlog,
         "log": log[-40:],
         "recent": [{"id": n, "folder": m["folder"], "mtime": int(m["mtime"])} for n, m in recent],
     }, fh)
 
-print(f"muninn-brain: {len(notes)} notes + {code_nodes} code nodes, {len(links)} links")
+print(f"muninn-brain: {len(notes)} notes + {code_nodes} code nodes, {len(links)} links, "
+      f"{len(inbox)} inbox, {orphans} orphans")

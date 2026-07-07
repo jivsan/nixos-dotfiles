@@ -9,7 +9,9 @@ let
 
   buildGraph = pkgs.writeShellApplication {
     name = "muninn-brain-build";
-    runtimeInputs = [ pkgs.python3Minimal pkgs.coreutils ];
+    # git + systemctl: activity.json includes the vault audit log and huginn
+    # timer/service health
+    runtimeInputs = [ pkgs.python3Minimal pkgs.coreutils pkgs.git pkgs.systemd ];
     text = ''python3 ${../../muninn/brain/build-graph.py}'';
   };
 in

@@ -167,6 +167,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          homeassistant = {
+            rule = "Host(`homeassistant.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "homeassistant";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -262,6 +270,16 @@
             loadBalancer = {
               servers = [
                 { url = "http://10.0.20.18:8188"; }
+              ];
+            };
+          };
+
+          # Home Assistant OS on the IoT VLAN. Needs use_x_forwarded_for +
+          # trusted_proxies set in its configuration.yaml or it returns 400.
+          homeassistant = {
+            loadBalancer = {
+              servers = [
+                { url = "http://10.0.50.101:8123"; }
               ];
             };
           };
