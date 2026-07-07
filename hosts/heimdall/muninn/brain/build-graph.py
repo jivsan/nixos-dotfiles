@@ -122,8 +122,7 @@ recent = sorted(notes.items(), key=lambda kv: kv[1]["mtime"], reverse=True)[:10]
 def sysprop(unit, *props):
     try:
         out = subprocess.run(
-            ["systemctl", "show", "--timestamp=unix", unit, "--"]
-            + [f"-p{p}" for p in props],
+            ["systemctl", "show", "--timestamp=unix", "-p", ",".join(props), "--", unit],
             capture_output=True, text=True, timeout=5).stdout
         return dict(l.split("=", 1) for l in out.splitlines() if "=" in l)
     except Exception:
