@@ -27,6 +27,61 @@ let
     runtimeInputs = [ pkgs.python3Minimal pkgs.coreutils pkgs.git pkgs.systemd ];
     text = ''python3 ${../../muninn/brain/build-graph.py}'';
   };
+
+  # Tiny stdlib-only capture endpoint.
+  # POST /capture with {"text": "..."} or raw text → writes capture-*.md into the vault _inbox/.
+  capturePy = pkgs.writeText "muninn-capture.py" ''
+    #!/usr/bin/env python3
+    import http.server
+    import socketserver
+    import os
+    import time
+    import json
+
+    VAULT = "/mnt/nas/obsidian/muninn"
+    INBOX = os.path.join(VAULT, "_inbox")
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            if self.path != "/capture":
+                self.send_error(404)
+                return
+            length = int(self.headers.get("content-length", 0))
+            body = self.rfile.read(length).decode("utf-8", errors="replace")
+            try:
+                data = json.loads(body)
+                text = data.get("text", body)
+            except Exception:
+                text = body
+            text = (text or "").strip()
+            if not text:
+                self.send_error(400, "empty note")
+                return
+            ts = time.strftime("%Y-%m-%d-%H%M%S")
+            fn = f"capture-{ts}.md"
+            path = os.path.join(INBOX, fn)
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text + "\n")
+                os.chmod(path, 0o644)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "file": fn}).encode())
+            except Exception as e:
+                self.send_error(500, str(e))
+
+        def log_message(self, fmt, *args):
+            pass  # quiet
+
+    if __name__ == "__main__":
+        os.makedirs(INBOX, exist_ok=True)
+        PORT = 8091
+        with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
+            httpd.serve_forever()
+  '';
+
+  captureSrv = "${pkgs.python3}/bin/python3 ${capturePy}";
 in
 {
   systemd.tmpfiles.rules = [
@@ -59,6 +114,21 @@ in
     };
   };
 
+  # Live capture endpoint (writes directly to _inbox/)
+  systemd.services."muninn-brain-capture" = {
+    description = "muninn brain: capture endpoint for dashboard quick notes";
+    unitConfig.RequiresMountsFor = vault;
+    serviceConfig = {
+      Type = "simple";
+      User = "christina";
+      Group = "users";
+      ExecStart = captureSrv;
+      Restart = "always";
+      RestartSec = "5s";
+    };
+    wantedBy = [ "multi-user.target" ];
+  };
+
   # static server on localhost; Traefik fronts it (see traefik.nix → brain router)
   services.nginx = {
     enable = true;
@@ -78,6 +148,11 @@ in
           add_header Cache-Control no-store;
           location ~ /\. { return 404; }
         '';
+      };
+      # capture endpoint (dashboard quick notes → _inbox/)
+      locations."/capture" = {
+        proxy_pass http://127.0.0.1:8091;
+        proxy_http_version 1.1;
       };
     };
   };

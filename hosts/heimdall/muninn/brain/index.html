@@ -19,7 +19,7 @@
   ::-webkit-scrollbar { width:7px; height:7px; }
   ::-webkit-scrollbar-thumb { background:rgba(138,125,255,.25); border-radius:4px; }
 
-  body { display:grid; grid-template-columns:212px 1fr; }
+  body { display:grid; grid-template-columns:212px 1fr; grid-template-rows: 1fr; height: 100vh; }
 
   /* ── sidebar ─────────────────────────────────────────── */
   aside { background:var(--side); border-right:1px solid var(--line);
@@ -42,7 +42,7 @@
   @keyframes p { 0%{box-shadow:0 0 0 0 rgba(45,226,230,.5)} 70%{box-shadow:0 0 0 9px rgba(45,226,230,0)} 100%{box-shadow:0 0 0 0 rgba(45,226,230,0)} }
 
   /* ── main / header ───────────────────────────────────── */
-  main { display:flex; flex-direction:column; min-width:0; padding:26px 34px 22px; gap:16px; }
+  main { display:flex; flex-direction:column; min-width:0; padding:26px 34px 22px; gap:16px; height: 100%; min-height: 0; }
   .pghead { flex:none; }
   .pghead h1 { margin:0; font-family:var(--serif); font-weight:500; font-size:42px;
     letter-spacing:.4px; color:var(--cream); }
@@ -51,13 +51,13 @@
     font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink3); }
   .pgmeta .sep { color:var(--violet); }
 
-  .view { flex:1; min-height:0; display:none; }
+  .view { flex:1; min-height:0; display:none; height: 100%; }
   .view.on { display:flex; flex-direction:column; }
 
   /* ── panel chrome ────────────────────────────────────── */
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:16px;
     flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden;
-    box-shadow:0 18px 60px rgba(0,0,0,.35); }
+    box-shadow:0 18px 60px rgba(0,0,0,.35); height: 100%; }
   .phead { display:flex; align-items:center; gap:10px; padding:13px 18px;
     border-bottom:1px solid var(--line); flex:none; }
   .phead .bar { width:3px; height:15px; background:var(--violet); border-radius:2px; }
@@ -81,7 +81,7 @@
   .chip b { color:var(--violet); font-weight:normal; margin-left:4px; }
   .chip.galaxy { margin-left:auto; border-color:rgba(45,226,230,.35); color:var(--cyan); }
 
-  .duo { flex:1; min-height:0; display:flex; }
+  .duo { flex: 1 1 0; min-height: 0; display:flex; height: 100%; }
   #mem-list { width:342px; flex:none; overflow-y:auto; border-right:1px solid var(--line); }
   .row { padding:10px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
   .row:hover, .row.sel { background:rgba(255,255,255,.028); }
@@ -89,7 +89,7 @@
   .row .tt .dot { width:7px; height:7px; border-radius:50%; flex:none; align-self:center; }
   .row .tt .when { margin-left:auto; font-size:10px; color:var(--ink3); flex:none; }
   .row .pp { font-size:10px; color:var(--ink3); margin-top:3px; padding-left:14px; }
-  #mem-read { flex:1; min-width:0; overflow-y:auto; padding:18px 26px 30px; }
+  #mem-read { flex: 1 1 0; min-height: 0; overflow-y: auto; padding:18px 26px 30px; height: 100%; }
   .rhead { display:flex; align-items:center; font-size:10px; letter-spacing:1.6px;
     color:var(--ink3); text-transform:uppercase; margin-bottom:14px; }
   .rhead .x { margin-left:auto; cursor:pointer; border:0; background:none; color:var(--ink3);
@@ -196,6 +196,7 @@
   <div class="navsec">self</div>
   <button class="nav on" data-v="memory"><span class="ic">◈</span><span class="lbl">Memory</span></button>
   <button class="nav" data-v="galaxy"><span class="ic">✦</span><span class="lbl">Galaxy</span></button>
+  <button class="nav" data-v="capture"><span class="ic">✎</span><span class="lbl">Capture</span></button>
   <div class="navsec">system</div>
   <button class="nav" data-v="systems"><span class="ic">⚙</span><span class="lbl">Systems</span></button>
   <a class="nav" href="https://obsidian.oryxserver.org" target="_blank"><span class="ic">↗</span><span class="lbl">Obsidian</span></a>
@@ -230,6 +231,21 @@
       <div class="duo">
         <div id="mem-list"><div class="ghost">connecting…</div></div>
         <div id="mem-read"><div class="ghost center">✦<br><br>select a memory</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── capture ── -->
+  <section class="view" id="view-capture">
+    <div class="panel">
+      <div class="phead"><div class="bar"></div><div class="tt"><i>✎</i> Capture to _inbox</div></div>
+      <div style="padding:18px; display:flex; flex-direction:column; flex:1; gap:12px;">
+        <textarea id="capture-text" placeholder="Type here...&#10;This will be saved as a new file in _inbox/.&#10;Huginn will title it, add frontmatter, and file it into the right place." style="flex:1; width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:10px; color:var(--cream); font:inherit; font-size:13px; padding:12px; resize:none; min-height:140px;"></textarea>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="capture-btn" style="background:var(--violet); color:white; border:none; border-radius:8px; padding:8px 18px; font:inherit; cursor:pointer;">Capture → _inbox</button>
+          <span id="capture-status" style="font-size:11px; color:var(--ink2);"></span>
+        </div>
+        <div style="font-size:10px; color:var(--ink3); margin-top:4px;">Press the button or Ctrl/Cmd+Enter in the box. New notes appear under the Inbox filter in Memory.</div>
       </div>
     </div>
   </section>
@@ -407,6 +423,7 @@ function focusSubgraph(id) {
 const TITLES = {
   memory:  ['Memory',  'Search the muninn vault — everything the OS remembers.'],
   galaxy:  ['Galaxy',  'Every memory is a star; huginn keeps them in orbit.'],
+  capture: ['Capture', 'Quick notes go straight to _inbox/ (huginn will file them).'],
   systems: ['Systems', 'Agent health, digests, and the vault audit trail.'],
 };
 let curView = 'memory';
@@ -416,6 +433,9 @@ function show(v) {
   document.querySelectorAll('.nav[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   const [t, s] = TITLES[v]; $('pg-title').textContent = t; $('pg-sub').textContent = s;
   if (v === 'galaxy') { initGalaxy(); sizeGalaxy(); if (Graph && gData) feedGalaxy(); }
+  if (v === 'capture') {
+    setTimeout(() => { const ta = $('capture-text'); if (ta) ta.focus(); }, 60);
+  }
   history.replaceState(null, '', '#'+v);
 }
 document.querySelectorAll('.nav[data-v]').forEach(b => b.addEventListener('click', () => show(b.dataset.v)));
@@ -553,6 +573,67 @@ document.addEventListener('click', e => {
   const id = (w.dataset.note || w.textContent).trim();
   if (byId()[id]) openNote(id);
 });
+
+/* ── capture tab: type → _inbox/ ─────────────────────── */
+async function doCapture() {
+  const ta = $('capture-text');
+  const status = $('capture-status');
+  const text = (ta.value || '').trim();
+  if (!text) {
+    status.textContent = 'nothing to capture';
+    setTimeout(() => status.textContent = '', 1200);
+    return;
+  }
+  status.textContent = 'capturing…';
+  try {
+    const res = await fetch('/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('server ' + res.status);
+    const data = await res.json();
+    status.textContent = 'captured ✓ ' + (data.file || '');
+    ta.value = '';
+    // refresh memory list so it shows in Inbox
+    if (typeof refreshNotes === 'function') {
+      setTimeout(refreshNotes, 300);
+    }
+    // optionally switch to memory + inbox filter
+    setTimeout(() => {
+      show('memory');
+      // activate inbox chip if present
+      const inboxChip = document.querySelector('#chips .chip[data-f="_inbox"]');
+      if (inboxChip) {
+        document.querySelectorAll('#chips .chip').forEach(c => c.classList.remove('on'));
+        inboxChip.classList.add('on');
+        if (typeof filter !== 'undefined') filter = '_inbox';
+        if (typeof renderList === 'function') renderList();
+      }
+    }, 900);
+    setTimeout(() => { status.textContent = ''; }, 2200);
+  } catch (e) {
+    status.textContent = 'failed: ' + e.message;
+    setTimeout(() => status.textContent = '', 2500);
+  }
+}
+
+function wireCapture() {
+  const btn = $('capture-btn');
+  const ta = $('capture-text');
+  if (btn) btn.addEventListener('click', doCapture);
+  if (ta) {
+    ta.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        doCapture();
+      }
+    });
+  }
+}
+
+// wire on load
+setTimeout(wireCapture, 50);
 
 async function refreshNotes() {
   try {
