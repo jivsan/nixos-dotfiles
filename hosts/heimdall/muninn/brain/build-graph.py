@@ -81,6 +81,8 @@ for name, meta in notes.items():
         "val": 2 + deg.get(name, 0),
         "recent": (now - meta["mtime"]) < 86400,
         "mtime": int(meta["mtime"]),
+        "rel": meta["rel"],
+        "tags": meta.get("tags", []),
     })
 
 # ── code graph (Graphify, repo) ──
@@ -108,6 +110,7 @@ if os.path.exists(REPO_GRAPH):
                 "color": community_color(n.get("community")),
                 "val": 1 + cdeg.get(nid, 0),
                 "recent": False,
+                "community": n.get("community"),
             })
             code_nodes += 1
     except (ValueError, OSError):

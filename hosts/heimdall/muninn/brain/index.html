@@ -165,6 +165,25 @@
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
   .empty { color:var(--ink3); font-size:11px; font-style:italic; padding:2px 0; }
 
+  /* galaxy interactive additions */
+  .gtools { position:absolute; top:16px; right:18px; z-index:6; display:flex; gap:6px; flex-wrap:wrap; }
+  .gtools button, .gtools .gsearch { font:inherit; font-size:10px; background:rgba(20,16,25,.7); color:var(--ink2);
+    border:1px solid var(--line); border-radius:7px; padding:3px 8px; cursor:pointer; }
+  .gtools button:hover { color:var(--cream); border-color:var(--violet); }
+  .gtools button.on { background:rgba(138,125,255,.2); color:var(--cream); border-color:var(--violet); }
+  .gtools .gsearch { width:148px; padding:3px 8px; }
+  .gsel { position:absolute; left:20px; bottom:18px; z-index:6; max-width:46%;
+    background:rgba(12,9,19,.88); border:1px solid rgba(138,125,255,.35); border-radius:10px;
+    padding:8px 12px; font-size:11px; line-height:1.35; pointer-events:auto; }
+  .gsel .nm { color:#fff; font-weight:500; }
+  .gsel .meta { color:var(--ink2); font-size:10px; }
+  .gsel .neighs { margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; }
+  .gsel .neigh { font-size:10px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+    padding:1px 6px; border-radius:5px; cursor:pointer; white-space:nowrap; }
+  .gsel .neigh:hover { background:rgba(45,226,230,.15); border-color:var(--cyan); }
+  .gsel .acts { margin-top:6px; display:flex; gap:6px; }
+  .gsel .acts button { font-size:9.5px; padding:2px 7px; }
+
   @media (max-width:1150px){ body{grid-template-columns:64px 1fr}
     .brand,.navsec,.sidefoot,.nav span.lbl{display:none} .nav{justify-content:center}
     #view-systems.on{grid-template-columns:1fr 1fr} }
@@ -222,9 +241,19 @@
       <div class="gcap">
         <div class="t1"><i>✦</i> MEMORY GALAXY</div>
         <div class="t2" id="g-stats">– stars · – links</div>
-        <div class="t3">drag to orbit · scroll to zoom · click a star · double-click to pause flight<br>
-          <i>✦</i> brighter &amp; whiter = more recently touched</div>
+        <div class="t3">drag to orbit · scroll to zoom · click a star · dbl-click rotate toggle<br>
+          <i>✦</i> white/bright = recently touched notes. code nodes are dimmer communities.</div>
       </div>
+      <div class="gtools" id="gtools">
+        <button data-f="all" class="on">all</button>
+        <button data-f="notes">notes</button>
+        <button data-f="code">code</button>
+        <button data-f="recent">recent</button>
+        <input class="gsearch" id="gq" placeholder="filter nodes..." />
+        <button id="g-focus">focus sel</button>
+        <button id="g-clear">clear</button>
+      </div>
+      <div id="gsel" class="gsel" style="display:none"></div>
     </div>
   </section>
 
@@ -268,6 +297,112 @@ const rel = t => {
 };
 const wiki = s => esc(s).replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, '<span class="wl" data-note="$1">$1</span>');
 
+/* ── galaxy state + helpers (interactive nodes + files) ─ */
+let Graph = null, gData = null, gGen = -1;
+let gFilter = 'all', gQuery = '', gSel = null;
+const nodeById = new Map();
+const neighById = new Map(); // id -> array of neighbor ids (built from links)
+function buildNeighbors(links) {
+  neighById.clear();
+  for (const l of links) {
+    const s = typeof l.source === 'object' ? l.source.id : l.source;
+    const t = typeof l.target === 'object' ? l.target.id : l.target;
+    if (!neighById.has(s)) neighById.set(s, []);
+    if (!neighById.has(t)) neighById.set(t, []);
+    neighById.get(s).push(t);
+    neighById.get(t).push(s);
+  }
+}
+function matchesFilter(n) {
+  if (gFilter === 'notes' && n.source !== 'note') return false;
+  if (gFilter === 'code' && n.source !== 'code') return false;
+  if (gFilter === 'recent' && !n.recent) return false;
+  if (gQuery) {
+    const hay = (n.label||n.id) + ' ' + (n.rel||'') + ' ' + (n.tags||[]).join(' ') + (n.community != null ? 'c'+n.community : '');
+    if (!hay.toLowerCase().includes(gQuery.toLowerCase())) return false;
+  }
+  return true;
+}
+function getFilteredData() {
+  if (!gData) return {nodes:[], links:[]};
+  const nodes = gData.nodes.filter(matchesFilter);
+  const keep = new Set(nodes.map(n => n.id));
+  const links = gData.links.filter(l => {
+    const s = typeof l.source==='object'?l.source.id:l.source;
+    const t = typeof l.target==='object'?l.target.id:l.target;
+    return keep.has(s) && keep.has(t);
+  });
+  return {nodes, links};
+}
+function renderSelInfo() {
+  const box = $('gsel');
+  if (!gSel || !nodeById.has(gSel)) { box.style.display='none'; return; }
+  const n = nodeById.get(gSel);
+  const isNote = n.source === 'note';
+  const comm = (n.community != null) ? ` · c${n.community}` : '';
+  const rel = n.rel ? `<div class="meta">${esc(n.rel)}</div>` : '';
+  const tags = (n.tags && n.tags.length) ? `<div class="meta">tags: ${n.tags.map(esc).join(', ')}</div>` : '';
+  let neighHtml = '';
+  const ns = (neighById.get(gSel) || []).slice(0,5);
+  if (ns.length) {
+    neighHtml = '<div class="neighs">' + ns.map(id => {
+      const nn = nodeById.get(id); const lbl = nn ? (nn.label||id) : id;
+      return `<span class="neigh" data-nid="${id}">${esc(lbl).slice(0,22)}</span>`;
+    }).join('') + '</div>';
+  }
+  const actions = isNote
+    ? `<button id="g-openmem">open in memory</button><button id="g-focus">focus</button>`
+    : `<button id="g-focus">focus subgraph</button>`;
+  box.innerHTML = `<div class="nm">${esc(n.label || n.id)} <span class="meta">${n.source}${comm}</span></div>
+    ${rel}${tags}${neighHtml}
+    <div class="acts">${actions}<button id="g-clrsel">clear</button></div>`;
+  box.style.display = '';
+  // wire
+  box.querySelectorAll('.neigh').forEach(el => el.onclick = () => flyToNode(el.dataset.nid));
+  const of = box.querySelector('#g-openmem'); if (of) of.onclick = () => openNote(gSel);
+  const foc = box.querySelector('#g-focus'); if (foc) foc.onclick = () => focusSubgraph(gSel);
+  box.querySelector('#g-clrsel').onclick = clearGalaxySel;
+}
+function clearGalaxySel() { gSel = null; $('gsel').style.display='none'; if (Graph) Graph.nodeColor(Graph.nodeColor()); }
+function flyToNode(id) {
+  if (!Graph) return;
+  const n = nodeById.get(id); if (!n) return;
+  gSel = id;
+  const d=110; const r=1 + d/Math.hypot(n.x||1,n.y||1,n.z||1);
+  Graph.cameraPosition({x:(n.x||0)*r, y:(n.y||0)*r, z:(n.z||0)*r}, n, 850);
+  renderSelInfo();
+  // light highlight
+  highlightNode(n);
+}
+function highlightNode(node) {
+  // simple re-trigger by touching a prop
+  if (!Graph) return;
+  const prev = Graph.nodeColor();
+  Graph.nodeColor(n => n===node ? '#fff' : prev(n));
+  setTimeout(() => { if (Graph) Graph.nodeColor(prev); }, 1400);
+}
+function focusSubgraph(id) {
+  if (!Graph || !gData) return;
+  gSel = id;
+  const core = new Set([id, ...(neighById.get(id)||[])]);
+  // temporarily filter view to subgraph + keep a bit of context
+  const subNodes = gData.nodes.filter(n => core.has(n.id) || (Math.random()<0.12)); // light context
+  const keep = new Set(subNodes.map(n=>n.id));
+  const subLinks = gData.links.filter(l => {
+    const s=typeof l.source=='object'?l.source.id:l.source, t=typeof l.target=='object'?l.target.id:l.target;
+    return keep.has(s)&&keep.has(t);
+  });
+  Graph.graphData({nodes: subNodes, links: subLinks});
+  setTimeout(() => {
+    const n = nodeById.get(id);
+    if (n && Graph) {
+      const d=70; const r=1 + d/Math.hypot(n.x||1,n.y||1,n.z||1);
+      Graph.cameraPosition({x:(n.x||0)*r,y:(n.y||0)*r,z:(n.z||0)*r}, n, 700);
+    }
+  }, 120);
+  renderSelInfo();
+}
+
 /* ── view routing ─────────────────────────────────────── */
 const TITLES = {
   memory:  ['Memory',  'Search the muninn vault — everything the OS remembers.'],
@@ -280,7 +415,7 @@ function show(v) {
   document.querySelectorAll('.view').forEach(e => e.classList.toggle('on', e.id === 'view-'+v));
   document.querySelectorAll('.nav[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   const [t, s] = TITLES[v]; $('pg-title').textContent = t; $('pg-sub').textContent = s;
-  if (v === 'galaxy') initGalaxy();
+  if (v === 'galaxy') { initGalaxy(); sizeGalaxy(); if (Graph && gData) feedGalaxy(); }
   history.replaceState(null, '', '#'+v);
 }
 document.querySelectorAll('.nav[data-v]').forEach(b => b.addEventListener('click', () => show(b.dataset.v)));
@@ -299,7 +434,8 @@ function renderList() {
   $('mem-list').innerHTML = arr.slice(0, 400).map(n => `
     <div class="row${n.id === selId ? ' sel' : ''}" data-id="${esc(n.id)}">
       <div class="tt"><span class="dot" style="background:${FOLDER[n.folder]||'#7f8cff'}"></span>
-        <span>${esc(n.id)}</span><span class="when">${rel(n.mtime)}</span></div>
+        <span>${esc(n.id)}</span><span class="when">${rel(n.mtime)}</span>
+        <span class="gal" data-gal="${esc(n.id)}" title="show in galaxy" style="margin-left:auto;font-size:10px;opacity:.6;cursor:pointer">✦</span></div>
       <div class="pp">${esc(n.rel)}</div>
     </div>`).join('') || '<div class="ghost">nothing matches</div>';
 }
@@ -311,10 +447,16 @@ $('chips').addEventListener('click', e => {
   renderList();
 });
 $('mem-list').addEventListener('click', e => {
+  const g = e.target.closest('.gal'); if (g) { e.stopImmediatePropagation(); selectInGalaxy(g.dataset.gal); return; }
   const r = e.target.closest('.row'); if (r) openNote(r.dataset.id);
 });
 addEventListener('keydown', e => {
-  if (e.key === '/' && document.activeElement !== $('q')) { e.preventDefault(); show('memory'); $('q').focus(); }
+  if (e.key === '/' && document.activeElement !== $('q') && document.activeElement !== $('gq')) {
+    e.preventDefault();
+    if (curView === 'galaxy') { show('galaxy'); setTimeout(()=> $('gq') && $('gq').focus(), 10); }
+    else { show('memory'); $('q').focus(); }
+  }
+  if (e.key === 'Escape' && curView === 'galaxy') { clearGalaxySel(); }
 });
 
 function mdRender(txt) {
@@ -351,16 +493,59 @@ async function openNote(id) {
   try { const r = await fetch(path); txt = r.ok ? await r.text() : `(couldn't load: HTTP ${r.status})`; }
   catch { txt = "(couldn't load note)"; }
   const { meta, html } = mdRender(txt);
+
+  // build graph neighbors (from gData if loaded)
+  let graphNeigh = '';
+  if (gData && neighById.size === 0 && gData.links) buildNeighbors(gData.links);
+  const ns = (neighById.get(id) || []).slice(0, 7);
+  if (ns.length) {
+    graphNeigh = '<div style="margin:16px 0 6px;font-size:10px;letter-spacing:1px;color:var(--ink2)">GRAPH NEIGHBORS</div><div class="neighs" style="margin-bottom:8px">';
+    graphNeigh += ns.map(nid => {
+      const nn = nodeById.get(nid) || (gData && gData.nodes.find(x=>x.id===nid)) || {label:nid};
+      const isC = (nid||'').startsWith('c:');
+      return `<span class="neigh" data-nid="${nid}" style="background:rgba(138,125,255,.1)">${esc((nn.label||nid).slice(0,26))}${isC?'<sup style="opacity:.6">c</sup>':''}</span>`;
+    }).join('');
+    graphNeigh += '</div>';
+  }
+
   $('mem-read').innerHTML = `
     <div class="rhead">muninn / ${esc(n.rel).toUpperCase()}
-      <button class="x" id="rclose">close ✕</button></div>
+      <button class="x" id="rclose">close ✕</button>
+      <button id="r-to-gal" style="margin-left:8px;font-size:10px;border:1px solid var(--line);background:none;color:var(--ink2);padding:1px 7px;border-radius:6px;cursor:pointer">✦ view in galaxy</button>
+    </div>
     ${meta ? `<div class="fmchips">${meta}</div>` : ''}
-    <div class="md">${html}</div>`;
+    <div class="md">${html}</div>
+    ${graphNeigh}`;
   $('mem-read').scrollTop = 0;
+
+  const togal = $('r-to-gal'); if (togal) togal.onclick = () => selectInGalaxy(id);
+  $('mem-read').querySelectorAll('.neigh').forEach(el => {
+    el.onclick = () => {
+      const nid = el.dataset.nid;
+      if (nid.startsWith('c:')) { selectInGalaxy(nid); } else { openNote(nid); }
+    };
+  });
   $('rclose').addEventListener('click', () => {
     selId = null; renderList();
     $('mem-read').innerHTML = '<div class="ghost center">✦<br><br>select a memory</div>';
   });
+}
+function selectInGalaxy(id) {
+  show('galaxy');
+  setTimeout(() => {
+    if (!gData) return;
+    const n = nodeById.get(id) || gData.nodes.find(x => x.id === id);
+    if (n) {
+      gSel = id;
+      if (Graph) {
+        // ensure visible
+        const f = getFilteredData();
+        if (!f.nodes.some(x=>x.id===id)) { gFilter='all'; gQuery=''; }
+        feedGalaxy();
+      }
+      flyToNode(id);
+    }
+  }, 80);
 }
 // wikilinks anywhere (reader, digest) open notes
 document.addEventListener('click', e => {
@@ -382,8 +567,7 @@ async function refreshNotes() {
   } catch {}
 }
 
-/* ── galaxy ───────────────────────────────────────────── */
-let Graph = null, gData = null, gGen = -1;
+/* ── galaxy (enhanced interactive) ────────────────────── */
 const texCache = new Map();
 function starTex(color, hot) {
   const key = color + (hot ? '+' : '');
@@ -414,10 +598,10 @@ const hl = new Set();
 function initGalaxy() {
   const el = $('g3d');
   sizeGalaxy();
-  if (Graph) return;
+  if (Graph) { feedGalaxy(); return; }
   try { buildGalaxy(el); }
-  catch (e) {   // galaxy must never take the rest of the OS down with it
-    $('g-stats').textContent = 'galaxy failed to load: ' + e.message;
+  catch (e) {
+    $('g-stats').textContent = 'galaxy failed: ' + e.message;
   }
 }
 function buildGalaxy(el) {
@@ -427,8 +611,8 @@ function buildGalaxy(el) {
     .width(el.clientWidth).height(el.clientHeight)
     .nodeLabel(n => (n.label || n.id) + (n.source === 'code' ? ' · code' : ''))
     .nodeThreeObject(star)
-    .linkColor(() => 'rgba(160,140,255,1)')
-    .linkOpacity(0.09)
+    .linkColor(() => 'rgba(160,140,255,.75)')
+    .linkOpacity(0.11)
     .linkWidth(0)
     .linkDirectionalParticles(l => hl.has(l) ? 3 : 0)
     .linkDirectionalParticleWidth(1.6)
@@ -437,20 +621,22 @@ function buildGalaxy(el) {
     .onNodeHover(n => {
       hl.clear();
       if (n) for (const l of Graph.graphData().links)
-        if (l.source === n || l.target === n) hl.add(l);
+        if ((l.source && l.source.id || l.source) === (n.id||n) || (l.target && l.target.id || l.target) === (n.id||n)) hl.add(l);
       el.style.cursor = n ? 'pointer' : '';
       Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
     })
     .onNodeClick(n => {
-      if (n.source === 'note' && byId()[n.id]) { openNote(n.id); return; }
-      const r = 1 + 90 / Math.hypot(n.x || 1, n.y || 1, n.z || 1);
-      Graph.cameraPosition({ x: (n.x||0)*r, y: (n.y||0)*r, z: (n.z||0)*r }, n, 900);
+      gSel = (n && n.id) || n;
+      renderSelInfo();
+      if (n.source === 'note' && byId()[n.id || n]) { openNote(n.id || n); return; }
+      const r = 1 + 95 / Math.hypot(n.x || 1, n.y || 1, n.z || 1);
+      Graph.cameraPosition({ x: (n.x||0)*r, y: (n.y||0)*r, z: (n.z||0)*r }, n, 820);
     })
     .warmupTicks(70)
-    .cooldownTime(9000);
-  Graph.d3Force('charge').strength(-55);
+    .cooldownTime(8500);
+  Graph.d3Force('charge').strength(-52);
   const ctl = Graph.controls();
-  ctl.autoRotate = true; ctl.autoRotateSpeed = 0.42;
+  ctl.autoRotate = true; ctl.autoRotateSpeed = 0.38;
   el.addEventListener('dblclick', () => { ctl.autoRotate = !ctl.autoRotate; });
   if (gData) feedGalaxy();
 }
@@ -458,28 +644,36 @@ function sizeGalaxy() {
   const el = $('g3d');
   if (Graph && el.clientWidth) Graph.width(el.clientWidth).height(el.clientHeight);
 }
-const nodeById = new Map();
 function feedGalaxy() {
   if (!Graph || !gData) return;
-  const nodes = gData.nodes.map(n => {
+  const f = getFilteredData();
+  const nodes = f.nodes.map(n => {
     const ex = nodeById.get(n.id);
     if (ex) { Object.assign(ex, n); return ex; }
     nodeById.set(n.id, n); return n;
   });
-  const ids = new Set(gData.nodes.map(n => n.id));
+  const ids = new Set(f.nodes.map(n => n.id));
   for (const k of [...nodeById.keys()]) if (!ids.has(k)) nodeById.delete(k);
-  Graph.graphData({ nodes, links: gData.links });
-  Graph.nodeThreeObject(Graph.nodeThreeObject());   // re-skin (recency may have shifted)
-  setTimeout(() => Graph.zoomToFit(800, 60), 700);
+  buildNeighbors(f.links);   // for inspector
+  Graph.graphData({ nodes: f.nodes, links: f.links });
+  Graph.nodeThreeObject(Graph.nodeThreeObject());
+  $('g-stats').textContent = `${f.nodes.length}/${gData.nodes.length} stars · ${f.links.length} links`;
+  setTimeout(() => Graph.zoomToFit(650, 50), 650);
+  if (gSel) renderSelInfo();
 }
 async function refreshGraph() {
   try {
     const d = await (await fetch('graph.json?_=' + Date.now())).json();
     if (d.generated === gGen) return;
     gGen = d.generated; gData = d;
-    $('g-stats').textContent = `${d.nodes.length} stars · ${d.links.length} links`;
+    nodeById.clear();
     feedGalaxy();
   } catch {}
+}
+
+/* wire helper (the boot timeout installs the handlers) */
+function applyGalaxyFilter() {
+  if (Graph && gData) feedGalaxy();
 }
 
 /* ── systems (same data pipeline as before) ───────────── */
@@ -557,6 +751,27 @@ setInterval(refreshNotes, 30000);
 setInterval(refreshGraph, 15000);
 setInterval(refreshActivity, 5000);
 addEventListener('resize', sizeGalaxy);
+
+// ensure galaxy toolbar is live even if DOMContentLoaded already passed
+setTimeout(() => {
+  const tools = $('gtools'); if (!tools) return;
+  tools.querySelectorAll('button[data-f]').forEach(b => {
+    b.onclick = () => {
+      tools.querySelectorAll('button[data-f]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); gFilter = b.dataset.f || 'all'; if (Graph && gData) feedGalaxy();
+    };
+  });
+  const gq = $('gq'); if (gq) {
+    gq.oninput = () => { gQuery = gq.value||''; if (Graph && gData) feedGalaxy(); };
+    gq.onkeydown = e => { if (e.key==='Escape'){ gq.value=''; gQuery=''; if(Graph&&gData) feedGalaxy(); } };
+  }
+  const gf = $('g-focus'); if (gf) gf.onclick = () => gSel && focusSubgraph(gSel);
+  const gc = $('g-clear'); if (gc) gc.onclick = () => {
+    gFilter='all'; gQuery=''; if($('gq')) $('gq').value=''; 
+    tools.querySelectorAll('button[data-f]').forEach(b=>b.classList.toggle('on',b.dataset.f==='all'));
+    if(Graph&&gData) feedGalaxy(); clearGalaxySel();
+  };
+}, 30);
 </script>
 </body>
 </html>
