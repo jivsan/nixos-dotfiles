@@ -51,6 +51,18 @@ in
       root = www;
       locations."/".index = "index.html";
       locations."~ \\.json$".extraConfig = "add_header Cache-Control no-store;";
+      # raw vault markdown for the Memory reader (read-only; behind lan-only Traefik).
+      # ^~ = prefix-priority so the .json regex above can't shadow vault files;
+      # the nested location denies dotfiles/-dirs (.obsidian, .git, …).
+      locations."^~ /vault/" = {
+        alias = "${vault}/";
+        extraConfig = ''
+          default_type text/plain;
+          charset utf-8;
+          add_header Cache-Control no-store;
+          location ~ /\. { return 404; }
+        '';
+      };
     };
   };
 }

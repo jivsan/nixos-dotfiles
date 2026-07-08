@@ -3,272 +3,557 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>muninn // brain</title>
+<title>muninn — agentic OS</title>
 <style>
-  :root { --pink:#ff4fa3; --cyan:#2de2e6; --bg:#05060f;
-    --ok:#5ad1a0; --bad:#ff5c6c; --ink:#cdd6f4; --ink2:#9aa5d6; --ink3:#7a86b6; }
+  :root {
+    --bg:#0c0913; --side:#0a0710; --panel:#141019; --panel2:#181223;
+    --line:rgba(255,255,255,.065); --cream:#ece5d8; --ink2:#a99fc0; --ink3:#6f6787;
+    --pink:#ff4fa3; --cyan:#2de2e6; --violet:#8a7dff; --gold:#e8c47a;
+    --ok:#5ad1a0; --bad:#ff5c6c;
+    --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); overflow:hidden;
-    font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink); }
-  #graph { position:fixed; inset:0; }
-  .col { position:fixed; top:18px; bottom:18px; display:flex; flex-direction:column;
-    gap:12px; pointer-events:none; z-index:10; transition:opacity .25s, transform .25s; }
-  #hud-l { left:18px;  width:342px; }
-  #hud-r { right:18px; width:372px; }
-  body.zen .col { opacity:0; pointer-events:none; transform:translateY(6px); }
-  .card { background:rgba(10,12,24,.74); border:1px solid rgba(45,226,230,.18);
-    border-radius:14px; padding:13px 15px; backdrop-filter:blur(8px);
-    box-shadow:0 0 40px rgba(255,79,163,.08); pointer-events:auto; min-height:0; }
-  h1 { margin:0; font-size:20px; letter-spacing:.5px;
-    background:linear-gradient(90deg,var(--pink),var(--cyan)); -webkit-background-clip:text;
-    background-clip:text; color:transparent; }
-  .sub { font-size:11px; color:var(--ink3); margin-top:2px; }
-  .sep { margin:0 0 8px; font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--cyan); }
-  .sep small { text-transform:none; letter-spacing:0; color:var(--ink3); float:right; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--cream);
+    font-family:var(--mono); font-size:13px; overflow:hidden; }
+  ::-webkit-scrollbar { width:7px; height:7px; }
+  ::-webkit-scrollbar-thumb { background:rgba(138,125,255,.25); border-radius:4px; }
 
-  /* stat tiles */
-  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px; }
-  .tile { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.05);
+  body { display:grid; grid-template-columns:212px 1fr; }
+
+  /* ── sidebar ─────────────────────────────────────────── */
+  aside { background:var(--side); border-right:1px solid var(--line);
+    padding:20px 14px; display:flex; flex-direction:column; gap:2px; }
+  .brand { font-family:var(--serif); font-size:21px; color:var(--cream);
+    padding:2px 10px 16px; letter-spacing:.3px; }
+  .brand em { font-style:italic; color:var(--violet); }
+  .navsec { font-size:9px; letter-spacing:2.4px; text-transform:uppercase;
+    color:var(--ink3); padding:14px 10px 6px; }
+  .nav { display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+    background:none; border:0; color:var(--ink2); font:inherit; font-size:12.5px;
+    padding:8px 10px; border-radius:9px; cursor:pointer; text-decoration:none; }
+  .nav:hover { background:rgba(255,255,255,.04); color:var(--cream); }
+  .nav.on { background:rgba(138,125,255,.13); color:var(--cream); }
+  .nav .ic { width:16px; text-align:center; opacity:.85; }
+  .sidefoot { margin-top:auto; padding:10px; font-size:10px; color:var(--ink3); line-height:1.7; }
+  .pulse { display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:var(--cyan); margin-right:6px; vertical-align:middle;
+    animation:p 1.8s infinite; }
+  @keyframes p { 0%{box-shadow:0 0 0 0 rgba(45,226,230,.5)} 70%{box-shadow:0 0 0 9px rgba(45,226,230,0)} 100%{box-shadow:0 0 0 0 rgba(45,226,230,0)} }
+
+  /* ── main / header ───────────────────────────────────── */
+  main { display:flex; flex-direction:column; min-width:0; padding:26px 34px 22px; gap:16px; }
+  .pghead { flex:none; }
+  .pghead h1 { margin:0; font-family:var(--serif); font-weight:500; font-size:42px;
+    letter-spacing:.4px; color:var(--cream); }
+  .pgsub { color:var(--ink2); font-size:12.5px; margin-top:5px; }
+  .pgmeta { display:flex; align-items:center; gap:10px; margin-top:9px;
+    font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink3); }
+  .pgmeta .sep { color:var(--violet); }
+
+  .view { flex:1; min-height:0; display:none; }
+  .view.on { display:flex; flex-direction:column; }
+
+  /* ── panel chrome ────────────────────────────────────── */
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 18px 60px rgba(0,0,0,.35); }
+  .phead { display:flex; align-items:center; gap:10px; padding:13px 18px;
+    border-bottom:1px solid var(--line); flex:none; }
+  .phead .bar { width:3px; height:15px; background:var(--violet); border-radius:2px; }
+  .phead .tt { font-size:12.5px; color:var(--cream); letter-spacing:.3px; }
+  .phead .tt i { color:var(--cyan); font-style:normal; }
+  .pill { margin-left:auto; font-size:9.5px; letter-spacing:1.6px; color:var(--ink2);
+    border:1px solid var(--line); background:rgba(255,255,255,.03);
+    padding:4px 11px; border-radius:99px; white-space:nowrap; }
+
+  /* ── memory view ─────────────────────────────────────── */
+  .memtools { padding:13px 18px 11px; border-bottom:1px solid var(--line); flex:none; }
+  #q { width:100%; background:var(--panel2); border:1px solid var(--line);
+    border-radius:10px; color:var(--cream); font:inherit; font-size:12.5px;
+    padding:9px 13px; outline:none; }
+  #q:focus { border-color:rgba(138,125,255,.45); }
+  .chips { display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
+  .chip { background:none; border:1px solid var(--line); color:var(--ink2); font:inherit;
+    font-size:11px; padding:4px 12px; border-radius:99px; cursor:pointer; }
+  .chip:hover { color:var(--cream); }
+  .chip.on { background:rgba(138,125,255,.16); border-color:rgba(138,125,255,.5); color:var(--cream); }
+  .chip b { color:var(--violet); font-weight:normal; margin-left:4px; }
+  .chip.galaxy { margin-left:auto; border-color:rgba(45,226,230,.35); color:var(--cyan); }
+
+  .duo { flex:1; min-height:0; display:flex; }
+  #mem-list { width:342px; flex:none; overflow-y:auto; border-right:1px solid var(--line); }
+  .row { padding:10px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .row:hover, .row.sel { background:rgba(255,255,255,.028); }
+  .row .tt { font-size:12.5px; color:var(--cream); display:flex; align-items:baseline; gap:7px; }
+  .row .tt .dot { width:7px; height:7px; border-radius:50%; flex:none; align-self:center; }
+  .row .tt .when { margin-left:auto; font-size:10px; color:var(--ink3); flex:none; }
+  .row .pp { font-size:10px; color:var(--ink3); margin-top:3px; padding-left:14px; }
+  #mem-read { flex:1; min-width:0; overflow-y:auto; padding:18px 26px 30px; }
+  .rhead { display:flex; align-items:center; font-size:10px; letter-spacing:1.6px;
+    color:var(--ink3); text-transform:uppercase; margin-bottom:14px; }
+  .rhead .x { margin-left:auto; cursor:pointer; border:0; background:none; color:var(--ink3);
+    font:inherit; font-size:11px; } .rhead .x:hover { color:var(--cream); }
+  .fmchips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .fmchip { font-size:10px; color:var(--ink2); border:1px solid var(--line);
+    border-radius:6px; padding:2px 8px; background:rgba(255,255,255,.02); }
+  .fmchip b { color:var(--violet); font-weight:normal; }
+  .md { font-size:12.5px; line-height:1.75; color:var(--cream); word-break:break-word; }
+  .md h2,.md h3,.md h4 { font-family:var(--serif); font-weight:500; color:var(--cream);
+    margin:18px 0 6px; } .md h2{font-size:22px} .md h3{font-size:17px} .md h4{font-size:14px}
+  .md pre { background:var(--panel2); border:1px solid var(--line); border-radius:9px;
+    padding:10px 13px; overflow-x:auto; font-size:11.5px; line-height:1.6; }
+  .md code { background:rgba(138,125,255,.12); border-radius:4px; padding:1px 5px; font-size:11.5px; }
+  .md .bl { padding-left:6px; }
+  .md hr { border:0; border-top:1px solid var(--line); margin:14px 0; }
+  .md a { color:var(--cyan); }
+  .wl { color:var(--pink); cursor:pointer; } .wl:hover { text-decoration:underline; }
+  .ghost { color:var(--ink3); font-style:italic; font-size:12px; padding:30px 0 0 4px; }
+  .ghost.center { text-align:center; padding:60px 20px; }
+
+  /* ── galaxy view ─────────────────────────────────────── */
+  .panel.gal { position:relative;
+    background:
+      radial-gradient(ellipse 58% 46% at 63% 40%, rgba(122,78,210,.17), transparent 62%),
+      radial-gradient(ellipse 42% 38% at 36% 62%, rgba(70,46,150,.14), transparent 66%),
+      radial-gradient(ellipse 30% 26% at 52% 30%, rgba(255,79,163,.05), transparent 70%),
+      radial-gradient(ellipse at center, #150e24 0%, #0d0917 58%, #070510 100%); }
+  #g3d { position:absolute; inset:0; }
+  .gcap { position:absolute; top:16px; left:20px; z-index:5; pointer-events:none; }
+  .gcap .t1 { font-size:10px; letter-spacing:2.4px; color:var(--cream); }
+  .gcap .t1 i { color:var(--gold); font-style:normal; }
+  .gcap .t2 { font-family:var(--serif); font-size:15px; color:var(--ink2); margin-top:4px; }
+  .gcap .t3 { font-size:10px; color:var(--ink3); margin-top:7px; line-height:1.8; }
+  .gcap .t3 i { color:var(--gold); font-style:normal; }
+  .scene-tooltip { font-family:var(--mono) !important; font-size:11px !important;
+    color:var(--cream) !important; background:rgba(12,9,19,.85) !important;
+    border:1px solid rgba(138,125,255,.3); border-radius:7px; padding:3px 9px !important; }
+
+  /* ── systems view ────────────────────────────────────── */
+  #view-systems.on { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; min-height:0; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:13px 15px; min-height:0; display:flex; flex-direction:column; }
+  .cardsep { margin:0 0 9px; font-size:9.5px; text-transform:uppercase; letter-spacing:1.8px;
+    color:var(--violet); flex:none; }
+  .cardsep small { text-transform:none; letter-spacing:0; color:var(--ink3); float:right; }
+  .syscol { display:flex; flex-direction:column; gap:14px; min-height:0; }
+  .scroll { overflow-y:auto; min-height:0; }
+  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .tile { background:rgba(255,255,255,.03); border:1px solid var(--line);
     border-radius:9px; padding:7px 9px; }
-  .tile b { font-size:19px; color:#fff; display:block; line-height:1.15; }
-  .tile span { font-size:9.5px; color:var(--ink3); text-transform:uppercase; letter-spacing:.6px; }
-  .tile.warn b { color:var(--bad); }
-  .tile.hot  b { color:var(--cyan); }
-  .status { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--ink2); margin-top:10px; }
-  .pulse { width:9px; height:9px; border-radius:50%; background:var(--cyan);
-    box-shadow:0 0 0 var(--cyan); animation:p 1.8s infinite; }
-  @keyframes p { 0%{box-shadow:0 0 0 0 rgba(45,226,230,.5)} 70%{box-shadow:0 0 0 10px rgba(45,226,230,0)} 100%{box-shadow:0 0 0 0 rgba(45,226,230,0)} }
-
-  /* agent health */
+  .tile b { font-size:19px; color:#fff; display:block; line-height:1.15; font-weight:normal; }
+  .tile span { font-size:9px; color:var(--ink3); text-transform:uppercase; letter-spacing:.6px; }
+  .tile.warn b { color:var(--bad); } .tile.hot b { color:var(--cyan); }
   .agent { display:flex; align-items:baseline; gap:8px; font-size:11px;
-    padding:4px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+    padding:4px 0; border-bottom:1px solid var(--line); }
   .agent:last-child { border-bottom:0; }
-  .agent .nm { width:96px; color:var(--ink); flex:none; }
+  .agent .nm { width:96px; color:var(--cream); flex:none; }
   .agent .tm { color:var(--ink3); font-size:10px; flex:1; min-width:0;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .badge { font-size:9.5px; padding:1px 7px; border-radius:8px; flex:none;
     border:1px solid transparent; letter-spacing:.4px; }
-  .badge.ok   { color:var(--ok);   border-color:rgba(90,209,160,.4);  background:rgba(90,209,160,.08); }
-  .badge.bad  { color:var(--bad);  border-color:rgba(255,92,108,.45); background:rgba(255,92,108,.10); }
-  .badge.run  { color:var(--cyan); border-color:rgba(45,226,230,.4);  background:rgba(45,226,230,.08); }
-  .svc { display:inline-flex; align-items:center; gap:5px; font-size:10px; color:var(--ink2); margin-right:12px; }
+  .badge.ok  { color:var(--ok);  border-color:rgba(90,209,160,.4);  background:rgba(90,209,160,.08); }
+  .badge.bad { color:var(--bad); border-color:rgba(255,92,108,.45); background:rgba(255,92,108,.10); }
+  .badge.run { color:var(--cyan); border-color:rgba(45,226,230,.4); background:rgba(45,226,230,.08); }
+  .svc { display:inline-flex; align-items:center; gap:5px; font-size:10px; color:var(--ink2); margin-right:10px; }
   .svc i { width:7px; height:7px; border-radius:50%; display:inline-block; }
-
-  /* feeds */
-  .scroll { overflow-y:auto; min-height:0; }
-  .scroll::-webkit-scrollbar{ width:6px } .scroll::-webkit-scrollbar-thumb{ background:rgba(255,79,163,.3); border-radius:3px }
-  .li { padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); word-break:break-word;
+  .li { padding:3px 0; border-bottom:1px solid var(--line); word-break:break-word;
     font-size:11px; line-height:1.5; }
   .li:last-child { border-bottom:0; }
   .li .t { color:var(--ink3); font-size:10px; margin-left:6px; }
   .job { color:var(--pink); }
-  .wl { color:var(--pink); }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
   .empty { color:var(--ink3); font-size:11px; font-style:italic; padding:2px 0; }
-  .legend { font-size:10px; color:var(--ink3); margin-top:9px; display:flex; flex-wrap:wrap; gap:6px 12px; }
-  .legend i { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle; }
 
-  #zen { position:fixed; right:18px; top:50%; z-index:11; opacity:.35; cursor:pointer;
-    background:none; border:1px solid rgba(255,255,255,.15); color:var(--ink2);
-    border-radius:8px; font:inherit; font-size:10px; padding:3px 8px; }
-  body.zen #zen { opacity:.9; }
-  @media (max-width:1180px){ #hud-r { display:none; } }
+  @media (max-width:1150px){ body{grid-template-columns:64px 1fr}
+    .brand,.navsec,.sidefoot,.nav span.lbl{display:none} .nav{justify-content:center}
+    #view-systems.on{grid-template-columns:1fr 1fr} }
 </style>
-<script src="//unpkg.com/3d-force-graph"></script>
+<script type="importmap">
+  { "imports": { "three": "https://esm.sh/three@0.170.0" } }
+</script>
 </head>
 <body>
-<div id="graph"></div>
-<button id="zen" title="toggle panels (h)">☯ zen</button>
 
-<div class="col" id="hud-l">
-  <div class="card">
-    <h1>muninn // brain</h1>
-    <div class="sub">agentic OS · live knowledge graph</div>
-    <div class="tiles" id="tiles"></div>
-    <div class="status"><span class="pulse"></span> huginn online · updated <span id="stamp">–</span></div>
-    <div class="legend">
-      <span><i style="background:#ff4fa3"></i>MOC</span>
-      <span><i style="background:#2de2e6"></i>inbox</span>
-      <span><i style="background:#39d0ff"></i>journal</span>
-      <span><i style="background:#8a7dff"></i>resources</span>
-      <span><i style="background:#5ad1a0"></i>areas</span>
-      <span><i style="background:linear-gradient(90deg,#ff4fa3,#2de2e6,#ffd166)"></i>code</span>
-      <span><i style="background:#ffffff"></i>fresh (24h)</span>
+<aside>
+  <div class="brand">muninn <em>OS</em></div>
+  <div class="navsec">self</div>
+  <button class="nav on" data-v="memory"><span class="ic">◈</span><span class="lbl">Memory</span></button>
+  <button class="nav" data-v="galaxy"><span class="ic">✦</span><span class="lbl">Galaxy</span></button>
+  <div class="navsec">system</div>
+  <button class="nav" data-v="systems"><span class="ic">⚙</span><span class="lbl">Systems</span></button>
+  <a class="nav" href="https://obsidian.oryxserver.org" target="_blank"><span class="ic">↗</span><span class="lbl">Obsidian</span></a>
+  <div class="sidefoot"><span class="pulse"></span>huginn online<br><span id="side-stamp">–</span></div>
+</aside>
+
+<main>
+  <div class="pghead">
+    <h1 id="pg-title">Memory</h1>
+    <div class="pgsub" id="pg-sub">Search the muninn vault — everything the OS remembers.</div>
+    <div class="pgmeta"><span id="clock">–</span><span class="sep">·</span>heimdall<span class="sep">·</span>lan</div>
+  </div>
+
+  <!-- ── memory ── -->
+  <section class="view on" id="view-memory">
+    <div class="panel">
+      <div class="phead"><div class="bar"></div><div class="tt"><i>◈</i> Memory — Obsidian Vault</div>
+        <div class="pill" id="mem-pill">–</div></div>
+      <div class="memtools">
+        <input id="q" type="search" placeholder="Search notes…" autocomplete="off">
+        <div class="chips" id="chips">
+          <button class="chip on" data-f="recent">Recent<b id="fresh-n"></b></button>
+          <button class="chip" data-f="all">All</button>
+          <button class="chip" data-f="MOCs">MOCs</button>
+          <button class="chip" data-f="Areas">Areas</button>
+          <button class="chip" data-f="Resources">Resources</button>
+          <button class="chip" data-f="journal">Journal</button>
+          <button class="chip" data-f="_inbox">Inbox</button>
+          <button class="chip galaxy" id="to-galaxy">✦ Galaxy</button>
+        </div>
+      </div>
+      <div class="duo">
+        <div id="mem-list"><div class="ghost">connecting…</div></div>
+        <div id="mem-read"><div class="ghost center">✦<br><br>select a memory</div></div>
+      </div>
     </div>
-  </div>
-  <div class="card">
-    <div class="sep">agents <small id="svcs"></small></div>
-    <div id="agents" class="empty">connecting…</div>
-  </div>
-  <div class="card" style="flex:1; display:flex; flex-direction:column;">
-    <div class="sep">activity log</div>
-    <div id="feed" class="scroll" style="flex:1">connecting…</div>
-  </div>
-</div>
+  </section>
 
-<div class="col" id="hud-r">
-  <div class="card" style="max-height:34%; display:flex; flex-direction:column;">
-    <div class="sep">nightly digest <small id="digest-day"></small></div>
-    <div id="digest" class="scroll" style="flex:1">connecting…</div>
-  </div>
-  <div class="card" style="max-height:22%; display:flex; flex-direction:column;">
-    <div class="sep">inbox queue <small id="inbox-n"></small></div>
-    <div id="inbox" class="scroll" style="flex:1"></div>
-  </div>
-  <div class="card" style="flex:1; display:flex; flex-direction:column;">
-    <div class="sep">huginn commits <small>vault git</small></div>
-    <div id="gitlog" class="scroll" style="max-height:46%"></div>
-    <div class="sep" style="margin-top:10px">recent notes</div>
-    <div id="recent" class="scroll" style="flex:1"></div>
-  </div>
-</div>
+  <!-- ── galaxy ── -->
+  <section class="view" id="view-galaxy">
+    <div class="panel gal">
+      <div id="g3d"></div>
+      <div class="gcap">
+        <div class="t1"><i>✦</i> MEMORY GALAXY</div>
+        <div class="t2" id="g-stats">– stars · – links</div>
+        <div class="t3">drag to orbit · scroll to zoom · click a star · double-click to pause flight<br>
+          <i>✦</i> brighter &amp; whiter = more recently touched</div>
+      </div>
+    </div>
+  </section>
 
-<script>
-  const FOLDER = { MOCs:'#ff4fa3', root:'#ff8ac4', _inbox:'#2de2e6', journal:'#39d0ff', Resources:'#8a7dff', Areas:'#5ad1a0' };
-  const colorFor = n => (n.recent && n.source === 'note') ? '#ffffff' : (n.color || FOLDER[n.folder] || '#7f8cff');
-  const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-  const rel = t => {                       // epoch → "5m ago" / "in 2h" / "—"
-    if (!t) return '—';
-    const d = Date.now()/1000 - t, a = Math.abs(d);
-    const s = a < 90 ? `${a|0}s` : a < 5400 ? `${Math.round(a/60)}m`
-            : a < 129600 ? `${Math.round(a/3600)}h` : `${Math.round(a/86400)}d`;
-    return d >= 0 ? `${s} ago` : `in ${s}`;
-  };
-  // render [[wikilinks]] in digest/report text
-  const wiki = s => esc(s).replace(/\[\[([^\]]+)\]\]/g, '<span class="wl">$1</span>');
+  <!-- ── systems ── -->
+  <section class="view" id="view-systems">
+    <div class="syscol">
+      <div class="card"><div class="cardsep">vault</div><div class="tiles" id="tiles"></div></div>
+      <div class="card"><div class="cardsep">agents <small id="svcs"></small></div>
+        <div id="agents" class="empty scroll">connecting…</div></div>
+      <div class="card" style="flex:1"><div class="cardsep">activity log</div>
+        <div id="feed" class="scroll" style="flex:1">connecting…</div></div>
+    </div>
+    <div class="syscol">
+      <div class="card" style="max-height:44%"><div class="cardsep">nightly digest <small id="digest-day"></small></div>
+        <div id="digest" class="scroll" style="flex:1">connecting…</div></div>
+      <div class="card" style="flex:1"><div class="cardsep">inbox queue <small id="inbox-n"></small></div>
+        <div id="inbox" class="scroll" style="flex:1"></div></div>
+    </div>
+    <div class="syscol">
+      <div class="card" style="max-height:46%"><div class="cardsep">huginn commits <small>vault git</small></div>
+        <div id="gitlog" class="scroll" style="flex:1"></div></div>
+      <div class="card" style="flex:1"><div class="cardsep">recent notes</div>
+        <div id="recent" class="scroll" style="flex:1"></div></div>
+    </div>
+  </section>
+</main>
 
-  // ── 3D graph (unchanged behaviour) ──
-  const linkColor = l => (l.source && l.source.color) || (l.target && l.target.color) || '#5b6bd6';
-  let hoverNode = null;
-  const highlightLinks = new Set();
-  const Graph = ForceGraph3D()(document.getElementById('graph'))
-    .backgroundColor('#05060f')
+<script type="module">
+import * as THREE from 'three';
+import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.77.0?external=three';
+
+const $ = id => document.getElementById(id);
+const FOLDER = { MOCs:'#ff4fa3', root:'#ff8ac4', _inbox:'#2de2e6', journal:'#39d0ff', Resources:'#8a7dff', Areas:'#5ad1a0' };
+const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const rel = t => {
+  if (!t) return '—';
+  const d = Date.now()/1000 - t, a = Math.abs(d);
+  const s = a < 90 ? `${a|0}s` : a < 5400 ? `${Math.round(a/60)}m`
+          : a < 129600 ? `${Math.round(a/3600)}h` : `${Math.round(a/86400)}d`;
+  return d >= 0 ? `${s} ago` : `in ${s}`;
+};
+const wiki = s => esc(s).replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, '<span class="wl" data-note="$1">$1</span>');
+
+/* ── view routing ─────────────────────────────────────── */
+const TITLES = {
+  memory:  ['Memory',  'Search the muninn vault — everything the OS remembers.'],
+  galaxy:  ['Galaxy',  'Every memory is a star; huginn keeps them in orbit.'],
+  systems: ['Systems', 'Agent health, digests, and the vault audit trail.'],
+};
+let curView = 'memory';
+function show(v) {
+  curView = v;
+  document.querySelectorAll('.view').forEach(e => e.classList.toggle('on', e.id === 'view-'+v));
+  document.querySelectorAll('.nav[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  const [t, s] = TITLES[v]; $('pg-title').textContent = t; $('pg-sub').textContent = s;
+  if (v === 'galaxy') initGalaxy();
+  history.replaceState(null, '', '#'+v);
+}
+document.querySelectorAll('.nav[data-v]').forEach(b => b.addEventListener('click', () => show(b.dataset.v)));
+$('to-galaxy').addEventListener('click', () => show('galaxy'));
+
+/* ── memory: index + search + reader ──────────────────── */
+let notesIdx = [], notesGen = -1, filter = 'recent', q = '', selId = null;
+const byId = () => Object.fromEntries(notesIdx.map(n => [n.id, n]));
+
+function renderList() {
+  let arr = notesIdx;
+  if (filter !== 'recent' && filter !== 'all') arr = arr.filter(n => n.folder === filter);
+  if (q) { const s = q.toLowerCase();
+    arr = arr.filter(n => (n.id+' '+n.excerpt+' '+(n.tags||[]).join(' ')).toLowerCase().includes(s)); }
+  if (filter === 'all') arr = [...arr].sort((a,b) => a.id.localeCompare(b.id));
+  $('mem-list').innerHTML = arr.slice(0, 400).map(n => `
+    <div class="row${n.id === selId ? ' sel' : ''}" data-id="${esc(n.id)}">
+      <div class="tt"><span class="dot" style="background:${FOLDER[n.folder]||'#7f8cff'}"></span>
+        <span>${esc(n.id)}</span><span class="when">${rel(n.mtime)}</span></div>
+      <div class="pp">${esc(n.rel)}</div>
+    </div>`).join('') || '<div class="ghost">nothing matches</div>';
+}
+$('q').addEventListener('input', e => { q = e.target.value.trim(); renderList(); });
+$('chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip[data-f]'); if (!c) return;
+  filter = c.dataset.f;
+  document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x === c));
+  renderList();
+});
+$('mem-list').addEventListener('click', e => {
+  const r = e.target.closest('.row'); if (r) openNote(r.dataset.id);
+});
+addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== $('q')) { e.preventDefault(); show('memory'); $('q').focus(); }
+});
+
+function mdRender(txt) {
+  const fm = txt.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  let meta = '', body = txt;
+  if (fm) {
+    body = txt.slice(fm[0].length);
+    meta = fm[1].split('\n').filter(l => l.includes(':')).map(l => {
+      const [k, ...v] = l.split(':');
+      return `<span class="fmchip"><b>${esc(k.trim())}</b> ${esc(v.join(':').trim())}</span>`;
+    }).join('');
+  }
+  let h = esc(body);
+  h = h.replace(/```([\s\S]*?)```/g, (_, c) => `<pre>${c.replace(/^\w+\n/, '')}</pre>`);
+  h = h.replace(/^####\s+(.*)$/gm, '<h4>$1</h4>').replace(/^###\s+(.*)$/gm, '<h4>$1</h4>')
+       .replace(/^##\s+(.*)$/gm, '<h3>$1</h3>').replace(/^#\s+(.*)$/gm, '<h2>$1</h2>');
+  h = h.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+  h = h.replace(/(^|[^`])`([^`\n]+)`/g, '$1<code>$2</code>');
+  h = h.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+    (_, t, a) => `<span class="wl" data-note="${t.trim()}">${a || t}</span>`);
+  h = h.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  h = h.replace(/^\s*[-*]\s+(.*)$/gm, '<div class="bl">•&nbsp; $1</div>');
+  h = h.replace(/^---\s*$/gm, '<hr>');
+  h = h.replace(/\n\n+/g, '<br><br>').replace(/\n(?!<)/g, '<br>');
+  return { meta, html: h };
+}
+
+async function openNote(id) {
+  const n = byId()[id];
+  if (!n) return;
+  selId = id; show('memory'); renderList();
+  const path = 'vault/' + n.rel.split('/').map(encodeURIComponent).join('/');
+  let txt = '';
+  try { const r = await fetch(path); txt = r.ok ? await r.text() : `(couldn't load: HTTP ${r.status})`; }
+  catch { txt = "(couldn't load note)"; }
+  const { meta, html } = mdRender(txt);
+  $('mem-read').innerHTML = `
+    <div class="rhead">muninn / ${esc(n.rel).toUpperCase()}
+      <button class="x" id="rclose">close ✕</button></div>
+    ${meta ? `<div class="fmchips">${meta}</div>` : ''}
+    <div class="md">${html}</div>`;
+  $('mem-read').scrollTop = 0;
+  $('rclose').addEventListener('click', () => {
+    selId = null; renderList();
+    $('mem-read').innerHTML = '<div class="ghost center">✦<br><br>select a memory</div>';
+  });
+}
+// wikilinks anywhere (reader, digest) open notes
+document.addEventListener('click', e => {
+  const w = e.target.closest('.wl'); if (!w) return;
+  const id = (w.dataset.note || w.textContent).trim();
+  if (byId()[id]) openNote(id);
+});
+
+async function refreshNotes() {
+  try {
+    const d = await (await fetch('notes.json?_=' + Date.now())).json();
+    if (d.generated === notesGen) return;
+    notesGen = d.generated;
+    notesIdx = d.notes || [];
+    $('fresh-n').textContent = notesIdx.filter(n => Date.now()/1000 - n.mtime < 86400).length || '';
+    $('mem-pill').textContent = `${notesIdx.length} notes`;
+    $('q').placeholder = `Search ${notesIdx.length} notes…`;
+    renderList();
+  } catch {}
+}
+
+/* ── galaxy ───────────────────────────────────────────── */
+let Graph = null, gData = null, gGen = -1;
+const texCache = new Map();
+function starTex(color, hot) {
+  const key = color + (hot ? '+' : '');
+  if (texCache.has(key)) return texCache.get(key);
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(hot ? 0.30 : 0.16, hot ? 'rgba(255,255,255,.95)' : color);
+  g.addColorStop(0.5, color + '59');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  texCache.set(key, t); return t;
+}
+function star(n) {
+  const col = n.color || '#8a7dff';
+  const days = n.mtime ? (Date.now()/1000 - n.mtime) / 86400 : 999;
+  const op = n.source === 'note' ? (days < 1 ? 1 : days < 7 ? .9 : days < 30 ? .7 : .55) : .5;
+  const m = new THREE.SpriteMaterial({ map: starTex(col, !!n.recent), transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending, opacity: op });
+  const s = new THREE.Sprite(m);
+  const sz = (3.6 + Math.sqrt(n.val || 1) * 2.3) * (n.recent ? 1.7 : 1);
+  s.scale.set(sz, sz, 1);
+  return s;
+}
+const hl = new Set();
+function initGalaxy() {
+  const el = $('g3d');
+  sizeGalaxy();
+  if (Graph) return;
+  Graph = ForceGraph3D()(el)
+    .backgroundColor('rgba(0,0,0,0)')
     .showNavInfo(false)
-    .nodeLabel(n => (n.label || n.id) + (n.source === 'code' ? '  ·  code' : ''))
-    .nodeVal(n => n.val)
-    .nodeRelSize(4)
-    .nodeResolution(12)
-    .nodeOpacity(0.96)
-    .nodeColor(n => n === hoverNode ? '#ffffff' : colorFor(n))
-    .linkColor(l => highlightLinks.has(l) ? '#ffffff' : linkColor(l))
-    .linkOpacity(0.36)
-    .linkWidth(l => highlightLinks.has(l) ? 2.4 : 0.7)
-    .linkCurvature(0.18)
-    .linkDirectionalParticles(l => highlightLinks.has(l) ? 4 : 1)
-    .linkDirectionalParticleWidth(1.3)
-    .linkDirectionalParticleSpeed(0.006)
-    .linkDirectionalParticleColor(l => highlightLinks.has(l) ? '#ffffff' : '#2de2e6')
-    .onNodeHover(node => {
-      if (node === hoverNode) return;
-      hoverNode = node || null;
-      highlightLinks.clear();
-      if (node) for (const l of Graph.graphData().links) {
-        if (l.source === node || l.target === node) highlightLinks.add(l);
-      }
-      document.getElementById('graph').style.cursor = node ? 'pointer' : '';
-      Graph.linkWidth(Graph.linkWidth()).nodeColor(Graph.nodeColor());
+    .width(el.clientWidth).height(el.clientHeight)
+    .nodeLabel(n => (n.label || n.id) + (n.source === 'code' ? ' · code' : ''))
+    .nodeThreeObject(star)
+    .linkColor(() => 'rgba(160,140,255,1)')
+    .linkOpacity(0.09)
+    .linkWidth(0)
+    .linkDirectionalParticles(l => hl.has(l) ? 3 : 0)
+    .linkDirectionalParticleWidth(1.6)
+    .linkDirectionalParticleSpeed(0.007)
+    .linkDirectionalParticleColor(() => '#ffffff')
+    .onNodeHover(n => {
+      hl.clear();
+      if (n) for (const l of Graph.graphData().links)
+        if (l.source === n || l.target === n) hl.add(l);
+      el.style.cursor = n ? 'pointer' : '';
+      Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
     })
-    .onNodeClick(node => {
-      const d = 90;
-      const r = 1 + d / Math.hypot(node.x || 1, node.y || 1, node.z || 1);
-      Graph.cameraPosition({ x: (node.x||0)*r, y: (node.y||0)*r, z: (node.z||0)*r }, node, 900);
+    .onNodeClick(n => {
+      if (n.source === 'note' && byId()[n.id]) { openNote(n.id); return; }
+      const r = 1 + 90 / Math.hypot(n.x || 1, n.y || 1, n.z || 1);
+      Graph.cameraPosition({ x: (n.x||0)*r, y: (n.y||0)*r, z: (n.z||0)*r }, n, 900);
     })
-    .warmupTicks(60)
+    .warmupTicks(70)
     .cooldownTime(9000);
-  Graph.d3Force('charge').strength(-42);
-  const controls = Graph.controls();
-  controls.autoRotate = true;
-  controls.autoRotateSpeed = 0.5;
+  Graph.d3Force('charge').strength(-55);
+  const ctl = Graph.controls();
+  ctl.autoRotate = true; ctl.autoRotateSpeed = 0.42;
+  el.addEventListener('dblclick', () => { ctl.autoRotate = !ctl.autoRotate; });
+  if (gData) feedGalaxy();
+}
+function sizeGalaxy() {
+  const el = $('g3d');
+  if (Graph && el.clientWidth) Graph.width(el.clientWidth).height(el.clientHeight);
+}
+const nodeById = new Map();
+function feedGalaxy() {
+  if (!Graph || !gData) return;
+  const nodes = gData.nodes.map(n => {
+    const ex = nodeById.get(n.id);
+    if (ex) { Object.assign(ex, n); return ex; }
+    nodeById.set(n.id, n); return n;
+  });
+  const ids = new Set(gData.nodes.map(n => n.id));
+  for (const k of [...nodeById.keys()]) if (!ids.has(k)) nodeById.delete(k);
+  Graph.graphData({ nodes, links: gData.links });
+  Graph.nodeThreeObject(Graph.nodeThreeObject());   // re-skin (recency may have shifted)
+  setTimeout(() => Graph.zoomToFit(800, 60), 700);
+}
+async function refreshGraph() {
+  try {
+    const d = await (await fetch('graph.json?_=' + Date.now())).json();
+    if (d.generated === gGen) return;
+    gGen = d.generated; gData = d;
+    $('g-stats').textContent = `${d.nodes.length} stars · ${d.links.length} links`;
+    feedGalaxy();
+  } catch {}
+}
 
-  const nodeById = new Map();
-  let lastGraphGen = -1, lastActGen = -1;
-  async function refreshGraph() {
-    try {
-      const data = await (await fetch('graph.json?_=' + Date.now())).json();
-      if (data.generated === lastGraphGen) return;
-      lastGraphGen = data.generated;
-      const nodes = data.nodes.map(n => {
-        const ex = nodeById.get(n.id);
-        if (ex) { Object.assign(ex, n); return ex; }
-        nodeById.set(n.id, n); return n;
-      });
-      const ids = new Set(data.nodes.map(n => n.id));
-      for (const k of [...nodeById.keys()]) if (!ids.has(k)) nodeById.delete(k);
-      Graph.graphData({ nodes, links: data.links });
-      setTimeout(() => Graph.zoomToFit(700, 80), 600);
-    } catch (e) {}
-  }
+/* ── systems (same data pipeline as before) ───────────── */
+let lastActGen = -1;
+function tiles(c) {
+  const t = [
+    { k:'notes',   v:c.notes },
+    { k:'links',   v:c.links },
+    { k:'code',    v:c.code ?? 0 },
+    { k:'MOCs',    v:c.mocs ?? '–' },
+    { k:'inbox',   v:c.inbox ?? 0,   cls:(c.inbox ?? 0) > 0 ? 'hot' : '' },
+    { k:'orphans', v:c.orphans ?? 0, cls:(c.orphans ?? 0) > 0 ? 'warn' : '' },
+  ];
+  $('tiles').innerHTML = t.map(x =>
+    `<div class="tile ${x.cls||''}"><b>${x.v}</b><span>${x.k}</span></div>`).join('');
+}
+function badge(a) {
+  if (a.active) return '<span class="badge run">⟳ running</span>';
+  if (a.result === 'success') return '<span class="badge ok">✓ ok</span>';
+  if (a.result === 'unknown' || !a.last) return '<span class="badge">·</span>';
+  return `<span class="badge bad">✗ ${esc(a.result)}</span>`;
+}
+async function refreshActivity() {
+  try {
+    const a = await (await fetch('activity.json?_=' + Date.now())).json();
+    if (a.generated === lastActGen) return;
+    lastActGen = a.generated;
+    $('side-stamp').textContent = 'updated ' + new Date(a.generated * 1000).toLocaleTimeString();
+    tiles(a.counts);
+    const c = a.counts || {};
+    $('mem-pill').textContent = `${c.notes ?? '–'} notes · ${c.code ?? 0} code`;
 
-  // ── HUD panels ──
-  const $ = id => document.getElementById(id);
-  function tiles(c) {
-    const t = [
-      { k:'notes',   v:c.notes },
-      { k:'links',   v:c.links },
-      { k:'code',    v:c.code ?? 0 },
-      { k:'MOCs',    v:c.mocs ?? '–' },
-      { k:'inbox',   v:c.inbox ?? 0,   cls:(c.inbox ?? 0) > 0 ? 'hot' : '' },
-      { k:'orphans', v:c.orphans ?? 0, cls:(c.orphans ?? 0) > 0 ? 'warn' : '' },
-    ];
-    $('tiles').innerHTML = t.map(x =>
-      `<div class="tile ${x.cls||''}"><b>${x.v}</b><span>${x.k}</span></div>`).join('');
-  }
-  function badge(a) {
-    if (a.active) return '<span class="badge run">⟳ running</span>';
-    if (a.result === 'success') return '<span class="badge ok">✓ ok</span>';
-    if (a.result === 'unknown' || !a.last) return '<span class="badge">·</span>';
-    return `<span class="badge bad">✗ ${esc(a.result)}</span>`;
-  }
-  async function refreshActivity() {
-    try {
-      const a = await (await fetch('activity.json?_=' + Date.now())).json();
-      if (a.generated === lastActGen) return;
-      lastActGen = a.generated;
-      $('stamp').textContent = new Date(a.generated * 1000).toLocaleTimeString();
-      tiles(a.counts);
+    $('agents').innerHTML = (a.agents || []).map(x =>
+      `<div class="agent"><span class="nm">${esc(x.name)}</span>${badge(x)}
+       <span class="tm">${rel(x.last)}${x.next ? ' · next ' + rel(x.next) : ''}</span></div>`
+    ).join('') || '<div class="empty">no agent data</div>';
+    $('svcs').innerHTML = (a.services || []).map(s =>
+      `<span class="svc"><i style="background:${s.ok ? 'var(--ok)' : 'var(--bad)'}"></i>${esc(s.name)} ${s.ok ? 'up' : 'DOWN'}</span>`
+    ).join('');
 
-      $('agents').innerHTML = (a.agents || []).map(x =>
-        `<div class="agent"><span class="nm">${esc(x.name)}</span>${badge(x)}
-         <span class="tm">${rel(x.last)}${x.next ? ' · next ' + rel(x.next) : ''}</span></div>`
-      ).join('') || '<div class="empty">no agent data</div>';
-      $('svcs').innerHTML = (a.services || []).map(s =>
-        `<span class="svc"><i style="background:${s.ok ? 'var(--ok)' : 'var(--bad)'}"></i>${esc(s.name)} ${s.ok ? 'up' : 'DOWN'}</span>`
-      ).join('');
+    const d = a.digest || {};
+    $('digest-day').textContent = d.day || '';
+    $('digest').innerHTML = d.text
+      ? d.text.split('\n').filter(l => l.trim())
+          .map(l => `<div class="li">${wiki(l.replace(/^[-*]\s*/, '• '))}</div>`).join('')
+      : '<div class="empty">no digest yet — huginn writes one at 23:00</div>';
 
-      const d = a.digest || {};
-      $('digest-day').textContent = d.day || '';
-      $('digest').innerHTML = d.text
-        ? d.text.split('\n').filter(l => l.trim())
-            .map(l => `<div class="li">${wiki(l.replace(/^[-*]\s*/, '• '))}</div>`).join('')
-        : '<div class="empty">no digest yet — huginn writes one at 23:00</div>';
+    const inbox = a.inbox || [];
+    $('inbox-n').textContent = inbox.length ? `${inbox.length} waiting` : '';
+    $('inbox').innerHTML = inbox.length
+      ? inbox.map(x => `<div class="li"><span class="dot" style="background:#2de2e6"></span>${esc(x.name)}<span class="t">${rel(x.mtime)}</span></div>`).join('')
+      : '<div class="empty">empty — everything filed ✓</div>';
 
-      const inbox = a.inbox || [];
-      $('inbox-n').textContent = inbox.length ? `${inbox.length} waiting` : '';
-      $('inbox').innerHTML = inbox.length
-        ? inbox.map(x => `<div class="li"><span class="dot" style="background:#2de2e6"></span>${esc(x.name)}<span class="t">${rel(x.mtime)}</span></div>`).join('')
-        : '<div class="empty">empty — everything filed ✓</div>';
+    $('gitlog').innerHTML = (a.gitlog || []).length
+      ? a.gitlog.map(g => `<div class="li">${esc(g.msg)}<span class="t">${rel(g.t)}</span></div>`).join('')
+      : '<div class="empty">vault has no git history yet</div>';
 
-      $('gitlog').innerHTML = (a.gitlog || []).length
-        ? a.gitlog.map(g => `<div class="li">${esc(g.msg)}<span class="t">${rel(g.t)}</span></div>`).join('')
-        : '<div class="empty">vault has no git history yet</div>';
+    $('recent').innerHTML = (a.recent || []).map(r =>
+      `<div class="li wl" data-note="${esc(r.id)}"><span class="dot" style="background:${FOLDER[r.folder]||'#7f8cff'}"></span>${esc(r.id)}<span class="t">${rel(r.mtime)}</span></div>`
+    ).join('');
 
-      $('recent').innerHTML = (a.recent || []).map(r =>
-        `<div class="li"><span class="dot" style="background:${FOLDER[r.folder]||'#7f8cff'}"></span>${esc(r.id)}<span class="t">${rel(r.mtime)}</span></div>`
-      ).join('');
+    $('feed').innerHTML = (a.log || []).slice().reverse().map(x =>
+      `<div class="li"><span class="job">${esc(x.job)}</span> ${esc(x.line)}</div>`).join('');
+  } catch {}
+}
 
-      $('feed').innerHTML = (a.log || []).slice().reverse().map(x =>
-        `<div class="li"><span class="job">${esc(x.job)}</span> ${esc(x.line)}</div>`).join('');
-    } catch (e) {}
-  }
+/* ── boot ─────────────────────────────────────────────── */
+const tick = () => $('clock').textContent =
+  new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+tick(); setInterval(tick, 20000);
 
-  const zen = () => document.body.classList.toggle('zen');
-  $('zen').addEventListener('click', zen);
-  addEventListener('keydown', e => { if (e.key === 'h' && !e.metaKey && !e.ctrlKey) zen(); });
-
-  refreshGraph(); refreshActivity();
-  setInterval(refreshGraph, 8000);
-  setInterval(refreshActivity, 5000);
-  window.addEventListener('resize', () => { Graph.width(innerWidth); Graph.height(innerHeight); });
+if (location.hash && TITLES[location.hash.slice(1)]) show(location.hash.slice(1));
+refreshNotes(); refreshGraph(); refreshActivity();
+setInterval(refreshNotes, 30000);
+setInterval(refreshGraph, 15000);
+setInterval(refreshActivity, 5000);
+addEventListener('resize', sizeGalaxy);
 </script>
 </body>
 </html>

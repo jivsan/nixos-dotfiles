@@ -14,6 +14,9 @@ WWW = "/var/lib/muninn-brain/www"
 REPO_GRAPH = "/var/lib/huginn/graphs/dotfiles/graph.json"
 SKIP = {".obsidian", "_templates", "agents", "graphify-out", ".git", "node_modules"}
 WIKILINK = re.compile(r"\[\[([^\]|#]+)")
+FRONTMATTER = re.compile(r"\A---\s*\n.*?\n---\s*\n", re.S)
+TAGS_LINE = re.compile(r"^tags:\s*\[([^\]]*)\]", re.M)
+MD_NOISE = re.compile(r"```.*?```|[#*`>\[\]]", re.S)  # strip markdown noise for excerpts
 
 FOLDER_COLOR = {
     "MOCs": "#ff4fa3", "root": "#ff8ac4", "_inbox": "#2de2e6",
@@ -56,6 +59,15 @@ for name, meta in notes.items():
             text = fh.read()
     except OSError:
         text = ""
+    fm = FRONTMATTER.match(text)
+    tags = []
+    if fm:
+        tm = TAGS_LINE.search(fm.group(0))
+        if tm:
+            tags = [t.strip() for t in tm.group(1).split(",") if t.strip()]
+    meta["tags"] = tags
+    body = text[fm.end():] if fm else text
+    meta["excerpt"] = re.sub(r"\s+", " ", MD_NOISE.sub(" ", body)).strip()[:600]
     for m in WIKILINK.finditer(text):
         t = m.group(1).strip().split("/")[-1]
         if t in notes and t != name:
@@ -68,6 +80,7 @@ for name, meta in notes.items():
         "color": FOLDER_COLOR.get(meta["folder"], "#7f8cff"),
         "val": 2 + deg.get(name, 0),
         "recent": (now - meta["mtime"]) < 86400,
+        "mtime": int(meta["mtime"]),
     })
 
 # ── code graph (Graphify, repo) ──
@@ -207,6 +220,17 @@ for name, meta in notes.items():
         continue
     if not (targets & moc_names):
         orphans += 1
+
+# ── notes.json — search index for the Memory view (reader fetches /vault/<rel>) ──
+with open(os.path.join(WWW, "notes.json"), "w") as fh:
+    json.dump({
+        "generated": int(now),
+        "notes": [
+            {"id": n, "rel": m["rel"], "folder": m["folder"], "mtime": int(m["mtime"]),
+             "tags": m.get("tags", []), "excerpt": m.get("excerpt", "")}
+            for n, m in sorted(notes.items(), key=lambda kv: -kv[1]["mtime"])
+        ],
+    }, fh)
 
 with open(os.path.join(WWW, "activity.json"), "w") as fh:
     json.dump({
