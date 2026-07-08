@@ -41,4 +41,10 @@
   };
   nix.daemonCPUSchedPolicy = "idle";
   nix.daemonIOSchedClass = "idle";
+
+  # Disable systemd-ssh-proxy feature. Its ssh_config Include pulls in a
+  # store file owned by nobody, which OpenSSH rejects ("Bad owner or permissions").
+  # This was breaking all `ssh` (including graphify MCP over SSH and `ask`/`capture`).
+  # See: nixos/modules/programs/ssh.nix (systemd-ssh-proxy.enable)
+  programs.ssh.systemd-ssh-proxy.enable = false;
 }

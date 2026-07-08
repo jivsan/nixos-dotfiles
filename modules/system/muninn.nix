@@ -23,7 +23,7 @@ let
       if [ "$#" -gt 0 ]; then printf '%s\n' "$*" > "$f"; else cat > "$f"; fi
       echo "captured → $f"
       # best-effort: nudge huginn to file it now (timer files it otherwise)
-      ( ssh -o BatchMode=yes -o ConnectTimeout=5 christina@10.0.20.17 \
+      ( ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=5 christina@10.0.20.17 \
           'sudo systemctl start --no-block huginn-inbox-sweep.service' >/dev/null 2>&1 & )
       echo "huginn nudged — it'll file this into a linked note shortly."
     '';
@@ -37,7 +37,7 @@ let
     text = ''
       q="$*"
       [ -n "$q" ] || { echo "usage: ask <question about your homelab / notes>" >&2; exit 1; }
-      printf '%s' "$q" | ssh -o BatchMode=yes -o ConnectTimeout=8 christina@10.0.20.17 \
+      printf '%s' "$q" | ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=8 christina@10.0.20.17 \
         'sudo systemd-run --wait --pipe --quiet --uid=christina --gid=users -p EnvironmentFile=/var/lib/secrets/graphify-openrouter.env -p Environment=HOME=/var/lib/huginn /run/current-system/sw/bin/muninn-ask'
     '';
   };
