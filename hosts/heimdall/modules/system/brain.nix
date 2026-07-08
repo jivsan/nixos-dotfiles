@@ -31,55 +31,57 @@ let
   # Tiny stdlib-only capture endpoint.
   # POST /capture with {"text": "..."} or raw text → writes capture-*.md into the vault _inbox/.
   capturePy = pkgs.writeText "muninn-capture.py" ''
-    #!/usr/bin/env python3
-    import http.server
-    import socketserver
-    import os
-    import time
-    import json
+#!/usr/bin/env python3
+import http.server
+import socketserver
+import os
+import time
+import json
 
-    VAULT = "/mnt/nas/obsidian/muninn"
-    INBOX = os.path.join(VAULT, "_inbox")
+VAULT = "/mnt/nas/obsidian/muninn"
+INBOX = os.path.join(VAULT, "_inbox")
 
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_POST(self):
-            if self.path != "/capture":
-                self.send_error(404)
-                return
-            length = int(self.headers.get("content-length", 0))
-            body = self.rfile.read(length).decode("utf-8", errors="replace")
-            try:
-                data = json.loads(body)
-                text = data.get("text", body)
-            except Exception:
-                text = body
-            text = (text or "").strip()
-            if not text:
-                self.send_error(400, "empty note")
-                return
-            ts = time.strftime("%Y-%m-%d-%H%M%S")
-            fn = f"capture-{ts}.md"
-            path = os.path.join(INBOX, fn)
-            try:
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(text + "\n")
-                os.chmod(path, 0o644)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"ok": True, "file": fn}).encode())
-            except Exception as e:
-                self.send_error(500, str(e))
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path != "/capture":
+            self.send_error(404)
+            return
+        length = int(self.headers.get("content-length", 0) or 0)
+        body = self.rfile.read(length).decode("utf-8", errors="replace")
+        try:
+            data = json.loads(body)
+            text = data.get("text", body)
+        except Exception:
+            text = body
+        text = (text or "").strip()
+        if not text:
+            self.send_error(400, "empty note")
+            return
+        ts = time.strftime("%Y-%m-%d-%H%M%S")
+        fn = f"capture-{ts}.md"
+        path = os.path.join(INBOX, fn)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text + "\n")
+            os.chmod(path, 0o644)
+            resp = json.dumps({"ok": True, "file": fn}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(resp)))
+            self.end_headers()
+            self.wfile.write(resp)
+        except Exception as e:
+            self.send_error(500, str(e))
 
-        def log_message(self, fmt, *args):
-            pass  # quiet
+    def log_message(self, fmt, *args):
+        pass  # quiet
 
-    if __name__ == "__main__":
-        os.makedirs(INBOX, exist_ok=True)
-        PORT = 8091
-        with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
-            httpd.serve_forever()
-  '';
+if __name__ == "__main__":
+    os.makedirs(INBOX, exist_ok=True)
+    PORT = 8091
+    with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
+        httpd.serve_forever()
+'';
 
 in
 {
