@@ -7,6 +7,19 @@ let
   vault = "/mnt/nas/obsidian/muninn";
   www   = "/var/lib/muninn-brain/www";
 
+  # Vendored, pinned JS libs served same-origin — no CDN at runtime (the esm.sh
+  # module chain proved flaky in-browser and one failed import killed all page JS).
+  # three 0.160.0 is the last release shipping a classic UMD build; 3d-force-graph
+  # 1.79.0 accepts three >=0.118 and its official examples use exactly this pairing.
+  threeJs = pkgs.fetchurl {
+    url = "https://unpkg.com/three@0.160.0/build/three.min.js";
+    hash = "sha256-FwxnifQyF8lrMXD0tC+v4TXef3zUhJekIY+XV+4dSfo=";
+  };
+  forceGraphJs = pkgs.fetchurl {
+    url = "https://unpkg.com/3d-force-graph@1.79.0/dist/3d-force-graph.min.js";
+    hash = "sha256-Khop08zFFZ8EobULFj/LkDMzwCaxIr/4WKcJZbLDjoc=";
+  };
+
   buildGraph = pkgs.writeShellApplication {
     name = "muninn-brain-build";
     # git + systemctl: activity.json includes the vault audit log and huginn
@@ -19,8 +32,11 @@ in
   systemd.tmpfiles.rules = [
     "d /var/lib/muninn-brain 0755 christina users -"
     "d ${www} 0755 christina users -"
-    # index.html is served from the store; refreshed on each rebuild
+    # index.html + vendored libs are served from the store; refreshed on each rebuild
     "L+ ${www}/index.html - - - - ${../../muninn/brain/index.html}"
+    "d ${www}/vendor 0755 christina users -"
+    "L+ ${www}/vendor/three.min.js - - - - ${threeJs}"
+    "L+ ${www}/vendor/3d-force-graph.min.js - - - - ${forceGraphJs}"
   ];
 
   # regenerate the graph data from the vault, on a fast cadence for a "live" feel

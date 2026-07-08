@@ -169,9 +169,6 @@
     .brand,.navsec,.sidefoot,.nav span.lbl{display:none} .nav{justify-content:center}
     #view-systems.on{grid-template-columns:1fr 1fr} }
 </style>
-<script type="importmap">
-  { "imports": { "three": "https://esm.sh/three@0.170.0" } }
-</script>
 </head>
 <body>
 
@@ -255,10 +252,10 @@
   </section>
 </main>
 
-<script type="module">
-import * as THREE from 'three';
-import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.77.0?external=three';
-
+<!-- vendored same-origin (see brain.nix) — page JS must never die on a CDN -->
+<script src="vendor/three.min.js"></script>
+<script src="vendor/3d-force-graph.min.js"></script>
+<script>
 const $ = id => document.getElementById(id);
 const FOLDER = { MOCs:'#ff4fa3', root:'#ff8ac4', _inbox:'#2de2e6', journal:'#39d0ff', Resources:'#8a7dff', Areas:'#5ad1a0' };
 const esc = s => (s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -418,6 +415,12 @@ function initGalaxy() {
   const el = $('g3d');
   sizeGalaxy();
   if (Graph) return;
+  try { buildGalaxy(el); }
+  catch (e) {   // galaxy must never take the rest of the OS down with it
+    $('g-stats').textContent = 'galaxy failed to load: ' + e.message;
+  }
+}
+function buildGalaxy(el) {
   Graph = ForceGraph3D()(el)
     .backgroundColor('rgba(0,0,0,0)')
     .showNavInfo(false)
