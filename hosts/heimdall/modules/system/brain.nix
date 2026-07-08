@@ -123,7 +123,7 @@ in
       Type = "simple";
       User = "christina";
       Group = "users";
-      ExecStart = [ "${pkgs.python3}/bin/python3" "${capturePy}" ];
+      ExecStart = "${pkgs.python3}/bin/python3 ${capturePy}";
       Restart = "always";
       RestartSec = "5s";
     };
