@@ -81,7 +81,6 @@ let
             httpd.serve_forever()
   '';
 
-  captureSrv = "${pkgs.python3}/bin/python3 ${capturePy}";
 in
 {
   systemd.tmpfiles.rules = [
@@ -122,7 +121,7 @@ in
       Type = "simple";
       User = "christina";
       Group = "users";
-      ExecStart = captureSrv;
+      ExecStart = [ "${pkgs.python3}/bin/python3" "${capturePy}" ];
       Restart = "always";
       RestartSec = "5s";
     };
@@ -151,8 +150,10 @@ in
       };
       # capture endpoint (dashboard quick notes → _inbox/)
       locations."/capture" = {
-        proxy_pass http://127.0.0.1:8091;
-        proxy_http_version 1.1;
+        proxyPass = "http://127.0.0.1:8091";
+        extraConfig = ''
+          proxy_http_version 1.1;
+        '';
       };
     };
   };
