@@ -18,6 +18,7 @@
     ../../modules/apps/vlc.nix
     ../../modules/apps/remote.nix
     ../../modules/apps/claude-code.nix
+    ../../modules/apps/grok.nix            # Grok Build (xAI CLI agent, Grok 4.5) via numtide/llm-agents.nix
     ../../modules/apps/telegram.nix
     ../../modules/apps/wowexport.nix
     ../../modules/apps/blender.nix

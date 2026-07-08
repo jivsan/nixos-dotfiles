@@ -27,6 +27,9 @@
     claude-code = {
       url = "github:sadjow/claude-code-nix";
     };
+    llm-agents = {
+      url = "github:numtide/llm-agents.nix";
+    };
   };
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, oxwm, claude-code, ... }@inputs:
     let
