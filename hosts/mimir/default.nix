@@ -16,7 +16,7 @@
     ./modules/system/immich-ml.nix
     ./modules/system/ollama.nix
     ./modules/system/open-webui.nix
-    ./modules/system/comfyui.nix
+#    ./modules/system/comfyui.nix
     ./modules/system/discordbot.nix
   ];
 
