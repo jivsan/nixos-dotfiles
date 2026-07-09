@@ -26,7 +26,7 @@
   # ⚠️ Confirm the real NIC name on the box after install (`ip -br link`).
   # Bare metal is usually enpXsY / enoX — NOT ens18 like the Proxmox VMs.
   # Update this attribute name before the first `nixos-rebuild switch`.
-  networking.interfaces.enp4s0.ipv4.addresses = [{
+  networking.interfaces.enp5s0.ipv4.addresses = [{
     address = "10.0.20.18";
     prefixLength = 24;
   }];
