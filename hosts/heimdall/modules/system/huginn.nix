@@ -40,7 +40,7 @@ let
       user="$(cat)"
       req="$(jq -n --arg m "$mdl" --arg s "$sys" --arg u "$user" \
         '{model:$m, temperature:0.2, messages:[{role:"system",content:$s},{role:"user",content:$u}]}')"
-      resp="$(printf 'header = "Authorization: Bearer ***"\n' "$OPENAI_API_KEY" | \
+      resp="$(printf 'header = "Authorization: Bearer %s"\n' "$OPENAI_API_KEY" | \
         curl -sS --max-time 120 --retry 2 -K - "$base/chat/completions" \
         -H "Content-Type: application/json" \
         -d "$req" 2>/dev/null || true)"
@@ -211,7 +211,7 @@ let
             + "\n\n--- recent journal ---\n" + $j) }
         ]
       }')"
-      printf 'header = "Authorization: Bearer ***"\n' "$OPENAI_API_KEY" | \
+      printf 'header = "Authorization: Bearer %s"\n' "$OPENAI_API_KEY" | \
         curl -sS -K - "$base/chat/completions" \
         -d "$body" \
         | jq -r '.choices[0].message.content // .error.message // "no response"'
