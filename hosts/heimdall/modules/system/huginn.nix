@@ -10,6 +10,7 @@
 #   • graphify-vault — the NOTES graph: staged copy of the vault's markdown only
 #                      (no .obsidian plugin JS) → /var/lib/huginn/graphs/vault (nightly)
 #   • gardener       — weekly vault hygiene report: orphans, dead links, stale notes
+#   • dead-link-fixer — weekly brain-API sweep: find broken wikilinks, create stub notes
 #
 # Cross-cutting: every vault-writing agent auto-commits the vault git repo
 # (audit trail, author huginn), and every huginn unit has OnFailure= wired to
@@ -39,8 +40,9 @@ let
       user="$(cat)"
       req="$(jq -n --arg m "$mdl" --arg s "$sys" --arg u "$user" \
         '{model:$m, temperature:0.2, messages:[{role:"system",content:$s},{role:"user",content:$u}]}')"
-      resp="$(printf 'header = "Authorization: Bearer %s"\n' "$OPENAI_API_KEY" | \
+      resp="$(printf 'header = "Authorization: Bearer ***"\n' "$OPENAI_API_KEY" | \
         curl -sS --max-time 120 --retry 2 -K - "$base/chat/completions" \
+        -H "Content-Type: application/json" \
         -d "$req" 2>/dev/null || true)"
       printf '%s' "$resp" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true
     '';
@@ -209,9 +211,8 @@ let
             + "\n\n--- recent journal ---\n" + $j) }
         ]
       }')"
-      printf 'header = "Authorization: Bearer %s"\n' "$OPENAI_API_KEY" | \
+      printf 'header = "Authorization: Bearer ***"\n' "$OPENAI_API_KEY" | \
         curl -sS -K - "$base/chat/completions" \
-        -H "Content-Type: application/json" \
         -d "$body" \
         | jq -r '.choices[0].message.content // .error.message // "no response"'
     '';
@@ -315,6 +316,21 @@ let
         muninn-vault-commit "huginn: weekly gardener report"
         echo "[$(date -Iseconds)] gardener done"
       } 2>&1 | tee -a "$logdir/gardener.log"
+    '';
+  };
+
+  # ── dead-link-fixer (weekly) — brain API: find broken wikilinks, create stubs ──
+  deadLinkFixer = pkgs.writeShellApplication {
+    name = "huginn-dead-link-fixer";
+    runtimeInputs = [ vaultCommit pkgs.python3Minimal pkgs.coreutils ];
+    text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      {
+        echo "[$(date -Iseconds)] dead-link-fixer start"
+        python3 ${../../muninn/dead-link-fixer.py}
+        muninn-vault-commit "huginn: weekly dead-link fixer sweep"
+        echo "[$(date -Iseconds)] dead-link-fixer done"
+      } 2>&1 | tee -a "$logdir/dead-link-fixer.log"
     '';
   };
 
@@ -507,6 +523,29 @@ in
       OnCalendar = "Sat *-*-* 08:30:00";
       Persistent = true;
       RandomizedDelaySec = "10m";
+    };
+  };
+
+  # ── dead-link-fixer: weekly broken-wikilink sweep ──
+  systemd.services."huginn-dead-link-fixer" = {
+    description = "huginn: find broken wikilinks via brain API and create stub notes";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${deadLinkFixer}/bin/huginn-dead-link-fixer";
+    };
+  };
+  systemd.timers."huginn-dead-link-fixer" = {
+    description = "huginn dead-link fixer schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Sun *-*-* 06:00:00";
+      Persistent = true;
+      RandomizedDelaySec = "15m";
     };
   };
 }
