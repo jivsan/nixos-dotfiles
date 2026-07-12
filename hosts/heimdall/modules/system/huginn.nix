@@ -237,6 +237,7 @@ let
       for f in "$inbox"/*.md; do
         bn="$(basename "$f")"
         [ "$bn" = "README.md" ] && continue
+        [ -r "$f" ] || { log "  ! skip $bn (unreadable — foreign NFS uid? fix perms on odyn)"; continue; }
         raw="$(head -c 8000 "$f")"
         [ -n "$raw" ] || { log "  ! skip $bn (empty)"; continue; }
         sys="You file a rough inbox note into an Obsidian vault. Reply with ONLY a JSON object (no code fences, no prose) with keys: title (concise, no slashes or newlines), folder (exactly Areas or Resources), moc (choose the single best from: $mocs), tags (array of 1-4 short lowercase strings), body (the note rewritten as clean markdown, keeping every fact, inventing nothing)."
@@ -307,7 +308,7 @@ let
   # Analysis is offline python; MiniMax only suggests MOC links for orphans.
   gardener = pkgs.writeShellApplication {
     name = "huginn-gardener";
-    runtimeInputs = [ vaultCommit pkgs.python3Minimal pkgs.coreutils ];
+    runtimeInputs = [ vaultCommit pkgs.python3 pkgs.coreutils ];
     text = ''
       logdir="${vault}/agents/logs"; mkdir -p "$logdir"
       {
@@ -322,7 +323,7 @@ let
   # ── dead-link-fixer (weekly) — brain API: find broken wikilinks, create stubs ──
   deadLinkFixer = pkgs.writeShellApplication {
     name = "huginn-dead-link-fixer";
-    runtimeInputs = [ vaultCommit pkgs.python3Minimal pkgs.coreutils ];
+    runtimeInputs = [ vaultCommit pkgs.python3 pkgs.coreutils ];
     text = ''
       logdir="${vault}/agents/logs"; mkdir -p "$logdir"
       {
