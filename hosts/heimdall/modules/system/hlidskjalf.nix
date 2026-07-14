@@ -13,6 +13,7 @@
     # refused server-side for destroy / reinstall / stop / reset.
     # this are the protected vmid's for my setup: heimdall is 154 that is running this panel
       protectedVmids = [ 151 152 153 154 155 201 ];
+      pveNode = "hella";
     };
   };
 }
