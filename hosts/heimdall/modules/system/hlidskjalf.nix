@@ -13,7 +13,7 @@
 
       # Admin exists on the tailnet and nowhere else. Everything arriving through
       # Cloudflare is a tenant, whatever password it types.
-      adminNetworks = [ "100.64.0.0/10" ];
+      adminNetworks = [ "100.64.0.0/10" "10.0.20.0/24" ];
 
       settings.protectedVmids = [ 151 152 153 154 155 201 ];
     };
