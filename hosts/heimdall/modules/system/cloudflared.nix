@@ -3,8 +3,8 @@
     services.cloudflared = {
       enable = true;
 
-      tunnels."7e2ff33e-964d-4f95-b99f-0736833da23a" = {
-        credentialsFile = "/var/lib/cloudflared/<uuid-from-tunnel-create>.json";
+      tunnels."" = {
+        credentialsFile = "/var/lib/cloudflared/7e2ff33e-964d-4f95-b99f-0736833da23a.json";
 
         # The public door: tenants only. Straight to the panel — Traefik is not
         # involved here, and does not need to be.

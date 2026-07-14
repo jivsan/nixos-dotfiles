@@ -291,11 +291,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784047892,
-        "narHash": "sha256-mHPjHu9NFxvMiWgOzkmqwAxZPLRtRlKU2fm8qbKU6F8=",
+        "lastModified": 1784050315,
+        "narHash": "sha256-5BbRXCBxjTCFEfQyo9+5gErcqBPl9bJ/7PbtjkwPuvI=",
         "owner": "jivsan",
         "repo": "Hlidskjalf",
-        "rev": "c3d403fb7f65c4f98451e109a58589443995f4a8",
+        "rev": "e135c7ed5dfa94900564fe124e0c18be1144e2d6",
         "type": "github"
       },
       "original": {
