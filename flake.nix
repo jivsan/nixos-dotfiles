@@ -30,6 +30,10 @@
     llm-agents = {
       url = "github:numtide/llm-agents.nix";
     };
+    hlidskjalf = {
+      url = "github:jivsan/Hlidskjalf";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, oxwm, claude-code, ... }@inputs:
     let
