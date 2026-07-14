@@ -51,11 +51,6 @@
     };
   };
 
-  users.users.christina.openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEA+3wCqGYzfe9u9zkU5beCkzBT9YWNc7M1nz/alhLaa
-  hlidskjalf-dev"
-    ];
-
   environment.systemPackages = with pkgs; [
     git vim curl wget htop tree jq
   ];
