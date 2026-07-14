@@ -291,7 +291,6 @@
               ];
             };
           };
-        };
 
           hlidskjalf = {
             loadBalancer = {
@@ -300,6 +299,7 @@
               ];
             };
           };
+        }; 
 
         serversTransports = {
           insecure = {
