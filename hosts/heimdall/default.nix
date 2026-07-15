@@ -32,7 +32,7 @@
     ./modules/system/huginn.nix
     ./modules/system/brain.nix
     ./modules/system/hlidskjalf.nix
-    ./modules/system/cloudflared.nix
+    ./modules/system/newt.nix
   ];
 
   networking.hostName = "heimdall";
