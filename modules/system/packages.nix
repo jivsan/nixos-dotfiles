@@ -35,9 +35,7 @@
       gsettings-desktop-schemas
     ];
   };
-  programs.firefox.enable = true;
   environment.systemPackages = with pkgs; [
-    nano
     wget
     alacritty
     git

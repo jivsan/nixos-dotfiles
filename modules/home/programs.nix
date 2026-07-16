@@ -6,12 +6,6 @@
     gcc
     rofi
     feh
-    kubectl
-    talosctl
-    fluxcd
-    kubernetes-helm
-    kustomize
-    kubeseal
     rsync
   ];
 }

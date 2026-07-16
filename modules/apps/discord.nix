@@ -1,7 +1,7 @@
-{ pkgs, ... }:
+{ pkgs-unstable, ... }:
 
 {
-  environment.systemPackages = with pkgs; [
-    discord
+  environment.systemPackages = [
+    pkgs-unstable.discord
   ];
 }

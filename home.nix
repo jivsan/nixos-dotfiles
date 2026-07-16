@@ -21,20 +21,7 @@
       pkgs.brave
   ];
 
-systemd.user.services.easyeffects = {
-  Unit = {
-    Description = "EasyEffects";
-    After = [ "graphical-session.target" ];
-    PartOf = [ "graphical-session.target" ];
-  };
-  Service = {
-    ExecStart = "${pkgs.easyeffects}/bin/easyeffects --gapplication-service";
-    Restart = "on-failure";
-  };
-  Install = {
-    WantedBy = [ "graphical-session.target" ];
-  };
-};
+  services.easyeffects.enable = true;
   
   services.udiskie = {
     enable = true;
