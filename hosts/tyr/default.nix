@@ -10,6 +10,8 @@
     ../../modules/system/tailscale.nix
   ];
 
+  boot.kernelPackages = pkgs.linuxPackages_latest;
+
   networking.hostName = "tyr";
   networking.useDHCP = false;
   networking.interfaces.ens18.ipv4.addresses = [{
