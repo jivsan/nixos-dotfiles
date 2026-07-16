@@ -6,10 +6,11 @@
   "margin-left": 16,
   "margin-right": 16,
   "spacing": 10,
+  "reload_style_on_change": true,
 
-  "modules-left": ["hyprland/workspaces", "hyprland/window"],
+  "modules-left": ["custom/kernel", "hyprland/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
-  "modules-right": ["pulseaudio", "cpu", "memory", "custom/gpu", "network", "tray", "custom/power"],
+  "modules-right": ["pulseaudio", "cpu", "temperature", "memory", "custom/gpu", "disk", "network", "tray", "custom/power"],
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -32,8 +33,47 @@
     "tooltip-format": "<tt>{calendar}</tt>"
   },
 
-  "cpu":    { "format": "\udb80\udccb {usage}%", "interval": 2 },
-  "memory": { "format": "\uf035b {percentage}%", "interval": 5 },
+  "custom/kernel": {
+    "exec": "uname -r",
+    "format": "\udb84\udd05 {}",
+    "interval": "once",
+    "tooltip": false
+  },
+
+  "cpu":    { "format": "\udb80\udccb {usage}%", "interval": 2, "on-click": "alacritty -e btop" },
+  "memory": { "format": "\udb80\udf5b {percentage}%", "interval": 5, "on-click": "alacritty -e btop" },
+
+  "temperature": {
+    "hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:18.3",
+    "input-filename": "temp1_input",
+    "critical-threshold": 80,
+    "format": "{icon} {temperatureC}\u00b0C",
+    "format-icons": ["\uf2cb", "\uf2c9", "\uf2c7"],
+    "interval": 2
+  },
+
+  "disk": {
+    "path": "/",
+    "format": "\udb80\udeca {percentage_used}%",
+    "interval": 30,
+    "tooltip-format": "{used} used / {total} ({free} free)"
+  },
+
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "format-muted": "\udb81\udf5f",
+    "format-icons": { "default": ["\uf026", "\uf027", "\uf028"] },
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "easyeffects",
+    "scroll-step": 5
+  },
+
+  "custom/power": {
+    "format": "\uf011",
+    "tooltip": false,
+    "on-click": "/home/christina/.config/waybar/power.sh"
+  },
+
   "custom/gpu": {
     "exec": "/home/christina/.config/waybar/gpu.sh",
     "return-type": "json",

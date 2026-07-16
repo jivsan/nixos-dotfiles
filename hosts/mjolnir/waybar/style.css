@@ -21,13 +21,26 @@ window#waybar {
 #window,
 #clock,
 #cpu,
+#temperature,
 #memory,
+#disk,
+#pulseaudio,
 #network,
 #tray {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 12px;
   padding: 2px 12px;
   margin: 4px 0;
+  transition: all 0.2s ease;
+}
+
+#cpu:hover,
+#temperature:hover,
+#memory:hover,
+#disk:hover,
+#pulseaudio:hover,
+#clock:hover {
+  background: rgba(255, 255, 255, 0.10);
 }
 
 #workspaces { padding: 2px 4px; }
@@ -63,3 +76,31 @@ window#waybar {
 #tray    { background: transparent; }
 #custom-gpu { color: #8bffb0; }
 #custom-gpu.gpu-hot { color: #ff4fa3; }
+
+/* kernel badge — inverse gradient pill, mirrors the active workspace */
+#custom-kernel {
+  color: #16161e;
+  background: linear-gradient(135deg, #2de2e6, #ff4fa3);
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 2px 14px;
+  margin: 4px 0;
+}
+
+#temperature          { color: #ffe08a; }
+#temperature.critical { color: #ff4fa3; }
+#disk                 { color: #7fdbca; }
+#pulseaudio           { color: #ffc777; }
+#pulseaudio.muted     { color: #6c7393; }
+
+#custom-power {
+  color: #ff4fa3;
+  border-radius: 12px;
+  padding: 2px 14px;
+  margin: 4px 0;
+  transition: all 0.2s ease;
+}
+#custom-power:hover {
+  color: #16161e;
+  background: linear-gradient(135deg, #ff4fa3, #2de2e6);
+}
