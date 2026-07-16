@@ -18,7 +18,7 @@
     ../../modules/apps/vlc.nix
     ../../modules/apps/remote.nix
     ../../modules/apps/claude-code.nix
-    ../../modules/apps/grok.nix            # Grok Build (xAI CLI agent, Grok 4.5) via numtide/llm-agents.nix
+    ../../modules/apps/grok.nix            
     ../../modules/apps/telegram.nix
     ../../modules/apps/wowexport.nix
     ../../modules/apps/blender.nix
@@ -48,4 +48,5 @@
   # This was breaking all `ssh` (including graphify MCP over SSH and `ask`/`capture`).
   # See: nixos/modules/programs/ssh.nix (systemd-ssh-proxy.enable)
   programs.ssh.systemd-ssh-proxy.enable = false;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
 }
