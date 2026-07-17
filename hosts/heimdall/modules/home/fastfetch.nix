@@ -1,189 +1,108 @@
-{ config, pkgs, ... }:
+{ ... }:
 
+let
+  # Fleet neon accents (same family as mimir/tyr)
+  pink = "38;2;255;79;163";   # #ff4fa3
+  cyan = "38;2;45;226;230";   # #2de2e6
+  dim  = "38;2;99;99;125";    # muted steel
+in
 {
   programs.fastfetch = {
     enable = true;
 
     settings = {
+      "$schema" = "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json";
+
       logo = {
-        source = "nixos_small";
-        padding = {
-          top = 1;
-          right = 3;
-        };
+        # "NIXOS" slant lettering, pink → cyan gradient baked into the file
+        # (regenerate: figlet -f slant NIXOS + per-column truecolor interpolation)
+        type = "file-raw";
+        source = "${./heimdall-logo.txt}";
+        padding = { top = 1; right = 4; };
       };
 
       display = {
         separator = "  ";
-        size.binaryPrefix = "iec";
+        color.keys = cyan;
+        percent.type = 9;   # colored % — green → yellow → red by usage
       };
 
       modules = [
-        { type = "title"; format = "{user-name-colored}@{host-name-colored}"; }
-        { type = "custom"; format = "{#90}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
-
-        { type = "custom"; format = "{#blue}── SYSTEM ──"; }
-        { type = "os";      key = "  OS";      keyColor = "blue"; }
-        { type = "host";    key = "  Host";    keyColor = "blue"; }
-        { type = "kernel";  key = "  Kernel";  keyColor = "blue"; }
-        { type = "uptime";  key = "  Uptime";  keyColor = "blue"; }
-        { type = "loadavg"; key = "  Load";    keyColor = "blue"; }
-
+        # ── identity ──────────────────────────────────────────────
+        { type = "title"; color = { user = pink; at = dim; host = cyan; }; }
+        { type = "custom"; format = "{#${dim}}⟨ {#${pink}}heimdall{#${dim}} :: watcher of the bifrǫst — services node ⟩"; }
+        { type = "separator"; string = "─"; }
+        { type = "os";       key = " os";      keyColor = pink; }
+        { type = "kernel";   key = " kernel";  keyColor = cyan; }
+        { type = "packages"; key = "󰏖 pkgs";    keyColor = pink; }
+        { type = "shell";    key = " shell";   keyColor = cyan; }
+        { type = "uptime";   key = "󰔟 uptime";  keyColor = pink; }
+        { type = "loadavg";  key = "󰓅 load";    keyColor = cyan; }
         "break"
 
-        { type = "custom"; format = "{#magenta}── RESOURCES ──"; }
-        {
-          type = "cpu";
-          key = "  CPU";
-          keyColor = "magenta";
-          format = "{name} ({cores-physical}c/{cores-logical}t)";
-        }
-        { type = "memory"; key = "  Memory"; keyColor = "magenta"; }
+        # ── lab — what a services box cares about ─────────────────
         {
           type = "command";
-          key = "  Pressure";
-          keyColor = "magenta";
-          text = "cat /proc/pressure/cpu 2>/dev/null | awk '/some/ {print $2, $3, $4}' | sed 's/avg10=/cpu10=/; s/avg60=/cpu60=/; s/avg300=/cpu300=/' || echo unavailable";
+          key = "󰜉 gen";
+          keyColor = pink;
+          text = "readlink /nix/var/nix/profiles/system | grep -o '[0-9]\\+' | head -1 | xargs -I{} echo 'generation {}'";
         }
-
+        {
+          type = "command";
+          key = "󰚰 drift";
+          keyColor = cyan;
+          text = "timeout 2 git -C ~/nixos-dotfiles fetch -q origin main 2>/dev/null; b=$(git -C ~/nixos-dotfiles rev-list --count HEAD..origin/main 2>/dev/null); [ \"$b\" = 0 ] && echo 'in sync with main' || echo \"$b commit(s) behind main\"";
+        }
+        {
+          type = "command";
+          key = "󰒋 units";
+          keyColor = pink;
+          text = "f=$(systemctl --failed --no-legend | wc -l); [ \"$f\" = 0 ] && echo 'all green' || echo \"$f FAILED\"";
+        }
+        {
+          type = "command";
+          key = "󰡨 podman";
+          keyColor = cyan;
+          text = "sudo -n podman ps -q 2>/dev/null | wc -l | awk '{print $1 \" containers up\"}'";
+        }
+        {
+          type = "command";
+          key = "󰑪 traefik";
+          keyColor = pink;
+          text = "systemctl is-active traefik.service 2>/dev/null; curl -ksS --max-time 2 https://immich.oryxserver.org >/dev/null 2>&1 && echo '  immich edge online' || echo '  immich edge UNREACHABLE'";
+        }
         "break"
 
-        { type = "custom"; format = "{#cyan}── STORAGE ──"; }
-        { type = "disk"; key = "  Root"; keyColor = "cyan"; folders = "/"; }
+        # ── hardware ──────────────────────────────────────────────
+        { type = "cpu";    key = "󰻠 cpu";    keyColor = pink;  format = "{name} ({cores-logical}t)"; }
+        { type = "memory"; key = "󰑭 memory"; keyColor = cyan; }
+        { type = "swap";   key = "󰓡 swap";   keyColor = pink; }
+        { type = "disk";   key = "󰋊 disk";   keyColor = cyan;  folders = "/"; }
         {
           type = "command";
-          key = "  NAS mounts";
-          keyColor = "cyan";
-          text = "findmnt -rn -t nfs,nfs4 | wc -l | awk '{print $1 \" mounted\"}'";
+          key = "󰉓 nas";
+          keyColor = pink;
+          text = "findmnt -rn -t nfs,nfs4 | wc -l | awk '{print $1 \" odyn mounts\"}'";
         }
-        {
-          type = "command";
-          key = "  Nextcloud";
-          keyColor = "cyan";
-          text = "findmnt -rn /mnt/nextcloud 2>/dev/null >/dev/null && echo mounted || echo not mounted";
-        }
-        {
-          type = "command";
-          key = "  Immich";
-          keyColor = "cyan";
-          text = "findmnt -rn /mnt/immich 2>/dev/null >/dev/null && echo mounted || echo not mounted";
-        }
-
         "break"
 
-        { type = "custom"; format = "{#green}── CONTAINER STACK ──"; }
-        {
-          type = "command";
-          key = "  Podman";
-          keyColor = "green";
-          text = "systemctl is-active podman.socket 2>/dev/null || systemctl is-active podman.service 2>/dev/null || echo available";
-        }
-        {
-          type = "command";
-          key = "  Running";
-          keyColor = "green";
-          text = "podman ps --format '{{.Names}}' 2>/dev/null | wc -l | awk '{print $1 \" containers\"}'";
-        }
-        {
-          type = "command";
-          key = "  Images";
-          keyColor = "green";
-          text = "podman images -q 2>/dev/null | sort -u | wc -l | awk '{print $1 \" images\"}'";
-        }
-        {
-          type = "command";
-          key = "  Volumes";
-          keyColor = "green";
-          text = "podman volume ls -q 2>/dev/null | wc -l | awk '{print $1 \" volumes\"}'";
-        }
-
-        "break"
-
-        { type = "custom"; format = "{#green}── SERVICES ──"; }
-        {
-          type = "command";
-          key = "  Traefik";
-          keyColor = "green";
-          text = "systemctl is-active traefik.service 2>/dev/null || echo not installed";
-        }
-        {
-          type = "command";
-          key = "  Immich";
-          keyColor = "green";
-          text = "systemctl is-active podman-immich-server.service 2>/dev/null || systemctl is-active podman-immich.service 2>/dev/null || echo not installed";
-        }
-        {
-          type = "command";
-          key = "  Nextcloud";
-          keyColor = "green";
-          text = "systemctl is-active podman-nextcloud-server.service 2>/dev/null || systemctl is-active podman-nextcloud.service 2>/dev/null || echo not installed";
-        }
-        {
-          type = "command";
-          key = "  Crafty";
-          keyColor = "green";
-          text = "systemctl is-active podman-crafty.service 2>/dev/null || echo not installed";
-        }
-        {
-          type = "command";
-          key = "  PostgreSQL";
-          keyColor = "green";
-          text = "systemctl list-units 'podman-*postgres*.service' --state=active --no-legend 2>/dev/null | wc -l | awk '{print $1 \" active\"}'";
-        }
-        {
-          type = "command";
-          key = "  Redis";
-          keyColor = "green";
-          text = "systemctl list-units 'podman-*redis*.service' --state=active --no-legend 2>/dev/null | wc -l | awk '{print $1 \" active\"}'";
-        }
-
-        "break"
-
-        { type = "custom"; format = "{#yellow}── NETWORK ──"; }
+        # ── network ───────────────────────────────────────────────
         {
           type = "localip";
-          key = "  LAN";
-          keyColor = "yellow";
-          format = "{ipv4} ({ifname})";
+          key = "󰩟 network";
+          keyColor = cyan;
+          showPrefixLen = true;
+          namePrefix = "en";     # ens*/eno* only — hides lo, tailscale, podman veths
         }
         {
           type = "command";
-          key = "  Tailscale";
-          keyColor = "yellow";
+          key = "󰖂 tailnet";
+          keyColor = pink;
           text = "tailscale ip -4 2>/dev/null || echo offline";
         }
-        {
-          type = "command";
-          key = "  HTTPS";
-          keyColor = "yellow";
-          text = "systemctl is-active acme-oryxserver.org.timer 2>/dev/null || systemctl is-active acme-order-renew-oryxserver.org.timer 2>/dev/null || echo check manually";
-        }
-
         "break"
 
-        { type = "custom"; format = "{#red}── EDGE ROUTES ──"; }
-        {
-          type = "command";
-          key = "  Immich";
-          keyColor = "red";
-          text = "curl -ksS --max-time 2 https://immich.oryxserver.org >/dev/null && echo online || echo unreachable";
-        }
-        {
-          type = "command";
-          key = "  Nextcloud";
-          keyColor = "red";
-          text = "curl -ksS --max-time 2 https://nextcloud.oryxserver.org >/dev/null && echo online || echo unreachable";
-        }
-        {
-          type = "command";
-          key = "  Traefik";
-          keyColor = "red";
-          text = "curl -ksS --max-time 2 https://traefik.oryxserver.org >/dev/null && echo online || echo unreachable";
-        }
-
-        "break"
-
-        { type = "custom"; format = "{#90}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; }
+        { type = "colors"; paddingLeft = 2; symbol = "circle"; }
       ];
     };
   };
