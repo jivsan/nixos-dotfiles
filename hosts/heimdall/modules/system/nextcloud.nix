@@ -1,9 +1,12 @@
 { pkgs, ... }:
 let
-  # Pinned to exactly what's running on k8s (Nextcloud 32.0.6.1)
-  nextcloudImage = "docker.io/library/nextcloud@sha256:297c6ecc0a94a4bb6e55f12d693a1cf3e5ca24797f70f8570d18cf784f757792";
-  postgresImage = "docker.io/library/postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416";
-  redisImage = "docker.io/library/redis@sha256:c5e375abb885e6b2021c0377879e4890bf76f9065b8922ffc113f2b226b9fc17";
+  # Nextcloud 32.0.12-apache (latest 32.x patch). Majors go ONE at a time:
+  # STAGE 2 bumps this to 33.0.6 once 32.0.12 is verified. (Was 32.0.6 from k8s.)
+  nextcloudImage = "docker.io/library/nextcloud@sha256:90fdc9f99fab6f8dcfb16f6010a2a615775f01ed8e9265fa10beed6b2f10cbae";
+  # postgres:16-alpine (minor bump within PG16 — data dir compatible)
+  postgresImage = "docker.io/library/postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777";
+  # redis:alpine (current)
+  redisImage = "docker.io/library/redis@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005";
 in
 {
   systemd.tmpfiles.rules = [

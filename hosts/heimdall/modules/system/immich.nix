@@ -1,8 +1,12 @@
 { pkgs, ... }:
 let
-  # Image versions matched exactly to what's running on k8s
+  # immich-server v2.7.5 — STAGE 2 bumps this to v3.0.3 once the DB migration below is verified
   immichImage = "ghcr.io/immich-app/immich-server@sha256:c15bff75068effb03f4355997d03dc7e0fc58720c2b54ad6f7f10d1bc57efaa5";
-  pgvectorImage = "tensorchord/pgvecto-rs@sha256:36218719c673b38adc1d4034b3666bae780bfffb17a250973b6108a9f11cd5d4";
+  # Immich's own postgres image: PG16 + VectorChord 0.4.3 + pgvecto.rs 0.2.1.
+  # Ships BOTH vector extensions so the server can auto-migrate vectors → vchord
+  # on first start (required before Immich v3, which dropped pgvecto.rs).
+  # Tag: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvector0.8.1-pgvectors0.2.1
+  pgvectorImage = "ghcr.io/immich-app/postgres@sha256:13d1ff1638f54be482620d0ef1eb2b004c99bfd674d06359ae0b91d8f5b5696b";
   redisImage = "redis:alpine";
 
   # ML backend was on nix-oryx (now decommissioned). To be re-hosted on the new
@@ -45,7 +49,8 @@ in
         "127.0.0.1:5433:5432"          # bound to localhost only, port 5433 to avoid collision with future native PG
       ];
 
-      cmd = [ "postgres" "-c" "shared_preload_libraries=vectors.so" ];
+      # No cmd override: the immich-app/postgres entrypoint manages
+      # shared_preload_libraries itself (loads vchord.so + vectors.so as needed).
 
       extraOptions = [
         "--network=immich-net"
