@@ -18,7 +18,8 @@
     ../../modules/apps/vlc.nix
     ../../modules/apps/remote.nix
     ../../modules/apps/claude-code.nix
-    ../../modules/apps/grok.nix            
+    ../../modules/apps/grok.nix
+    ../../modules/apps/hermes-agent.nix    # Hermes Agent (Nous Research) → OpenRouter, `hermes` CLI
     ../../modules/apps/telegram.nix
     ../../modules/apps/wowexport.nix
     ../../modules/apps/blender.nix

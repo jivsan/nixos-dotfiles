@@ -34,6 +34,7 @@
       url = "github:jivsan/Hlidskjalf";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hermes-agent.url = "github:NousResearch/hermes-agent";
   };
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, oxwm, claude-code, ... }@inputs:
     let

@@ -27,8 +27,6 @@ All persistent data is on `odyn` at `10.0.20.6`, ZFS pool `vault`, mounted over 
 ```
 10.0.20.6:/mnt/vault/immich                             → Immich photos (dedicated dataset,
                                                           700 root:root, export heimdall-only)
-10.0.20.6:/mnt/vault/nextcloud                          → old Nextcloud files (ro; service
-                                                          removed 2026-07-17, data retained)
 10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/*        → Crafty config/backups/servers/…
 10.0.20.6:/mnt/vault/nix-services                       → service data (dataset kept its old name)
 ```

@@ -17,10 +17,6 @@ let
   # Path containers will see for uploads (immich expects /usr/src/app/upload).
   # Backed by dedicated dataset odyn:/mnt/vault/immich since 2026-07-17.
   uploadHostPath = "/mnt/nas/immich-upload";
-  # Read-only view of the retired Nextcloud files — keeps the old Photos
-  # folder (17G) reachable for an external library / gap-filling until the
-  # phone backup is verified complete.
-  nextcloudHostPath = "/mnt/nas/nextcloud";
 in
 {
   # Pre-create local Postgres data dir on SSD
@@ -95,7 +91,6 @@ in
 
       volumes = [
         "${uploadHostPath}:/usr/src/app/upload:rw"
-        "${nextcloudHostPath}:/mnt/nextcloud:ro"
         "/etc/localtime:/etc/localtime:ro"
       ];
 
