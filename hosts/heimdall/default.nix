@@ -8,6 +8,7 @@
     ../../modules/system/nix.nix
     ../../modules/system/users.nix
     ../../modules/system/tailscale.nix
+    ../../modules/system/dotfiles-pull.nix
 
     ./modules/system/acme.nix
     ./modules/system/traefik.nix

@@ -8,6 +8,7 @@
     ../../modules/system/nix.nix
     ../../modules/system/users.nix
     ../../modules/system/tailscale.nix
+    ../../modules/system/dotfiles-pull.nix
   ];
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
