@@ -1,7 +1,7 @@
 { pkgs, ... }:
 let
-  # immich-server v2.7.5 — STAGE 2 bumps this to v3.0.3 once the DB migration below is verified
-  immichImage = "ghcr.io/immich-app/immich-server@sha256:c15bff75068effb03f4355997d03dc7e0fc58720c2b54ad6f7f10d1bc57efaa5";
+  # immich-server v3.0.3 (DB migrated pgvecto.rs → VectorChord on 2026-07-17, on v2.7.5)
+  immichImage = "ghcr.io/immich-app/immich-server@sha256:c716dc20f957aafd89fa9d284a2ec63e25c9e2d8d8e87c6197d540a3dce237db";
   # Immich's own postgres image: PG16 + VectorChord 0.4.3 + pgvecto.rs 0.2.1.
   # Ships BOTH vector extensions so the server can auto-migrate vectors → vchord
   # on first start (required before Immich v3, which dropped pgvecto.rs).
@@ -9,10 +9,10 @@ let
   pgvectorImage = "ghcr.io/immich-app/postgres@sha256:13d1ff1638f54be482620d0ef1eb2b004c99bfd674d06359ae0b91d8f5b5696b";
   redisImage = "redis:alpine";
 
-  # ML backend was on nix-oryx (now decommissioned). To be re-hosted on the new
-  # NixOS AI box (configured from mjolnir, like heimdall) and re-pointed here.
-  # Smart search / face detection stay off until then.
-  # mlUrl = "http://<ai-box>:3003";
+  # ML backend on mimir (hosts/mimir/modules/system/immich-ml.nix, pinned to the
+  # same immich release). Container needs mimir's GPU/driver working to start;
+  # immich-server tolerates ML being down (smart search just stays unavailable).
+  mlUrl = "http://10.0.20.18:3003";
 
   # Path containers will see for uploads (immich expects /usr/src/app/upload)
   uploadHostPath = "/mnt/nas/immich-upload";
@@ -81,7 +81,7 @@ in
         DB_DATABASE_NAME = "immich";
         DB_USERNAME = "immich";
         REDIS_HOSTNAME = "immich-redis";
-        # IMMICH_MACHINE_LEARNING_URL = mlUrl;   # re-enable once the AI box is up
+        IMMICH_MACHINE_LEARNING_URL = mlUrl;
 
         # Suppress upgrade nag if version drifts later
         IMMICH_VERSION_CHECK = "false";

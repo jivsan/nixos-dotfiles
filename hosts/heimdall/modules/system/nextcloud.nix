@@ -1,8 +1,7 @@
 { pkgs, ... }:
 let
-  # Nextcloud 32.0.12-apache (latest 32.x patch). Majors go ONE at a time:
-  # STAGE 2 bumps this to 33.0.6 once 32.0.12 is verified. (Was 32.0.6 from k8s.)
-  nextcloudImage = "docker.io/library/nextcloud@sha256:90fdc9f99fab6f8dcfb16f6010a2a615775f01ed8e9265fa10beed6b2f10cbae";
+  # Nextcloud 33.0.6-apache (upgraded 32.0.6 → 32.0.12 → 33.0.6; majors go ONE at a time)
+  nextcloudImage = "docker.io/library/nextcloud@sha256:73280a6f559e9a6c96e012324086ff63af7ccfbed260f71f17738e5494375052";
   # postgres:16-alpine (minor bump within PG16 — data dir compatible)
   postgresImage = "docker.io/library/postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777";
   # redis:alpine (current)

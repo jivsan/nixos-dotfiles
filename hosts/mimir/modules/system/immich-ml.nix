@@ -3,7 +3,8 @@ let
   # ⚠️ Pin this to the SAME immich version as immich-server on heimdall
   # (heimdall's immich.nix pins the server by digest). A mismatched ML/server
   # pair can break the API. The `-cuda` tag is the GPU build for NVIDIA.
-  immichMlImage = "ghcr.io/immich-app/immich-machine-learning:release-cuda";
+  # v3.0.3-cuda (matches heimdall's immich-server v3.0.3)
+  immichMlImage = "ghcr.io/immich-app/immich-machine-learning@sha256:0d66acce99224495fda2288e2d8f52b459712b2e897e67b492729bce07775c08";
 in
 {
   systemd.tmpfiles.rules = [
