@@ -13,7 +13,6 @@
     ./modules/system/traefik.nix
     ./modules/system/nas.nix
     ./modules/system/immich.nix
-    ./modules/system/nextcloud.nix
     ./modules/system/crafty.nix
     ./modules/system/homepage.nix
     ./modules/system/paperless.nix

@@ -63,12 +63,6 @@ let
             description: Photos, faces, memories
             ping: https://immich.oryxserver.org
 
-        - Nextcloud:
-            icon: nextcloud.png
-            href: https://nextcloud.oryxserver.org
-            description: Files and personal cloud
-            ping: https://nextcloud.oryxserver.org
-
         - Paperless:
             icon: paperless-ngx.png
             href: https://paperless.oryxserver.org
@@ -161,9 +155,6 @@ let
         - TrueNAS:
             - icon: truenas.png
               href: https://truenas.oryxserver.org
-        - Nextcloud:
-            - icon: nextcloud.png
-              href: https://nextcloud.oryxserver.org
         - Paperless:
             - icon: paperless-ngx.png
               href: https://paperless.oryxserver.org

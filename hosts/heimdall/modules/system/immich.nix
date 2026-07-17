@@ -14,8 +14,12 @@ let
   # immich-server tolerates ML being down (smart search just stays unavailable).
   mlUrl = "http://10.0.20.18:3003";
 
-  # Path containers will see for uploads (immich expects /usr/src/app/upload)
+  # Path containers will see for uploads (immich expects /usr/src/app/upload).
+  # Backed by dedicated dataset odyn:/mnt/vault/immich since 2026-07-17.
   uploadHostPath = "/mnt/nas/immich-upload";
+  # Read-only view of the retired Nextcloud files — keeps the old Photos
+  # folder (17G) reachable for an external library / gap-filling until the
+  # phone backup is verified complete.
   nextcloudHostPath = "/mnt/nas/nextcloud";
 in
 {

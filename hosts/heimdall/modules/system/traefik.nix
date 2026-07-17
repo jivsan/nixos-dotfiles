@@ -75,18 +75,6 @@
             middlewares = [ "lan-only" ];
           };
 
-          nextcloud = {
-            rule = "Host(`nextcloud.oryxserver.org`)";
-            service = "nextcloud";
-            entryPoints = [ "websecure" ];
-            tls = {};
-            middlewares = [
-              "lan-only"
-              "nextcloud-redirect"
-              "nextcloud-headers"
-            ];
-          };
-
           truenas = {
             rule = "Host(`truenas.oryxserver.org`)";
             service = "truenas";
@@ -190,14 +178,6 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:2283"; }
-              ];
-            };
-          };
-
-          nextcloud = {
-            loadBalancer = {
-              servers = [
-                { url = "http://127.0.0.1:8081"; }
               ];
             };
           };
@@ -316,27 +296,6 @@
             ];
           };
 
-          nextcloud-redirect = {
-            redirectRegex = {
-              regex = "^https://([^/]+)/.well-known/(card|cal)dav";
-              replacement = "https://$1/remote.php/dav";
-              permanent = true;
-            };
-          };
-
-          nextcloud-headers = {
-            headers = {
-              customRequestHeaders = {
-                X-Forwarded-Proto = "https";
-              };
-
-              customResponseHeaders = {
-                "Strict-Transport-Security" = "max-age=15552000; includeSubDomains";
-              };
-
-              referrerPolicy = "no-referrer";
-            };
-          };
         };
       };
     };

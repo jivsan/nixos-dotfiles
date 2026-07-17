@@ -35,10 +35,6 @@
         job_name = "postgres-immich";
         static_configs = [{ targets = [ "localhost:9187" ]; labels.db = "immich"; }];
       }
-      {
-        job_name = "postgres-nextcloud";
-        static_configs = [{ targets = [ "localhost:9188" ]; labels.db = "nextcloud"; }];
-      }
       # === Traefik built-in metrics ===
       {
         job_name = "traefik";
@@ -74,7 +70,6 @@
         static_configs = [{
           targets = [
             "https://immich.oryxserver.org"
-            "https://nextcloud.oryxserver.org"
             "https://grafana.oryxserver.org"
             "https://traefik.oryxserver.org"
             "https://homepage.oryxserver.org"

@@ -16,26 +16,21 @@ let
 in
 {
   # ── Immich ──
+  # Dedicated dataset (2026-07-17): 700 root:root, export answers heimdall only,
+  # maproot=root. Old data migrated from /mnt/vault/nfs-pvc-kubernetes/immich/upload.
   fileSystems."/mnt/nas/immich-upload" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/immich/upload";
+    device = "10.0.20.6:/mnt/vault/immich";
     fsType = "nfs";
     options = commonOpts;
   };
-  # ── Nextcloud ──
+  # ── Nextcloud (service removed 2026-07-17; files kept on odyn) ──
+  # Read-only view of the old Nextcloud files — admin/files/Photos (17G) is the
+  # only server-side copy of the photo history until the phone backup to Immich
+  # is verified complete. Immich mounts this ro for a potential external library.
   fileSystems."/mnt/nas/nextcloud" = {
     device = "10.0.20.6:/mnt/vault/nextcloud";
     fsType = "nfs";
     options = commonOpts ++ [ "ro" ];
-  };
-  fileSystems."/mnt/nas/nextcloud-app" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/nextcloud/app";
-    fsType = "nfs";
-    options = commonOpts;
-  };
-  fileSystems."/mnt/nas/nextcloud-data" = {
-    device = "10.0.20.6:/mnt/vault/nextcloud";
-    fsType = "nfs";
-    options = commonOpts;
   };
   # ── Crafty ──
   fileSystems."/mnt/nas/crafty-config" = {

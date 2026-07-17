@@ -25,8 +25,10 @@ All persistent data is on `odyn` at `10.0.20.6`, ZFS pool `vault`, mounted over 
 `hosts/heimdall/modules/system/nas.nix`. Key mounts:
 
 ```
-10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/immich/upload   → Immich photos
-10.0.20.6:/mnt/vault/nextcloud                          → Nextcloud files
+10.0.20.6:/mnt/vault/immich                             → Immich photos (dedicated dataset,
+                                                          700 root:root, export heimdall-only)
+10.0.20.6:/mnt/vault/nextcloud                          → old Nextcloud files (ro; service
+                                                          removed 2026-07-17, data retained)
 10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/*        → Crafty config/backups/servers/…
 10.0.20.6:/mnt/vault/nix-services                       → service data (dataset kept its old name)
 ```
@@ -43,8 +45,7 @@ Exact subdomains live in that file — the pattern is `<service>.oryxserver.org`
 | Service | Type | Notes |
 |---|---|---|
 | Traefik | native | reverse proxy + dashboard (`api@internal`), wildcard TLS |
-| Immich | podman | photos; data on odyn NFS |
-| Nextcloud | podman | files; data on odyn NFS |
+| Immich | podman | photos; data on odyn NFS (`vault/immich` dataset) |
 | Crafty | podman | Minecraft server controller |
 | Paperless | podman | document management |
 | Homepage | podman | dashboard / landing page |
@@ -100,7 +101,6 @@ hosts/heimdall/
         ├── traefik.nix             # reverse proxy + all routes
         ├── nas.nix                 # NFS mounts from odyn
         ├── immich.nix              # immich-server + postgres + redis
-        ├── nextcloud.nix           # nextcloud + postgres + redis
         ├── crafty.nix              # Minecraft controller
         ├── paperless.nix
         ├── homepage.nix            # dashboard
@@ -147,10 +147,12 @@ See [`deploying-services.md`](deploying-services.md) for the full walkthrough.
   detection are off until ML is re-hosted on the new NixOS AI box (to be configured from
   mjolnir, like heimdall) and re-pointed.
 
-### Nextcloud (from k8s, 2026-04-29)
-- postgres:16-alpine + redis:alpine + nextcloud:stable; 137 tables restored from `pg_dump`.
-- Files on odyn NFS at `/mnt/vault/nextcloud`; app dir at `/mnt/vault/nfs-pvc-kubernetes/nextcloud/app`.
-- DB user `oc_admin` recreated post-restore (dump used `--no-owner --no-acl`).
+### Nextcloud (from k8s 2026-04-29; REMOVED 2026-07-17)
+- Ran postgres:16-alpine + redis:alpine + nextcloud (last version: 33.0.6).
+- **Removed 2026-07-17** — replaced by Immich for photos. Files retained read-only on odyn
+  at `/mnt/vault/nextcloud` (Photos = 17G); DB dump at
+  `/mnt/nas/nix-services/db-backups/2026-07-17/nextcloud-pgdumpall.sql`; local DB dir
+  `/var/lib/nextcloud-db` left in place as extra safety.
 
 ## Common operations
 
