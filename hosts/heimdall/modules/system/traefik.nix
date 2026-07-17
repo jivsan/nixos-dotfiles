@@ -291,6 +291,8 @@
           lan-only = {
             ipAllowList.sourceRange = [
               "10.0.20.0/24"
+              "10.0.50.10/32"    # Christina's phone (static DHCP mapping on the IoT VLAN) —
+                                 # single host, NOT the VLAN; IoT gear stays locked out
               "100.64.0.0/10"
               "127.0.0.1/32"
             ];
