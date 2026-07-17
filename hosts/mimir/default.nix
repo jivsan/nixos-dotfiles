@@ -12,12 +12,12 @@
 
     # ── mimir-local: AI / GPU stack ──
     ./modules/system/nvidia.nix
-    ./modules/system/storage.nix
+#   ./modules/system/storage.nix
     ./modules/system/immich-ml.nix
     ./modules/system/ollama.nix
     ./modules/system/open-webui.nix
 #    ./modules/system/comfyui.nix
-    ./modules/system/discordbot.nix
+#    ./modules/system/discordbot.nix
   ];
 
   networking.hostName = "mimir";
