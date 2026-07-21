@@ -16,9 +16,16 @@ let
   # client and sends the public half over. Public keys are not secrets, so this
   # belongs in the repo.
   #
-  # TODO: replace this placeholder with her real key. The assertion below fails
-  # the build until you do, so a half-configured tunnel can never deploy.
+  # Kept as an uncommitted local edit on mjolnir and heimdall only: this repo is
+  # public, and committing the key would be a durable public link between her and
+  # this infra. The committed value stays the placeholder below, so a clean clone
+  # fails the assertion loudly rather than deploying a broken peer.
   mishkaPublicKey = "REPLACE_WITH_MISHKA_PUBLIC_KEY";
+
+  # Her laptop. A second device needs its own keypair AND its own address on the
+  # tunnel: WireGuard routes by allowedIPs, so two peers sharing 10.9.0.2 would
+  # make return traffic ambiguous and break both devices intermittently.
+  mishkaLaptopPublicKey = "REPLACE_WITH_MISHKA_LAPTOP_PUBLIC_KEY";
 
   # This repo has no sops-nix or agenix, so the private key and the PSK live in
   # a root-only directory outside git and are referenced by path. See the
@@ -49,6 +56,13 @@ in
         Paste her real public key into hosts/heimdall/modules/system/amneziawg.nix.
       '';
     }
+    {
+      assertion = mishkaLaptopPublicKey != "REPLACE_WITH_MISHKA_LAPTOP_PUBLIC_KEY";
+      message = ''
+        amneziawg: mishkaLaptopPublicKey is still the placeholder.
+        Paste her laptop's real public key into hosts/heimdall/modules/system/amneziawg.nix.
+      '';
+    }
   ];
 
   networking.firewall.allowedUDPPorts = [ 51820 ];
@@ -72,6 +86,13 @@ in
         publicKey = mishkaPublicKey;
         presharedKeyFile = "${secretsDir}/mishka.psk";
         allowedIPs = [ "10.9.0.2/32" ];
+        persistentKeepalive = 25;
+      }
+      {
+        name = "mishka-laptop";
+        publicKey = mishkaLaptopPublicKey;
+        presharedKeyFile = "${secretsDir}/mishka-laptop.psk";
+        allowedIPs = [ "10.9.0.3/32" ];
         persistentKeepalive = 25;
       }
     ];
