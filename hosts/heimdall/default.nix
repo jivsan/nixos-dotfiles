@@ -33,6 +33,7 @@
     ./modules/system/brain.nix
     ./modules/system/hlidskjalf.nix
     ./modules/system/newt.nix
+    ./modules/system/amneziawg.nix
   ];
 
   networking.hostName = "heimdall";
