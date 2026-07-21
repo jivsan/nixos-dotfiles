@@ -14,8 +14,10 @@ set -euo pipefail
 DIR=/var/lib/amneziawg
 
 if ! command -v awg >/dev/null 2>&1; then
-  echo "awg not found. Deploy the amneziawg module first, or run this via:" >&2
-  echo "  nix shell nixpkgs#amneziawg-tools -c sudo bash \$0" >&2
+  echo "awg not found — the amneziawg module is not deployed yet." >&2
+  echo "That is fine, run this first and the tunnel comes up clean on rebuild:" >&2
+  echo "  sudo nix shell nixpkgs#amneziawg-tools -c bash $0" >&2
+  echo "(sudo goes on the outside: it resets PATH, so nix shell must run as root.)" >&2
   exit 1
 fi
 
