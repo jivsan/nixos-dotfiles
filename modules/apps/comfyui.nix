@@ -21,9 +21,15 @@ in
   boot.supportedFilesystems = [ "nfs" ];
 
   # One mount for the whole dataset; the container maps subpaths out of it.
+  # Mounted inside $HOME (not /mnt) so it shows up as an ordinary folder in
+  # Nautilus and you can drag checkpoints/LoRAs straight in — same pattern as
+  # ~/muninn and ~/OBS-recordings. Safe from the backup script: backup.nix only
+  # walks ~/nixos-dotfiles, ~/.config and ~/octane-src, so this can't loop back
+  # onto odyn.
+  #
   # No x-systemd.automount here on purpose — podman resolves bind-mount paths
   # at container start and would happily bind an empty, un-triggered directory.
-  fileSystems."/mnt/odyn/comfyui" = {
+  fileSystems."/home/christina/comfyui" = {
     device = "10.0.20.6:/mnt/vault/comfyui";
     fsType = "nfs";
     options = [
@@ -64,9 +70,9 @@ in
     ports = [ "127.0.0.1:8188:8188" ];
 
     volumes = [
-      "/mnt/odyn/comfyui/models:/app/ComfyUI/models"
-      "/mnt/odyn/comfyui/output:/app/ComfyUI/output"
-      "/mnt/odyn/comfyui/input:/app/ComfyUI/input"
+      "/home/christina/comfyui/models:/app/ComfyUI/models"
+      "/home/christina/comfyui/output:/app/ComfyUI/output"
+      "/home/christina/comfyui/input:/app/ComfyUI/input"
       "/var/lib/comfyui/user:/app/ComfyUI/user"
       "/var/lib/comfyui/temp:/app/ComfyUI/temp"
     ];
@@ -76,5 +82,5 @@ in
 
   # Refuse to start against a missing NFS mount rather than silently
   # generating into an empty local directory.
-  systemd.services.podman-comfyui.unitConfig.RequiresMountsFor = "/mnt/odyn/comfyui";
+  systemd.services.podman-comfyui.unitConfig.RequiresMountsFor = "/home/christina/comfyui";
 }
