@@ -10,6 +10,7 @@ FROM docker.io/library/python:3.12-slim
 ARG COMFYUI_VERSION=v0.28.2
 ARG IMPACT_PACK_VERSION=8.28
 ARG IMPACT_SUBPACK_VERSION=1.3.4
+ARG MANAGER_VERSION=4.2.2
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cu128
 
 RUN apt-get update \
@@ -38,6 +39,21 @@ RUN git clone --depth 1 --branch ${IMPACT_PACK_VERSION} \
  && pip install --no-cache-dir -c /tmp/constraints.txt \
       -r /app/ComfyUI/custom_nodes/ComfyUI-Impact-Subpack/requirements.txt
 
+# ComfyUI-Manager — node browser / updater.
+#
+# As of ComfyUI 0.28 this is a first-class integration, NOT a custom node:
+# nodes.py does `import comfyui_manager` guarded by `--enable-manager` (see the
+# CMD below), so the flag is what actually switches it on. Do *not* clone it
+# into custom_nodes/ — Manager 4.x has no root __init__.py and ComfyUI's loader
+# (spec_from_file_location on "<dir>/__init__.py") would silently fail to
+# import it. Install it as a normal package instead.
+#
+# CAVEAT: nodes Manager *installs* at runtime land in the ephemeral container
+# fs and are gone on the next start. Use it to browse and pick what you want,
+# then make it permanent by adding a layer here and rebuilding.
+RUN pip install --no-cache-dir -c /tmp/constraints.txt \
+      comfyui-manager==${MANAGER_VERSION}
+
 # triton (torch's JIT dep) compiles a tiny C module at CUDA init — without a
 # compiler in the image the container dies with "Failed to find C compiler".
 # Separate layer at the end so image rebuilds stay cached and fast.
@@ -47,4 +63,4 @@ RUN apt-get update \
 
 WORKDIR /app/ComfyUI
 EXPOSE 8188
-CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188"]
+CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--enable-manager"]
