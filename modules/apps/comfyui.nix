@@ -46,10 +46,20 @@ in
   };
 
   # Local-only state (see header).
+  #
+  # custom_nodes/ + venv/ exist because oci-containers runs podman with --rm and
+  # `podman rm -f` on stop, so the container filesystem is destroyed every
+  # restart. Without these, anything ComfyUI-Manager installs is gone the moment
+  # you restart to activate it — and a restart is exactly what loading a new
+  # node requires. Kept host-local, not on odyn: this is Python code compiled
+  # against a specific torch (2.11 here vs 2.6 on mimir), so the two hosts must
+  # not share it.
   systemd.tmpfiles.rules = [
-    "d /var/lib/comfyui       0755 root root -"
-    "d /var/lib/comfyui/temp  0755 root root -"
-    "d /var/lib/comfyui/user  0755 root root -"
+    "d /var/lib/comfyui              0755 root root -"
+    "d /var/lib/comfyui/temp         0755 root root -"
+    "d /var/lib/comfyui/user         0755 root root -"
+    "d /var/lib/comfyui/custom_nodes 0755 root root -"
+    "d /var/lib/comfyui/venv         0755 root root -"
   ];
 
   # mjolnir had neither of these — ComfyUI is the first container on this host.
@@ -75,6 +85,11 @@ in
       "/home/christina/comfyui/input:/app/ComfyUI/input"
       "/var/lib/comfyui/user:/app/ComfyUI/user"
       "/var/lib/comfyui/temp:/app/ComfyUI/temp"
+      # Survive --rm: Manager installs nodes into the first registered
+      # custom_nodes path (extra_model_paths.yaml pins this one at index 0),
+      # and their pip deps land in the venv.
+      "/var/lib/comfyui/custom_nodes:/app/custom_nodes"
+      "/var/lib/comfyui/venv:/app/venv"
     ];
 
     extraOptions = [ "--device=nvidia.com/gpu=all" "--pull=never" ];

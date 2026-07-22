@@ -1,0 +1,12 @@
+# Registers a PERSISTENT custom_nodes directory (a host volume at
+# /var/lib/comfyui/custom_nodes) in addition to the image's baked-in
+# /app/ComfyUI/custom_nodes. ComfyUI scans every registered custom_nodes path
+# (nodes.py init_external_custom_nodes), so baked nodes keep working.
+#
+# is_default: true puts this path at index 0 of
+# folder_paths.get_folder_paths("custom_nodes") — and index 0 is exactly what
+# ComfyUI-Manager's get_default_custom_nodes_path() returns. So Manager installs
+# HERE, on the volume, instead of into the throwaway container filesystem.
+persistent:
+  is_default: true
+  custom_nodes: /app/custom_nodes

@@ -61,6 +61,14 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends gcc libc6-dev \
  && rm -rf /var/lib/apt/lists/*
 
+# Persistence wiring (see entrypoint.sh / extra_model_paths.yaml for the why).
+# /app/custom_nodes and /app/venv are mount points for host volumes; created
+# here so the container still starts if a volume is ever missing.
+COPY extra_model_paths.yaml /app/ComfyUI/extra_model_paths.yaml
+COPY entrypoint.sh /usr/local/bin/comfyui-entrypoint
+RUN chmod +x /usr/local/bin/comfyui-entrypoint \
+ && mkdir -p /app/custom_nodes /app/venv
+
 WORKDIR /app/ComfyUI
 EXPOSE 8188
 # --enable-manager-legacy-ui is what actually draws the Manager button next to
@@ -71,5 +79,6 @@ EXPOSE 8188
 # expects and injects the UI via EXTENSION_WEB_DIRS. It implies
 # --enable-manager; both are listed for clarity (they are not mutually
 # exclusive — only --disable-manager-ui conflicts).
-CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", \
+ENTRYPOINT ["/usr/local/bin/comfyui-entrypoint"]
+CMD ["--listen", "0.0.0.0", "--port", "8188", \
      "--enable-manager", "--enable-manager-legacy-ui"]

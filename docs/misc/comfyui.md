@@ -78,8 +78,13 @@ does `import comfyui_manager` guarded by `if args.enable_manager`.
     serves its API under `/v2/`, but the frontend pinned by ComfyUI 0.28.2
     (`comfyui-frontend-package` 1.45.21) still calls the unprefixed `customnode/*` paths and
     404s. The legacy flag registers the routes its JS expects and injects the web dir.
-- Nodes Manager **installs at runtime do not persist** — `--rm` recreates the container fs
-  each start. Use it to browse, then bake what you want into the Containerfile.
+- **Runtime installs persist on mjolnir** (see below). On mimir they do not — it has no
+  persistence wiring yet, so bake nodes into its Containerfile there.
+- Refusal: *"security_level must be `normal or below`, and network_mode must be
+  `personal_cloud`"* → set `network_mode = personal_cloud` in `config.ini` and restart.
+  Manager infers `public` because the container must listen on `0.0.0.0` for podman's port
+  forward, even though the host only binds `127.0.0.1`. Correcting a false signal, not
+  widening access.
 - Its own config persists (`user/__manager/config.ini`, on the host-local volume). Git-URL
   and pip installs are gated by `allow_git_url_install` / `allow_pip_install` there, plus a
   non-local-listener rule needing `network_mode = personal_cloud`.
@@ -105,8 +110,33 @@ mjolnir's copy lives at `modules/apps/comfyui/`; mimir's at
 `hosts/mimir/modules/system/comfyui/`. **Do not copy one Containerfile over the other** —
 they pin different torch builds.
 
-**Add a permanent custom node**: add a `git clone` + `pip install -r` layer to the
-Containerfile and rebuild.
+**Add a permanent custom node**: on mjolnir just install it from Manager — it persists (see
+below). To pin one declaratively (or on mimir), add a `git clone` + `pip install -r` layer to
+the Containerfile and rebuild.
+
+## How runtime installs survive `--rm` (mjolnir)
+
+oci-containers runs podman with `--rm` and `podman rm -f` in ExecStopPost, so the container
+filesystem is destroyed on every stop. That created a catch-22: loading a newly installed node
+requires a restart, and the restart deleted it. Two volumes fix it:
+
+| host path | in container | holds |
+|---|---|---|
+| `/var/lib/comfyui/custom_nodes` | `/app/custom_nodes` | the node files |
+| `/var/lib/comfyui/venv` | `/app/venv` | their pip dependencies |
+
+- `extra_model_paths.yaml` registers `/app/custom_nodes` with `is_default: true`, which
+  `folder_paths.add_model_folder_path` inserts at **index 0** — exactly what Manager's
+  `get_default_custom_nodes_path()` returns, so Manager installs there. ComfyUI scans *all*
+  registered paths, so the baked-in Impact Pack nodes keep working alongside it.
+- `entrypoint.sh` creates a venv (`--system-site-packages`) on the volume and execs ComfyUI
+  from it, so `sys.executable` is the venv python and Manager's pip/uv installs land on the
+  volume. torch and ComfyUI's own deps still come from the image. The venv is recreated
+  automatically if the image's python minor version changes (`.pyver` marker) — a venv built
+  against a different python silently fails to import everything.
+
+Both are host-local on purpose: this is Python compiled against a specific torch (2.11 on
+mjolnir vs 2.6 on mimir), so the hosts must **not** share it via odyn.
 
 ## Secrets (never in git)
 
