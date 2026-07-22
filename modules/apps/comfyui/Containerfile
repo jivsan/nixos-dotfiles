@@ -63,4 +63,13 @@ RUN apt-get update \
 
 WORKDIR /app/ComfyUI
 EXPOSE 8188
-CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--enable-manager"]
+# --enable-manager-legacy-ui is what actually draws the Manager button next to
+# Run. Without it you get the backend but no UI: Manager 4.2.2 serves its API
+# under a /v2/ prefix, while the frontend pinned by ComfyUI 0.28.2
+# (comfyui-frontend-package 1.45.21) still calls the unprefixed
+# `customnode/*` paths and 404s. The legacy flag registers the routes its JS
+# expects and injects the UI via EXTENSION_WEB_DIRS. It implies
+# --enable-manager; both are listed for clarity (they are not mutually
+# exclusive — only --disable-manager-ui conflicts).
+CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", \
+     "--enable-manager", "--enable-manager-legacy-ui"]
