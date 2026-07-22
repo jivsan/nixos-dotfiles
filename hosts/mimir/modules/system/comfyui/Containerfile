@@ -1,15 +1,24 @@
 # ComfyUI for mimir's GTX 1070 (Pascal, sm_61).
 #
 # torch is pinned to 2.6.0+cu126 — the last line with solid Pascal support.
-# Bump the ARGs consciously: newer torch/CUDA builds drop Pascal kernels.
+# Bump TORCH consciously: newer torch/CUDA builds drop Pascal kernels.
+#
+# The ComfyUI version is NOT tied to that pin. 0.28.2 runs fine on torch 2.6:
+# the only version gate in model_management.py is a `>= (2, 7)` check guarding
+# an optional optimization ("works on 2.6 but doesn't actually seem to improve
+# much"). So this tracks mjolnir's ComfyUI/Manager versions while keeping the
+# Pascal-safe torch — the two hosts share one model library on odyn, and
+# matching versions keep workflows portable between them.
+#
 # Build on mimir:  ./build.sh   → localhost/comfyui:<version>
 # (Self-built local image = pinned by construction; nothing is pulled at runtime.)
 
 FROM docker.io/library/python:3.12-slim
 
-ARG COMFYUI_VERSION=v0.27.0
+ARG COMFYUI_VERSION=v0.28.2
 ARG IMPACT_PACK_VERSION=8.28
 ARG IMPACT_SUBPACK_VERSION=1.3.4
+ARG MANAGER_VERSION=4.2.2
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cu126
 
 RUN apt-get update \
@@ -41,6 +50,13 @@ RUN git clone --depth 1 --branch ${IMPACT_PACK_VERSION} \
  && pip install --no-cache-dir -c /tmp/constraints.txt \
       -r /app/ComfyUI/custom_nodes/ComfyUI-Impact-Subpack/requirements.txt
 
+# ComfyUI-Manager — as of ComfyUI 0.28 this is a first-class integration, NOT a
+# custom node: nodes.py does `import comfyui_manager` guarded by
+# --enable-manager (see CMD). Do *not* clone it into custom_nodes/ — Manager 4.x
+# has no root __init__.py and ComfyUI's loader would silently fail to import it.
+RUN pip install --no-cache-dir -c /tmp/constraints.txt \
+      comfyui-manager==${MANAGER_VERSION}
+
 # triton (torch's JIT dep) compiles a tiny C module at CUDA init — without a
 # compiler in the image the container dies with "Failed to find C compiler".
 # Separate layer at the end so image rebuilds stay cached and fast.
@@ -50,4 +66,8 @@ RUN apt-get update \
 
 WORKDIR /app/ComfyUI
 EXPOSE 8188
-CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188"]
+# --enable-manager-legacy-ui is what actually draws the Manager button next to
+# Run: Manager 4.2.2 serves its API under /v2/, while the frontend pinned by
+# ComfyUI 0.28.2 still calls the unprefixed customnode/* paths and 404s.
+CMD ["python", "main.py", "--listen", "0.0.0.0", "--port", "8188", \
+     "--enable-manager", "--enable-manager-legacy-ui"]

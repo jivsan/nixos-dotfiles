@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION=v0.27.0   # keep in sync with comfyui.nix + Containerfile ARG
+VERSION=v0.28.2   # keep in sync with comfyui.nix + Containerfile ARG
 
 sudo podman build -t "localhost/comfyui:${VERSION}" -f Containerfile .
 echo "✔ built localhost/comfyui:${VERSION}"

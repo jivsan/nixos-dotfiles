@@ -13,7 +13,9 @@
 
     # ── mimir-local: AI / GPU stack ──
     ./modules/system/nvidia.nix
-#   ./modules/system/storage.nix
+#   ./modules/system/storage.nix        # ZFS `scratch` pool — SSDs physically removed
+                                         # 2026-07; models live on odyn now. Kept (not
+                                         # deleted) for the pinned hostId + brunnr plan.
     ./modules/system/immich-ml.nix
     ./modules/system/ollama.nix
     ./modules/system/open-webui.nix

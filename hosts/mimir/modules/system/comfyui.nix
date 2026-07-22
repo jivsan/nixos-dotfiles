@@ -1,7 +1,7 @@
 { ... }:
 let
   # Keep in sync with comfyui/Containerfile + comfyui/build.sh.
-  version = "v0.27.0";
+  version = "v0.28.2";
 in
 {
   # ComfyUI has no first-class NixOS module, so run it as a podman container
