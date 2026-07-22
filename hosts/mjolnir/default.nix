@@ -30,6 +30,7 @@
     ../../modules/system/hyprland.nix      # Hyprland session (additive; oxwm untouched)
     ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture` (terminal ↔ knowledge base)
     ../../modules/apps/obs.nix             # OBS Studio + ~/OBS-recordings (odyn NFS over 10GbE)
+    ../../modules/apps/comfyui.nix         # ComfyUI (podman + CDI), models on odyn over 10GbE
   ];
 
   networking.hostName = "mjolnir";
