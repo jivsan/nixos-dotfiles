@@ -20,12 +20,12 @@ let
   # public, and committing the key would be a durable public link between her and
   # this infra. The committed value stays the placeholder below, so a clean clone
   # fails the assertion loudly rather than deploying a broken peer.
-  mishkaPublicKey = "REPLACE_WITH_MISHKA_PUBLIC_KEY";
+  mishkaPublicKey = "JJUSr+F2Yft1x52PlqTI4iGhIi5PpPvd1kxUjtYDnxs=";
 
   # Her laptop. A second device needs its own keypair AND its own address on the
   # tunnel: WireGuard routes by allowedIPs, so two peers sharing 10.9.0.2 would
   # make return traffic ambiguous and break both devices intermittently.
-  mishkaLaptopPublicKey = "REPLACE_WITH_MISHKA_LAPTOP_PUBLIC_KEY";
+  mishkaLaptopPublicKey = "uv9X8wXoIwWmsqn3KFNN+jODxIt8fKF8qNUSzdYnanw=";
 
   # This repo has no sops-nix or agenix, so the private key and the PSK live in
   # a root-only directory outside git and are referenced by path. See the

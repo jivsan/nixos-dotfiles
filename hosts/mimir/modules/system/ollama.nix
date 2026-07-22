@@ -1,8 +1,8 @@
-{ pkgs, ... }:
+{ pkgs-unstable, ... }:
 {
   services.ollama = {
     enable = true;
-    package = pkgs.ollama-cuda;   # NVIDIA GPU build (replaces the removed `acceleration` option)
+    package = pkgs-unstable.ollama-cuda;   # NVIDIA GPU build (replaces the removed `acceleration` option)
 
     # Bound to localhost — Open-WebUI (same box) talks to it here.
     # To let other hosts hit Ollama directly, set host = "0.0.0.0" and open
