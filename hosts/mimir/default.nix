@@ -17,8 +17,8 @@
     ./modules/system/immich-ml.nix
     ./modules/system/ollama.nix
     ./modules/system/open-webui.nix
-#    ./modules/system/comfyui.nix
-#    ./modules/system/discordbot.nix
+    ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
+#    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];
 
   networking.hostName = "mimir";
