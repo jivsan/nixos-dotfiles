@@ -39,7 +39,10 @@ let
     runScript = pkgs.writeShellScript "wow-export-run" ''
       export XDG_DATA_DIRS="${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:''${XDG_DATA_DIRS:-}"
       cd "/mnt/data_ssd/3DBLENDER/wowexporttools"
-      exec ./wow.export "$@"
+      # Auto-updater is broken on NixOS: the delta download fails zlib
+      # decompression and the prebuilt `updater` helper can't run under the
+      # FHS wrapper, leaving the app stuck on "Downloading updates...".
+      exec ./wow.export --disable-auto-update "$@"
     '';
   };
 in
