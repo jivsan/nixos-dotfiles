@@ -13,6 +13,8 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB1csspUrW5PNLgmMxv/eMWVnnBWqmSEDlE4OemZGfDQ jivsan"
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJPk8y0SG07+N9tZvyCkxNKjpiGDk94u3qKyiJtAG7P+ hermes-agent@vps-jiv-prod"
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEA+3wCqGYzfe9u9zkU5beCkzBT9YWNc7M1nz/alhLaa hlidskjalf-dev"
+      # Nexterm (heimdall) — web SSH console; private half lives in Nexterm's identity store
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICv5EKRDOCy5PIuPwglImox8QAia8PX4+nvtoNLE1Vmr nexterm@heimdall"
     ];
   };
 
