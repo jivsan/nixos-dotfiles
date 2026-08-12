@@ -8,11 +8,15 @@ on a VLAN-segmented homelab network behind an Arista core switch.
 
 ## Hosts
 
-| Host           | Role                                            | Desktop                                   |
-|----------------|-------------------------------------------------|-------------------------------------------|
-| `mjolnir`      | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
-| `heimdall`     | Headless self-hosted services VM (Proxmox, on `hella`) | —                                  |
-| `mimir`        | Headless AI box (5950X, RTX 3090) — Ollama, Open-WebUI, ComfyUI, Immich-ML (VLAN 20, 10.0.20.18) | — |
+All hosts sit on VLAN 20 (`10.0.20.0/24`); the VMs run on `hella` (Proxmox).
+
+| Host           | IP            | Role                                            | Desktop                                   |
+|----------------|---------------|-------------------------------------------------|-------------------------------------------|
+| `mjolnir`      | `10.0.20.100` | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
+| `heimdall`     | `10.0.20.17`  | Headless self-hosted services VM — Traefik, Immich, Paperless, Grafana, huginn | — |
+| `mimir`        | `10.0.20.18`  | Headless AI box (5950X, RTX 3090) — Ollama, Open-WebUI, ComfyUI, Immich-ML | — |
+| `tyr`          | `10.0.20.19`  | Headless testing / sandbox VM — deliberately minimal | —                          |
+| `njord`        | `10.0.20.20`  | Headless finance VM — [Sure](https://github.com/we-promise/sure), isolated from the rest of the fleet | — |
 
 > These are the **NixOS** hosts in this flake. The homelab also runs non-NixOS
 > infrastructure — the Arista switch, pfSense, TrueNAS, a Pi-hole LXC — described in the
@@ -96,8 +100,11 @@ the shared modules it needs. Full breakdown in [`docs/nixos-structure.md`](docs/
   selectable `ly` sessions, fully isolated; switching has no side effects.
 - **Hyprland in Lua** (0.55), frosted-glass Tokyo Night theme, live-editable configs via
   out-of-store symlinks (edit → hot-reload, no rebuild).
-- **Self-hosted stack** on `heimdall` — Immich, Nextcloud, Paperless, Crafty, behind
+- **Self-hosted stack** on `heimdall` — Immich, Paperless, Crafty, behind
   Traefik with a Prometheus/Loki/Grafana monitoring setup.
+- **Blast-radius isolation for financial data** — Sure runs on its own VM (`njord`) with
+  nftables accepting `:3000` from heimdall's Traefik only, rather than sharing the
+  services box.
 - **VLAN-segmented network** behind the `bifrost` Arista core — trusted / storage / IoT
   separation, pfSense router-on-a-stick, Pi-hole DNS, IoT firewalled off the trusted side.
 - Reproducible end to end — deploy a whole machine from a fresh install with one command.
