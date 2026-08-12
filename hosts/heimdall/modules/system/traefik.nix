@@ -171,6 +171,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          sure = {
+            rule = "Host(`sure.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "sure";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -258,6 +266,16 @@
             loadBalancer = {
               servers = [
                 { url = "http://10.0.20.18:8188"; }
+              ];
+            };
+          };
+
+          # Sure (personal finance) runs on njord, its own isolated VM.
+          # njord's nftables rules only accept :3000 from heimdall.
+          sure = {
+            loadBalancer = {
+              servers = [
+                { url = "http://10.0.20.20:3000"; }
               ];
             };
           };
