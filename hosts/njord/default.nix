@@ -10,9 +10,8 @@
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
 
-    # Enable AFTER first boot, once /var/lib/secrets/sure.env exists —
-    # the containers crash-loop without SECRET_KEY_BASE.
-    # ./modules/system/sure.nix
+    # Requires /var/lib/secrets/sure.env (SECRET_KEY_BASE, POSTGRES_PASSWORD).
+    ./modules/system/sure.nix
   ];
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
