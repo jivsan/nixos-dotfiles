@@ -179,6 +179,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          vaultwarden = {
+            rule = "Host(`vault.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "vaultwarden";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -256,6 +264,14 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:8090"; }
+              ];
+            };
+          };
+
+          vaultwarden = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:8222"; }
               ];
             };
           };

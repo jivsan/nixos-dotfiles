@@ -34,6 +34,7 @@
     ./modules/system/hlidskjalf.nix
     ./modules/system/newt.nix
     ./modules/system/amneziawg.nix
+    ./modules/system/vaultwarden.nix
   ];
 
   networking.hostName = "heimdall";
