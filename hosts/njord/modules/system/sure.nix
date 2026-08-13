@@ -110,8 +110,16 @@ in
   # gateway) is dropped and every container fails to resolve its peers.
   networking.nftables.enable = true;
   networking.firewall.trustedInterfaces = [ "sure0" ];
-  networking.firewall.extraInputRules = ''
-    ip saddr 10.0.20.17 tcp dport 3000 accept
+
+  # The published port is DNAT'd by netavark and traverses FORWARD, never
+  # INPUT — so an input rule does nothing to restrict it. Filter on forward,
+  # after DNAT has rewritten the destination to the container's bridge IP.
+  networking.firewall.filterForward = true;
+  networking.firewall.extraForwardRules = ''
+    ct state established,related accept
+    iifname "sure0" accept
+    iifname "ens18" ip saddr 10.0.20.17 ip daddr 10.89.0.0/24 tcp dport 3000 accept
+    iifname "ens18" ip daddr 10.89.0.0/24 drop
   '';
 
   systemd.services.sure-db-backup = {
