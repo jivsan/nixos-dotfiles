@@ -17,6 +17,10 @@ let
 
     REDIS_URL = "redis://sure-redis:6379/1";
 
+    # action_mailer's default_url_options reads this — without it, password
+    # reset and invitation emails render links to a bare host.
+    APP_DOMAIN = "sure.oryxserver.org";
+
     WEBAUTHN_RP_ID           = "sure.oryxserver.org";
     WEBAUTHN_ALLOWED_ORIGINS = "https://sure.oryxserver.org";
   };
