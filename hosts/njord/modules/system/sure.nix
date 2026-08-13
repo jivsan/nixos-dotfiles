@@ -111,16 +111,23 @@ in
   networking.nftables.enable = true;
   networking.firewall.trustedInterfaces = [ "sure0" ];
 
-  # The published port is DNAT'd by netavark and traverses FORWARD, never
-  # INPUT — so an input rule does nothing to restrict it. Filter on forward,
-  # after DNAT has rewritten the destination to the container's bridge IP.
-  networking.firewall.filterForward = true;
-  networking.firewall.extraForwardRules = ''
-    ct state established,related accept
-    iifname "sure0" accept
-    iifname "ens18" ip saddr 10.0.20.17 ip daddr 10.89.0.0/24 tcp dport 3000 accept
-    iifname "ens18" ip daddr 10.89.0.0/24 drop
-  '';
+  # Restricting the published port is harder than it looks:
+  #   - it is DNAT'd by netavark in prerouting, so it never reaches INPUT;
+  #   - nixos-fw's forward-allow starts with `ct status dnat accept`
+  #     ("allow port forward"), and extraForwardRules can only append AFTER
+  #     that, so a drop there is never reached.
+  # So filter in a dedicated table at prerouting/raw (priority -300), which
+  # runs before dstnat (-100) — the destination is still 10.0.20.20:3000 here,
+  # and a drop in any table is terminal regardless of what nixos-fw accepts.
+  networking.nftables.tables.sure-isolation = {
+    family = "ip";
+    content = ''
+      chain prerouting {
+        type filter hook prerouting priority raw; policy accept;
+        iifname "ens18" ip daddr 10.0.20.20 tcp dport 3000 ip saddr != 10.0.20.17 drop
+      }
+    '';
+  };
 
   systemd.services.sure-db-backup = {
     description = "Back up the Sure database";
