@@ -35,7 +35,10 @@ in
     path = [ pkgs.podman ];
     serviceConfig.Type = "oneshot";
     script = ''
-      podman network exists sure || podman network create sure
+      # --interface-name pins the bridge to a known name so the firewall can
+      # trust it (podman would otherwise allocate podmanN by creation order).
+      podman network exists sure \
+        || podman network create --interface-name sure0 --subnet 10.89.0.0/24 sure
     '';
   };
 
@@ -100,7 +103,13 @@ in
   };
 
   # ─── Only heimdall's Traefik may reach the app port ───
+  # nftables (rather than the fleet-default iptables backend) is required for
+  # extraInputRules. Unlike the iptables path, netavark does NOT get its accept
+  # rules in ahead of nixos-fw's `policy drop`, so the podman bridge must be
+  # trusted explicitly — without it, container->aardvark-dns (:53 on the bridge
+  # gateway) is dropped and every container fails to resolve its peers.
   networking.nftables.enable = true;
+  networking.firewall.trustedInterfaces = [ "sure0" ];
   networking.firewall.extraInputRules = ''
     ip saddr 10.0.20.17 tcp dport 3000 accept
   '';
