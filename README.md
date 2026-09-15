@@ -13,8 +13,8 @@ All hosts sit on VLAN 20 (`10.0.20.0/24`); the VMs run on `hella` (Proxmox).
 | Host           | IP            | Role                                            | Desktop                                   |
 |----------------|---------------|-------------------------------------------------|-------------------------------------------|
 | `mjolnir`      | `10.0.20.100` | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
-| `heimdall`     | `10.0.20.17`  | Headless self-hosted services VM — Traefik, Immich, Paperless, Grafana, huginn | — |
-| `mimir`        | `10.0.20.18`  | Headless AI box (5950X, RTX 3090) — Ollama, Open-WebUI, ComfyUI, Immich-ML | — |
+| `heimdall`     | `10.0.20.17`  | Headless self-hosted services VM — Traefik, Immich, Paperless, Vaultwarden, Grafana, huginn | — |
+| `mimir`        | `10.0.20.18`  | Headless AI box (5950X, GTX 1070 — RTX 3090 pending) — Ollama, Open-WebUI, ComfyUI, Immich-ML | — |
 | `tyr`          | `10.0.20.19`  | Headless testing / sandbox VM — deliberately minimal | —                          |
 | `njord`        | `10.0.20.20`  | Headless finance VM — [Sure](https://github.com/we-promise/sure), isolated from the rest of the fleet | — |
 
@@ -100,8 +100,16 @@ the shared modules it needs. Full breakdown in [`docs/nixos-structure.md`](docs/
   selectable `ly` sessions, fully isolated; switching has no side effects.
 - **Hyprland in Lua** (0.55), frosted-glass Tokyo Night theme, live-editable configs via
   out-of-store symlinks (edit → hot-reload, no rebuild).
-- **Self-hosted stack** on `heimdall` — Immich, Paperless, Crafty, behind
+- **Bleeding-edge GPU stack on `mjolnir`** — it takes `boot.kernelPackages` (and therefore
+  the NVIDIA driver) from `nixpkgs-unstable` rather than the pinned 26.05, because 26.05's
+  595.x driver no longer builds against kernel 7.2. Currently 7.2.5 + `nvidia-open` 610.x.
+  Everything else on the host still comes from 26.05.
+- **Self-hosted stack** on `heimdall` — Immich, Paperless, Vaultwarden, Crafty, behind
   Traefik with a Prometheus/Loki/Grafana monitoring setup.
+- **[muninn](docs/muninn-agentic-os.md), an agentic OS** — an Obsidian vault on `odyn` as
+  shared memory for humans and headless Claude Code agents (`huginn`), with the config repo
+  rendered as a queryable knowledge graph and a live 3D `brain` frontend. Runs entirely on
+  `heimdall`; the workstation is just a consumer.
 - **Blast-radius isolation for financial data** — Sure runs on its own VM (`njord`) with
   nftables accepting `:3000` from heimdall's Traefik only, rather than sharing the
   services box.
@@ -113,5 +121,8 @@ the shared modules it needs. Full breakdown in [`docs/nixos-structure.md`](docs/
 
 - [`docs/nixos-structure.md`](docs/nixos-structure.md) — repository structure & how hosts are assembled
 - [`docs/deploying-services.md`](docs/deploying-services.md) — adding/deploying self-hosted services
+- [`docs/deploy-new-host.md`](docs/deploy-new-host.md) — bringing a brand-new host into the flake
 - [`docs/heimdall-docs.md`](docs/heimdall-docs.md) — the services VM in detail
+- [`docs/muninn-agentic-os.md`](docs/muninn-agentic-os.md) — the vault, the agents, and the knowledge graph
 - [`network/bifrost-arista-core.cfg`](network/bifrost-arista-core.cfg) — Arista EOS core switch config
+- [`network/CHANGELOG.md`](network/CHANGELOG.md) — network change history
