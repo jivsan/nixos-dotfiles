@@ -1,10 +1,11 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 let
   octaneBase = "/opt/octane";
+  nvidiaPackage = config.hardware.nvidia.package;
 
   commonPkgs = pkgs: with pkgs; [
     # NVIDIA / CUDA
-    linuxPackages.nvidia_x11
+    nvidiaPackage
     cudaPackages.cudatoolkit
     cudaPackages.cuda_cudart
     # Graphics

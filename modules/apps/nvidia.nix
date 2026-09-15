@@ -5,7 +5,7 @@
     modesetting.enable = true;
     nvidiaSettings = true;
     open = true;
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    package = config.boot.kernelPackages.nvidiaPackages.new_feature;
     forceFullCompositionPipeline = false;
   };
 }

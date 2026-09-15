@@ -1,4 +1,4 @@
-{ inputs, pkgs, ... }:
+{ inputs, pkgs, pkgs-unstable, ... }:
 {
   imports = [
     ../../configuration.nix
@@ -50,5 +50,5 @@
   # This was breaking all `ssh` (including graphify MCP over SSH and `ask`/`capture`).
   # See: nixos/modules/programs/ssh.nix (systemd-ssh-proxy.enable)
   programs.ssh.systemd-ssh-proxy.enable = false;
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
 }
