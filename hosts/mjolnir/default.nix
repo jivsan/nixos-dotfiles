@@ -39,8 +39,8 @@
   services.xserver.windowManager.oxwm.enable = true;
 
   nix.settings = {
-    max-jobs = 6;     # your tuned 5900X values
-    cores = 4;
+    max-jobs = 4;
+    cores = 0;
   };
   nix.daemonCPUSchedPolicy = "idle";
   nix.daemonIOSchedClass = "idle";
