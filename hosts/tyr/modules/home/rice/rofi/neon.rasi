@@ -1,0 +1,79 @@
+/* tyr — neon rofi theme (launcher on Mod+D, window switcher on Mod+W) */
+
+* {
+    bg:       #0b0d17e0;
+    bg-alt:   #1e2430d0;
+    fg:       #d8dee9;
+    dim:      #63637d;
+    pink:     #ff4fa3;
+    cyan:     #2de2e6;
+
+    font:             "JetBrainsMono Nerd Font 12";
+    background-color: transparent;
+    text-color:       @fg;
+}
+
+window {
+    width:            640px;
+    location:         center;
+    background-color: @bg;
+    border:           2px;
+    border-color:     @pink;
+    border-radius:    16px;
+    padding:          18px;
+}
+
+mainbox {
+    spacing:  14px;
+    children: [ inputbar, listview ];
+}
+
+inputbar {
+    background-color: @bg-alt;
+    border:           0 0 2px 0;
+    border-color:     @cyan;
+    border-radius:    10px;
+    padding:          10px 14px;
+    spacing:          12px;
+    children:         [ prompt, entry ];
+}
+
+prompt {
+    text-color: @pink;
+}
+
+entry {
+    placeholder:       "type to search";
+    placeholder-color: @dim;
+    cursor:            text;
+}
+
+listview {
+    lines:        8;
+    columns:      1;
+    spacing:      6px;
+    scrollbar:    false;
+    fixed-height: true;
+}
+
+element {
+    padding:       8px 14px;
+    border-radius: 10px;
+}
+
+element normal.normal,
+element alternate.normal {
+    background-color: transparent;
+    text-color:       @fg;
+}
+
+element selected.normal {
+    background-color: @pink;
+    text-color:       #0b0d17;
+}
+
+element-text {
+    background-color: transparent;
+    text-color:       inherit;
+    vertical-align:   0.5;
+}

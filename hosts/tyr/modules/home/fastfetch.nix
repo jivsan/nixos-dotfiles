@@ -29,7 +29,7 @@ in
       modules = [
         # ── identity ──────────────────────────────────────────────
         { type = "title"; color = { user = pink; at = dim; host = cyan; }; }
-        { type = "custom"; format = "{#${dim}}⟨ {#${pink}}tyr{#${dim}} :: test node — break things here ⟩"; }
+        { type = "custom"; format = "{#${dim}}⟨ {#${pink}}tyr{#${dim}} :: agent workstation ⟩"; }
         { type = "separator"; string = "─"; }
         { type = "os";       key = " os";      keyColor = pink; }
         { type = "kernel";   key = " kernel";  keyColor = cyan; }

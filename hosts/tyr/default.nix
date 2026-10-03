@@ -9,6 +9,15 @@
     ../../modules/system/users.nix
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
+    ../../modules/system/fonts.nix
+    ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture` / `ask`
+
+    ../../modules/apps/unfree.nix          # claude-code is unfree
+    ../../modules/apps/claude-code.nix
+    ../../modules/apps/codex.nix
+    ../../modules/apps/herdr.nix
+
+    ./modules/system/desktop.nix           # oxwm over xrdp (Remmina)
   ];
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -24,6 +33,8 @@
   networking.firewall.enable = true;
 
   services.qemuGuest.enable = true;
+
+  zramSwap.enable = true;
 
   services.openssh = {
     enable = true;
