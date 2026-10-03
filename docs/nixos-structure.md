@@ -115,7 +115,6 @@ Inputs:
 | `hyprland-plugins` | pinned to the commit that still ships `hyprexpo`, follows `hyprland` |
 | `oxwm`             | tony's Wayland-config'd X11 WM (Lua)                         |
 | `helium`           | Helium browser                                              |
-| `blender-bin`      | Blender binary builds                                       |
 | `claude-code`      | Claude Code (applied as an overlay)                         |
 
 `mkHost hostPath homeFile` wraps `nixpkgs.lib.nixosSystem`: passes `inputs` +

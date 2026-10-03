@@ -17,7 +17,7 @@
   home.homeDirectory = "/home/christina";
   home.stateVersion = "25.11";
   home.packages = [
-    inputs.helium.packages.${pkgs.system}.default
+    inputs.helium.packages.${pkgs.stdenv.hostPlatform.system}.default
       pkgs.brave
   ];
 

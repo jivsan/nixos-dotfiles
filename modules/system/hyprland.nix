@@ -5,8 +5,8 @@
 {
   programs.hyprland = {
     enable = true;
-    package       = inputs.hyprland.packages.${pkgs.system}.hyprland;
-    portalPackage = inputs.hyprland.packages.${pkgs.system}.xdg-desktop-portal-hyprland;
+    package       = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
+    portalPackage = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.xdg-desktop-portal-hyprland;
   };
 
   # Lock screen + PAM so it can authenticate.
@@ -16,7 +16,7 @@
   # hyprexpo plugin .so, built against the pinned Hyprland for ABI match.
   # (Only loaded if a session's hyprland.lua actually calls `hyprctl plugin load`.)
  # environment.sessionVariables.HYPREXPO_PLUGIN =
- #   "${inputs.hyprland-plugins.packages.${pkgs.system}.hyprexpo}/lib/libhyprexpo.so";
+ #   "${inputs.hyprland-plugins.packages.${pkgs.stdenv.hostPlatform.system}.hyprexpo}/lib/libhyprexpo.so";
 
   # Prebuilt Hyprland binaries instead of compiling.
   nix.settings = {

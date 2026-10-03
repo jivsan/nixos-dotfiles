@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 let
   tokyonight = pkgs.tokyonight-gtk-theme;
 in
@@ -14,6 +14,10 @@ in
   };
 
   gtk = {
+    # GTK4 apps keep following the theme below. home-manager 26.05 changed
+    # this default to null and warns until it is set explicitly.
+    gtk4.theme = config.gtk.theme;
+
     enable = true;
     theme = {
       name = "Tokyonight-Dark";
