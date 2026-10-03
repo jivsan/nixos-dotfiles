@@ -18,6 +18,7 @@ VAULT = os.environ.get("MUNINN_VAULT", "/mnt/nas/obsidian/muninn")
 DB = os.environ.get("MUNINN_DB", "/var/lib/muninn-brain/index.db")
 PORT = int(os.environ.get("MUNINN_BRIDGE_PORT", "8093"))
 LOG_DIR = os.environ.get("MUNINN_TALK_LOG_DIR", os.path.join(VAULT, "Resources", "Talk logs"))
+TALK_SPOOL = os.environ.get("MUNINN_TALK_SPOOL", "/var/lib/muninn-brain/talk-spool.jsonl")
 KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 BASE = os.environ.get("OPENAI_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
 MODEL = os.environ.get("OPENAI_MODEL", "minimax/minimax-m3")
@@ -464,8 +465,7 @@ def run_agent(job):
         job.update(status="failed", answer=f"Agent failed: {str(exc)[:300]}")
     finally:
         job_store().finish(job)
-        log_talk(job["text"], {"answer": job["answer"] + (f"\nReport: [[{job['report'][:-3]}]]" if job.get("report") else ""),
-                              "sources": [], "route": job["route"]})
+        log_job(job)
 
 
 def available_agents():
@@ -510,7 +510,9 @@ def job_store():
     with LOCK:
         if JOBS is None:
             JOBS = JobStore(JOBS_DB, VAULT, MAX_JOBS, titler=report_titler)
-            JOBS.recover()
+            # work cut off by a restart never got to log itself in run_agent
+            for job in JOBS.recover():
+                log_job(job)
         return JOBS
 
 
@@ -641,28 +643,90 @@ def load_stats():
 # ── vault log: everything said goes back into memory ───────────────────────
 def log_talk(q, res):
     with TALK_LOCK:
-        _log_talk(q, res)
+        _write_talk(_spooled() + [{"day": datetime.date.today().isoformat(), "entry": _talk_entry(q, res)}])
 
 
-def _log_talk(q, res):
-    try:
-        os.makedirs(LOG_DIR, exist_ok=True)
-        day = datetime.date.today().isoformat()
-        path = os.path.join(LOG_DIR, f"Talk {day}.md")
-        new = not os.path.exists(path)
-        r = res.get("route", {})
-        p = (r.get("probabilities") or {}).get(r.get("tier"))
-        head = f"### {datetime.datetime.now().strftime('%H:%M')} · {r.get('tier', '?')}" + (f" ({p:.2f} via {r.get('via')})" if isinstance(p, (int, float)) else "")
-        src = " ".join(f"[[{s['id']}]]" for s in res.get("sources", [])[:5])
-        with open(path, "a", encoding="utf-8") as fh:
-            if new:
-                fh.write(f"---\ntype: journal\nstatus: active\ntags: [talk, muninn]\ncreated: {day}\nagent: muninn-bridge\n---\n\n"
-                         f"# Talk {day}\n\nEverything said to muninn on {day}, logged by the bridge.\n\nUp: [[Agents MOC]]\n")
-            fh.write(f"\n{head}\n- **you:** {q.strip()}\n- **muninn:** {(res.get('answer') or '—').strip()}\n" + (f"- sources: {src}\n" if src else ""))
+def log_job(job):
+    log_talk(job["text"], {"answer": job["answer"] + (f"\nReport: [[{job['report'][:-3]}]]" if job.get("report") else ""),
+                           "sources": [], "route": job["route"], "agent": job["agent"]})
+
+
+def flush_talk():
+    with TALK_LOCK:
+        held = _spooled()
+        if held:
+            _write_talk(held)
+
+
+def _talk_entry(q, res):
+    r = res.get("route", {})
+    p = (r.get("probabilities") or {}).get(r.get("tier"))
+    head = f"### {datetime.datetime.now().strftime('%H:%M')} · {r.get('tier', '?')}" + (f" ({p:.2f} via {r.get('via')})" if isinstance(p, (int, float)) else "")
+    # Who really answered: the model of an answer, the worker of an agent job.
+    # A deep request that fell back to a lighter model says so.
+    depth = res.get("depth")
+    who = res.get("model") or res.get("agent") or ("no model" if depth else None)
+    if depth and r.get("depth") == "deep" and depth != "deep":
+        depth += " (deep requested)"
+    head += "".join(f" · {x}" for x in (who, depth) if x)
+    src = " ".join(f"[[{s['id']}]]" for s in res.get("sources", [])[:5])
+    return f"\n{head}\n- **you:** {q.strip()}\n- **muninn:** {(res.get('answer') or '—').strip()}\n" + (f"- sources: {src}\n" if src else "")
+
+
+def _append_talk(day, entry):
+    os.makedirs(LOG_DIR, exist_ok=True)
+    path = os.path.join(LOG_DIR, f"Talk {day}.md")
+    new = not os.path.exists(path)
+    with open(path, "a", encoding="utf-8") as fh:
         if new:
+            fh.write(f"---\ntype: journal\nstatus: active\ntags: [talk, muninn]\ncreated: {day}\nagent: muninn-bridge\n---\n\n"
+                     f"# Talk {day}\n\nEverything said to muninn on {day}, logged by the bridge.\n\nUp: [[Agents MOC]]\n")
+        fh.write(entry)
+    if new:
+        try:
             os.chmod(path, 0o664)
+        except OSError:
+            pass   # the entry is written; a mode it cannot set must not log it twice
+
+
+def _spooled():
+    held = []
+    try:
+        with open(TALK_SPOOL, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue
+                if (isinstance(e, dict) and isinstance(e.get("entry"), str)
+                        and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(e.get("day")))):
+                    held.append(e)
     except OSError:
         pass
+    return held
+
+
+def _write_talk(entries):
+    # An entry the vault refuses (NFS away, permissions) is held in a local
+    # spool and goes in first on the next write: an outage delays the log
+    # instead of silently losing what was said.
+    held = []
+    for i, e in enumerate(entries):
+        try:
+            _append_talk(e["day"], e["entry"])
+        except OSError as exc:
+            held = entries[i:]
+            print(f"muninn-bridge: talk log write failed ({exc}); {len(held)} held in {TALK_SPOOL}", flush=True)
+            break
+    try:
+        if held:
+            with open(TALK_SPOOL + ".tmp", "w", encoding="utf-8") as fh:
+                fh.writelines(json.dumps(e, ensure_ascii=False) + "\n" for e in held)
+            os.replace(TALK_SPOOL + ".tmp", TALK_SPOOL)
+        elif os.path.exists(TALK_SPOOL):
+            os.remove(TALK_SPOOL)
+    except OSError as exc:
+        print(f"muninn-bridge: talk spool write failed ({exc})", flush=True)
 
 
 def talk(text, target="auto"):
@@ -689,8 +753,10 @@ def talk(text, target="auto"):
             try:
                 job = start_agent(text, agent, route)
             except BusyError as exc:
-                return {"answer": str(exc), "sources": [], "route": route, "busy": True,
-                        **({"jev_error": jev_error} if jev_error else {})}
+                res = {"answer": str(exc), "sources": [], "route": route, "busy": True,
+                       **({"jev_error": jev_error} if jev_error else {})}
+                log_talk(text, {**res, "agent": agent})   # refused, but still something she asked
+                return res
             res = {"answer": f"On it. {agent.capitalize()} is working on that now.", "sources": [], "job": job["id"],
                    "agent": agent, "route": route}
             if jev_error:
@@ -848,5 +914,6 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     job_store()
+    flush_talk()
     print(f"muninn-bridge: 127.0.0.1:{PORT} jev={'on' if JEV_KEY else 'off (rules)'} llm={MODEL} voice={VOICE}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()

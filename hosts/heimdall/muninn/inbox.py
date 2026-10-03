@@ -24,6 +24,7 @@ JEV_MIN_CONFIDENCE = float(os.environ.get("JEV_MIN_CONFIDENCE", "0.5"))
 JEV_INPUT = 12_000   # Jev only chooses; the start of a capture is enough for that.
 BRIDGE_URL = os.environ.get("MUNINN_BRIDGE_URL", "http://127.0.0.1:8093")
 FRONTMATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
+UNSAFE = re.compile(r'[\x00-\x1f\x7f/\\\[\]#|:]')   # not allowed in a note title
 # Opt-in: only a capture whose first line starts with one of these is a request.
 REQUEST = re.compile(r"(?:todo|jev)[ \t]*:", re.I)
 FOLDERS = {
@@ -250,14 +251,24 @@ def hold(vault, source, name, label):
     raise ValueError("too many review name collisions")
 
 
+def tidy_title(title):
+    # The writer likes "topic: detail" and "a/b" titles. Punctuation that cannot be
+    # in a file name or wikilink is repaired instead of failing the capture on
+    # every sweep; validate still has the last word on what is acceptable.
+    if not isinstance(title, str):
+        return ""
+    title = " ".join(UNSAFE.sub(" ", re.sub(r"\s*:\s+", " — ", title)).split())
+    return title.encode()[:160].decode("utf-8", "ignore").strip()
+
+
 def validate(note, mocs):
     if not isinstance(note, dict):
         raise ValueError("model response must be an object")
-    title = note.get("title")
-    if (not isinstance(title, str) or not title.strip() or title != title.strip()
-            or len(title.encode()) > 160 or title in (".", "..")
-            or re.search(r'[\x00-\x1f\x7f/\\\[\]#|:]', title)):
-        raise ValueError("invalid model title")
+    title = tidy_title(note.get("title"))
+    # A leading dot is a hidden file, and what is left of a "../" path.
+    if not title or title.startswith("."):
+        raise ValueError("invalid model title: " + repr(note.get("title"))[:80])
+    note = {**note, "title": title}
     if note.get("folder") not in ("Areas", "Resources"):
         raise ValueError("invalid model folder")
     if not isinstance(note.get("moc"), str) or note["moc"] not in mocs:

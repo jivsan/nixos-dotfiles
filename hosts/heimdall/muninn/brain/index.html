@@ -649,6 +649,57 @@
   .ntip .nt-s { color:var(--ink3); font-size:9px; letter-spacing:1.4px; text-transform:uppercase; margin:1px 0 5px; }
   .ntip .nt-st { margin-top:6px; font-size:9.5px; letter-spacing:1px; text-transform:uppercase; }
   .ntip .nt-st.ok { color:var(--ok); } .ntip .nt-st.bad { color:var(--bad); } .ntip .nt-st.unknown { color:var(--ink3); }
+
+  /* ── audio-reactive orb: glow follows the sound level ── */
+  .orb.listening { box-shadow:0 0 calc(8px + var(--lvl, 0) * 42px) rgba(255,79,163,.55);
+    transform:scale(calc(1 + var(--lvl, 0) * .14)); }
+  .orb.speaking { transform:scale(calc(1 + var(--lvl, 0) * .16)); }
+
+  /* ── thought ticker: the header thinks out loud ── */
+  #thought { transition:opacity .45s ease; max-width:38vw; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ── command palette: ctrl+k ── */
+  #pal { position:fixed; inset:0; z-index:96; display:none; align-items:flex-start;
+    justify-content:center; padding-top:14vh; background:rgba(6,4,12,.55); backdrop-filter:blur(3px); }
+  #pal.on { display:flex; }
+  .palbox { width:min(560px, 92vw); background:var(--surface2); border:1px solid var(--line2);
+    border-radius:14px; overflow:hidden; animation:palin .22s cubic-bezier(.2,.9,.3,1.15);
+    box-shadow:0 24px 70px rgba(0,0,0,.6), 0 0 40px rgba(138,125,255,.07); }
+  @keyframes palin { from { opacity:0; transform:translateY(-10px) scale(.98); } }
+  #pal-in { width:100%; background:none; border:0; outline:none; color:var(--cream); font:inherit;
+    font-size:15px; padding:14px 18px; border-bottom:1px solid var(--line); caret-color:var(--cyan); }
+  .palrows { max-height:46vh; overflow-y:auto; padding:6px; }
+  .prow { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:9px;
+    cursor:pointer; font-size:12.5px; color:var(--ink2); animation:prowin .25s ease both; }
+  .prow.sel { background:rgba(138,125,255,.14); color:var(--cream); box-shadow:inset 2px 0 0 var(--violet); }
+  .prow .pi { width:16px; text-align:center; flex:none; }
+  .prow .pk { margin-left:auto; font-size:9px; letter-spacing:1.6px; text-transform:uppercase;
+    color:var(--ink3); flex:none; }
+  @keyframes prowin { from { opacity:0; transform:translateY(4px); } }
+  .palhint { padding:8px 14px; font-size:9.5px; color:var(--ink3); border-top:1px solid var(--line);
+    letter-spacing:1px; }
+
+  /* ── dream mode: idle memories drift past ── */
+  #dream { position:fixed; inset:0; z-index:95; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse 90% 80% at 50% 45%, rgba(6,4,12,.25), rgba(6,4,12,.78));
+    backdrop-filter:blur(2px); cursor:pointer; animation:dreamin 2.4s ease both; }
+  #dream.out { transition:opacity .7s ease; opacity:0; }
+  @keyframes dreamin { from { opacity:0; } }
+  .dreamf { position:absolute; font-family:var(--serif); font-style:italic; font-size:15px;
+    color:rgba(236,229,216,.5); white-space:nowrap; cursor:pointer;
+    text-shadow:0 0 14px rgba(138,125,255,.35); animation:drift linear infinite; }
+  .dreamf:hover { color:var(--cyan); text-shadow:0 0 16px rgba(45,226,230,.6); }
+  @keyframes drift {
+    from { transform:translate3d(0,0,0); opacity:0; }
+    12% { opacity:.85; } 88% { opacity:.85; }
+    to { transform:translate3d(var(--dx, 30vw), var(--dy, -12vh), 0); opacity:0; } }
+  .dreamc { text-align:center; color:var(--ink2); font-family:var(--serif); font-size:20px;
+    font-style:italic; letter-spacing:.4px; animation:dreampulse 6s ease-in-out infinite; }
+  .dreamc small { display:block; font-family:var(--mono); font-style:normal; font-size:9.5px;
+    letter-spacing:2.4px; text-transform:uppercase; color:var(--ink3); margin-top:12px; }
+  @keyframes dreampulse { 50% { opacity:.55; } }
+  @media (prefers-reduced-motion: reduce) { #dream { display:none; } }
 </style>
 </head>
 <body>
@@ -676,7 +727,7 @@
   <div class="pghead">
     <h1 id="pg-title">Memory</h1>
     <div class="pgsub" id="pg-sub">Search the muninn vault — everything the OS remembers.</div>
-    <div class="pgmeta"><span id="clock">–</span><span class="sep">·</span>heimdall<span class="sep">·</span>lan</div>
+    <div class="pgmeta"><span id="clock">–</span><span class="sep">·</span>heimdall<span class="sep">·</span>lan<span class="sep">·</span><span id="thought"></span></div>
   </div>
 
   <!-- ── memory ── -->
@@ -830,12 +881,18 @@
     <div class="route" id="route"></div>
     <button class="tbtn" id="t-target" title="who gets the request: auto lets Jev sort it, or address an agent by name">to: auto</button>
     <button class="tbtn on" id="t-speak" title="read answers aloud">voice</button>
+    <button class="tbtn" id="t-sfx" title="interface blips">sfx</button>
     <button class="tbtn" id="t-log" title="show the conversation">log</button>
   </div>
   <div class="drawer" id="drawer">
     <div class="dh">conversation<button id="d-close">close ✕</button></div>
     <div class="msgs" id="msgs"></div>
   </div>
+  <div id="pal"><div class="palbox">
+    <input id="pal-in" placeholder="jump to a note, view or skill — or ask muninn…" autocomplete="off">
+    <div class="palrows" id="pal-rows"></div>
+    <div class="palhint">↑↓ move · enter open · esc close · ctrl+k</div>
+  </div></div>
 </main>
 
 <!-- vendored same-origin (see brain.nix) — page JS must never die on a CDN -->
@@ -1344,6 +1401,7 @@ function applyGalaxyFilter() {
 
 /* ── systems (same data pipeline as before) ───────────── */
 let lastActGen = -1, lastActData = null;
+let prevGitHead = null, prevInboxN = null;   /* event-toast baselines */
 function tiles(c) {
   const t = [
     { k:'notes',   v:c.notes },
@@ -1369,6 +1427,19 @@ async function refreshActivity() {
     lastActData = a;
     if (a.generated === lastActGen) return;
     lastActGen = a.generated;
+    /* live events: a new vault commit or a new capture lights up the room */
+    const head = (a.gitlog || [])[0];
+    if (prevGitHead !== null && head && head.t !== prevGitHead) {
+      toast(`<i>✦</i> huginn committed — ${esc((head.msg || '').slice(0, 48))}`);
+      nexusFlashIds(['e9', 'e10'], 4200);
+    }
+    if (head) prevGitHead = head.t;
+    const inboxN = (a.inbox || []).length;
+    if (prevInboxN !== null && inboxN > prevInboxN) {
+      toast(`<i>◈</i> ${inboxN - prevInboxN} new capture${inboxN - prevInboxN > 1 ? 's' : ''} in the inbox`);
+      nexusFlashIds(['e9'], 3200);
+    }
+    prevInboxN = inboxN;
     $('side-stamp').textContent = 'updated ' + new Date(a.generated * 1000).toLocaleTimeString();
     tiles(a.counts);
     const c = a.counts || {};
@@ -1512,15 +1583,15 @@ async function doAction(a) {
 }
 async function send(text) {
   text = (text || '').trim(); if (!text) return;
-  addMsg('you', text); setOrb('thinking'); thinkingOn = true;
+  addMsg('you', text); setOrb('thinking'); thinkingOn = true; sfx.send();
   let d;
   try {
     const r = await fetch('bridge/talk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, target }) });
     d = await r.json(); if (!r.ok) throw new Error(d.error || r.status);
   } catch (e) {
-    thinkingOn = false; addMsg('muninn', `The bridge did not answer (${e.message}).`); setOrb('idle', 'ready'); return;
+    thinkingOn = false; sfx.error(); addMsg('muninn', `The bridge did not answer (${e.message}).`); setOrb('idle', 'ready'); return;
   }
-  thinkingOn = false; renderRoute(d.route, d.jev_error);
+  thinkingOn = false; sfx.answer(); renderRoute(d.route, d.jev_error);
   nexusFlash(d.route, d.model);
   if (d.action) await doAction(d.action);
   if (d.answer) addMsg('muninn', d.answer, { sources: d.sources,
@@ -1557,18 +1628,20 @@ async function speak(text) {
     const r = await fetch('bridge/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
     if (!r.ok) throw 0;
     audio = new Audio(URL.createObjectURL(await r.blob()));
-    audio.onended = () => setOrb('idle', 'ready');
+    audio.onended = () => { orbLevelStop(); setOrb('idle', 'ready'); };
+    orbSpeak(audio);
     await audio.play();
-  } catch { setOrb('idle', 'ready'); }
+  } catch { orbLevelStop(); setOrb('idle', 'ready'); }
 }
 async function micToggle() {
-  if (audio && !audio.paused) { audio.pause(); return setOrb('idle', 'ready'); }
+  if (audio && !audio.paused) { audio.pause(); orbLevelStop(); return setOrb('idle', 'ready'); }
   if (rec && rec.state === 'recording') return rec.stop();
   if (!health.voice) { $('talkin').focus(); return flashState('voice offline'); }
   try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return flashState('no mic'); }
   chunks = []; rec = new MediaRecorder(recStream);
   rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   rec.onstop = async () => {
+    orbLevelStop();
     recStream.getTracks().forEach(t => t.stop());
     const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
     setOrb('thinking', 'hearing');
@@ -1578,7 +1651,7 @@ async function micToggle() {
       if (d.text) send(d.text); else flashState('heard nothing');
     } catch { flashState('ears offline'); }
   };
-  rec.start(); setOrb('listening');
+  rec.start(); setOrb('listening'); orbListen(recStream);
 }
 async function refreshHealth() {
   try { health = await (await fetch('bridge/health?_=' + Date.now())).json(); } catch { health = {}; }
@@ -1602,7 +1675,7 @@ $('t-log').onclick = e => e.target.classList.toggle('on', $('drawer').classList.
 $('d-close').onclick = () => { $('drawer').classList.remove('on'); $('t-log').classList.remove('on'); };
 addEventListener('keydown', e => {
   if (e.ctrlKey && e.code === 'Space') { e.preventDefault(); micToggle(); }
-  if (e.ctrlKey && e.key === 'k') { e.preventDefault(); $('talkin').focus(); }
+  if (e.ctrlKey && e.key === 'k') { e.preventDefault(); palToggle(); }
 });
 
 /* ── skills: domain → task → skill → automation ───────── */
@@ -1668,6 +1741,216 @@ async function refreshUsage() {
 setInterval(() => { if (curView === 'usage') refreshUsage(); }, 30000);
 setInterval(() => { if (curView === 'pulse') refreshPulse(); }, 30000);
 
+/* ── sfx: tiny synthesized blips, never an asset file ── */
+let sfxOn = false;
+try { sfxOn = localStorage.getItem('muninn-sfx') === '1'; } catch {}
+let AC = null;
+const actx = () => { try { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); } catch {} return AC; };
+function blip(freq, dur, type, gain) {
+  if (!sfxOn) return;
+  try {
+    const ctx = actx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(gain || .04, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + dur);
+    o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + dur);
+  } catch {}
+}
+const sfx = {
+  send:   () => { blip(520, .06); setTimeout(() => blip(780, .08), 60); },
+  answer: () => blip(880, .12, 'triangle'),
+  view:   () => blip(440, .05, 'square', .025),
+  toast:  () => blip(990, .09),
+  error:  () => blip(180, .18, 'sawtooth', .05),
+};
+function wireSfx() {
+  const b = $('t-sfx');
+  b.classList.toggle('on', sfxOn);
+  b.onclick = () => {
+    sfxOn = !sfxOn;
+    try { localStorage.setItem('muninn-sfx', sfxOn ? '1' : '0'); } catch {}
+    b.classList.toggle('on', sfxOn);
+    if (sfxOn) sfx.answer();
+  };
+}
+wireSfx();
+
+/* ── audio-reactive orb: sound level → glow ── */
+let orbLvlRaf = 0;
+function orbLevelStart(an) {
+  const data = new Uint8Array(an.frequencyBinCount);
+  cancelAnimationFrame(orbLvlRaf);
+  (function loop() {
+    an.getByteTimeDomainData(data);
+    let s = 0;
+    for (let i = 0; i < data.length; i += 2) { const v = (data[i] - 128) / 128; s += v * v; }
+    $('orb').style.setProperty('--lvl', Math.min(1, Math.sqrt(s / (data.length / 2)) * 3.2).toFixed(3));
+    orbLvlRaf = requestAnimationFrame(loop);
+  })();
+}
+function orbLevelStop() {
+  cancelAnimationFrame(orbLvlRaf);
+  const o = $('orb'); if (o) o.style.setProperty('--lvl', 0);
+}
+function orbListen(stream) {   /* mic level while recording */
+  try {
+    const ctx = actx(); if (!ctx) return;
+    const an = ctx.createAnalyser(); an.fftSize = 512;
+    ctx.createMediaStreamSource(stream).connect(an);
+    orbLevelStart(an);
+  } catch {}
+}
+function orbSpeak(el) {        /* muninn's voice level while talking */
+  try {
+    const ctx = actx(); if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    const an = ctx.createAnalyser(); an.fftSize = 512;
+    ctx.createMediaElementSource(el).connect(an);
+    an.connect(ctx.destination);
+    orbLevelStart(an);
+  } catch {}
+}
+
+/* ── command palette: ctrl+k ── */
+let palOpen = false, palSel = 0, palItems = [], palSkills = null;
+const PAL_VIEWS = { galaxy:'neural · knowledge galaxy', memory:'memory · the vault', pulse:'pulse · statistics',
+  nexus:'nexus · system map', capture:'capture · quick note', hermes:'hermes · direct line',
+  skills:'skills · automations', usage:'usage · subscriptions', systems:'systems · agents + logs' };
+function fuzzy(q, h) {
+  if (h.includes(q)) return 100 - h.indexOf(q);
+  let qi = 0, sc = 0;
+  for (let i = 0; i < h.length && qi < q.length; i++) if (h[i] === q[qi]) { sc += 2; qi++; }
+  return qi === q.length ? sc : 0;
+}
+function palData(q) {
+  if (!q) return [];
+  const ql = q.toLowerCase(), items = [];
+  for (const [v, label] of Object.entries(PAL_VIEWS)) items.push({ kind:'view', id:v, label, icon:'⌁' });
+  for (const n of notesIdx.slice(0, 400)) items.push({ kind:'note', id:n.id, label:n.id, icon:'◈' });
+  for (const s of palSkills || []) items.push({ kind:'skill', id:s.id, label:s.skill + ' — ' + (s.does || ''), icon:'⚡' });
+  const scored = [];
+  for (const it of items) { const sc = fuzzy(ql, it.label.toLowerCase()); if (sc > 0) scored.push([sc, it]); }
+  scored.sort((a, b) => b[0] - a[0]);
+  const out = scored.slice(0, 8).map(x => x[1]);
+  out.unshift({ kind:'ask', id:q, label:`ask muninn “${q}”`, icon:'✦' });
+  return out;
+}
+function palRender() {
+  palItems = palData($('pal-in').value.trim());
+  palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+  $('pal-rows').innerHTML = palItems.length ? palItems.map((it, i) =>
+    `<div class="prow${i === palSel ? ' sel' : ''}" data-i="${i}" style="animation-delay:${i * 25}ms">
+      <span class="pi">${it.icon}</span><span>${esc(it.label)}</span><span class="pk">${it.kind}</span></div>`).join('')
+    : '<div class="ghost center" style="padding:18px">type to search notes, views, skills…</div>';
+  $('pal-rows').querySelectorAll('.prow').forEach(r => {
+    r.onmouseenter = () => { palSel = +r.dataset.i; palPaintSel(); };
+    r.onclick = () => palExec(+r.dataset.i);
+  });
+}
+function palPaintSel() {
+  $('pal-rows').querySelectorAll('.prow').forEach((r, i) => r.classList.toggle('sel', i === palSel));
+}
+function palExec(i) {
+  const it = palItems[i]; if (!it) return;
+  palClose();
+  if (it.kind === 'view') show(it.id);
+  else if (it.kind === 'note') openNote(it.id);
+  else if (it.kind === 'ask') send(it.id);
+  else if (it.kind === 'skill') {
+    fetch('bridge/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ skill: it.id }) })
+      .then(r => toast(`<i>⚡</i> ${esc(it.id)} ${r.ok ? 'started ✓' : 'failed'}`))
+      .catch(() => toast(`<i>⚡</i> ${esc(it.id)} failed`));
+  }
+}
+function palToggle() {
+  if (palOpen) return palClose();
+  palOpen = true; palSel = 0;
+  $('pal').classList.add('on');
+  $('pal-in').value = ''; palRender();
+  setTimeout(() => $('pal-in').focus(), 30);
+  if (!palSkills)
+    fetch('bridge/skills?_=' + Date.now()).then(r => r.json()).then(d => { palSkills = d.skills || []; })
+      .catch(() => { palSkills = []; });
+}
+function palClose() { palOpen = false; $('pal').classList.remove('on'); }
+$('pal-in').addEventListener('input', () => { palSel = 0; palRender(); });
+$('pal-in').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palSel + 1, palItems.length - 1); palPaintSel(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(palSel - 1, 0); palPaintSel(); }
+  else if (e.key === 'Enter') palExec(palSel);
+  else if (e.key === 'Escape') palClose();
+});
+$('pal').addEventListener('click', e => { if (e.target.id === 'pal') palClose(); });
+
+/* ── dream mode: when idle, memories drift past ── */
+let lastActive = Date.now(), dreamOn = false;
+function wake(e) {
+  lastActive = Date.now();
+  if (!dreamOn) return;
+  const f = e && e.target && e.target.closest ? e.target.closest('.dreamf') : null;
+  exitDream();
+  if (f) setTimeout(() => openNote(f.dataset.id), 80);
+}
+function enterDream() {
+  dreamOn = true;
+  if (curView === 'galaxy' && Graph) Graph.pauseAnimation();
+  const d = document.createElement('div'); d.id = 'dream';
+  const notes = [...notesIdx].sort(() => Math.random() - .5).slice(0, 14);
+  d.innerHTML = notes.map(n => {
+    const x = (Math.random() * 86) | 0, y = (Math.random() * 88) | 0;
+    const dx = ((Math.random() * 44) - 22) | 0, dy = ((Math.random() * 30) - 22) | 0;
+    return `<span class="dreamf" data-id="${esc(n.id)}" style="left:${x}vw;top:${y}vh;--dx:${dx}vw;--dy:${dy}vh;` +
+      `animation-duration:${(26 + Math.random() * 30) | 0}s;animation-delay:-${(Math.random() * 30) | 0}s">${esc(n.id)}</span>`;
+  }).join('') + `<div class="dreamc">dreaming of ${notesIdx.length} memories…<small>touch anything to wake</small></div>`;
+  document.body.appendChild(d);
+}
+function exitDream() {
+  dreamOn = false;
+  const d = $('dream');
+  if (d) { d.classList.add('out'); setTimeout(() => d.remove(), 750); }
+  if (curView === 'galaxy' && Graph) Graph.resumeAnimation();
+}
+['pointermove', 'pointerdown', 'keydown', 'wheel'].forEach(ev =>
+  addEventListener(ev, wake, { passive: true, capture: true }));
+setInterval(() => {
+  if (dreamOn || palOpen || document.hidden) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (Date.now() - lastActive < 90e3) return;
+  if (rec && rec.state === 'recording') return;
+  if (audio && !audio.paused) return;
+  enterDream();
+}, 5000);
+
+/* ── thought ticker: the header thinks out loud ── */
+let thoughtIdx = 0;
+function thoughts() {
+  const t = [];
+  if (lastActData) {
+    const agents = lastActData.agents || [];
+    const digest = agents.find(a => /digest/i.test(a.name));
+    if (digest && digest.last) t.push('last digest ' + rel(digest.last));
+    const nexts = agents.filter(a => a.next).sort((a, b) => a.next - b.next);
+    if (nexts[0]) t.push('next: ' + nexts[0].name + ' ' + rel(nexts[0].next));
+    const inbox = (lastActData.inbox || []).length;
+    t.push(inbox ? inbox + ' capture' + (inbox > 1 ? 's' : '') + ' waiting in the inbox' : 'inbox clear ✓');
+    const g = (lastActData.gitlog || [])[0];
+    if (g) t.push('vault commit: ' + (g.msg || '').slice(0, 42));
+  }
+  const today = notesIdx.filter(n => Date.now() / 1000 - n.mtime < 86400).length;
+  if (today) t.push(today + ' note' + (today > 1 ? 's' : '') + ' touched today');
+  if (gData) t.push(gData.nodes.length + ' neurons · ' + gData.links.length + ' synapses');
+  return t;
+}
+setInterval(() => {
+  const el = $('thought'); if (!el) return;
+  const t = thoughts(); if (!t.length) return;
+  thoughtIdx = (thoughtIdx + 1) % t.length;
+  el.style.opacity = 0;
+  setTimeout(() => { el.textContent = t[thoughtIdx]; el.style.opacity = 1; }, 450);
+}, 9000);
+
 /* ── boot ─────────────────────────────────────────────── */
 setTimeout(() => { const b = $('boot'); if (b) b.remove(); }, 2400);
 const tick = () => $('clock').textContent =
@@ -1716,6 +1999,7 @@ const _show = show;
 show = function (v) {
   const switching = v !== curView;
   _show(v);
+  if (switching) sfx.view();
   if (!switching || RM.matches) return;
   let b = document.querySelector('.crt-blink');
   if (!b) { b = document.createElement('div'); b.className = 'crt-blink';
@@ -2102,6 +2386,7 @@ function nexusInit() {
 
 /* ── toast: report filed (click to open) ── */
 function toast(html, onclick) {
+  sfx.toast();
   const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = html;
   const dismiss = () => { t.classList.add('out'); setTimeout(() => t.remove(), 450); };
   t.onclick = () => { if (onclick) onclick(); dismiss(); };

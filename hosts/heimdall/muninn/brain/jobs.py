@@ -143,3 +143,4 @@ class JobStore:
             else:
                 job.update(status="failed", answer="Bridge restarted before completion. Work may have partially executed; inspect before retrying.")
                 self.finish(job)
+        return pending   # closed here, so none of them reached the talk log

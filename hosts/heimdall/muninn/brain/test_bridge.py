@@ -13,6 +13,16 @@ import bridge
 from jobs import JobStore
 
 
+def setUpModule():
+    # This suite also runs on heimdall: keep it out of the live talk log, spool and Pulse counters.
+    scratch = tempfile.TemporaryDirectory()
+    unittest.addModuleCleanup(scratch.cleanup)
+    for name, leaf in (("LOG_DIR", "talk"), ("TALK_SPOOL", "talk-spool.jsonl"), ("STATS_FILE", "stats.json")):
+        patch = mock.patch.object(bridge, name, str(Path(scratch.name) / leaf))
+        patch.start()
+        unittest.addModuleCleanup(patch.stop)
+
+
 def jev_choice(choice, confidence=0.9):
     return {"choice": choice, "confidence": confidence, "probabilities": {choice: 1.0}}
 
@@ -278,11 +288,79 @@ class BridgeJobIntegrationTests(unittest.TestCase):
         self.store.create("Existing work", "hermes", self.route)
         with mock.patch.object(bridge, "route_jev", return_value=self.route), \
                 mock.patch.object(bridge, "pick_agent", return_value="hermes"), \
+                mock.patch.object(bridge, "log_talk") as log, \
                 mock.patch.object(bridge.threading, "Thread") as thread:
             result = bridge.talk("Research storage")
         self.assertTrue(result["busy"])
         self.assertNotIn("job", result)
         thread.assert_not_called()
+        # the refusal is logged with the worker that was asked, the response is unchanged
+        self.assertEqual(log.call_args.args[0], "Research storage")
+        self.assertEqual(log.call_args.args[1]["agent"], "hermes")
+        self.assertNotIn("agent", result)
+
+
+class RestartLogTests(unittest.TestCase):
+    def test_job_cut_off_by_a_restart_is_logged(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            JobStore(root / "jobs.db", root).create("Research storage", "hermes", {"via": "jev", "tier": "agent"})
+            with mock.patch.multiple(bridge, JOBS=None, JOBS_DB=str(root / "jobs.db"), VAULT=str(root), KEY=""), \
+                    mock.patch.object(bridge, "log_talk") as log:
+                bridge.job_store()
+        self.assertEqual(log.call_args.args[0], "Research storage")
+        self.assertIn("Bridge restarted", log.call_args.args[1]["answer"])
+        self.assertEqual(log.call_args.args[1]["agent"], "hermes")
+
+
+class TalkLogTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        for name, leaf in (("LOG_DIR", "talk"), ("TALK_SPOOL", "spool.jsonl")):
+            patch = mock.patch.object(bridge, name, str(self.root / leaf))
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def said(self, text, **res):
+        bridge.log_talk(text, {"answer": "An answer.", "sources": [], **res})
+
+    def log(self):
+        return next((self.root / "talk").glob("Talk *.md")).read_text()
+
+    def test_entry_names_the_model_and_depth_that_answered(self):
+        deep = {"tier": "answer", "via": "jev", "depth": "deep", "probabilities": {"answer": 0.9}}
+        self.said("Compare the hosts", route=deep, model="claude-opus-5-5", depth="deep")
+        self.said("Compare them again", route=deep, model="codex (gpt)", depth="light")
+        self.said("Anyone there?", route={"tier": "answer"}, model=None, depth="light")
+        self.said("Research storage", route={"tier": "agent", "via": "jev"}, agent="hermes")
+        self.said("hi hermes", route={"tier": "hermes", "via": "direct"})
+        heads = [line.split(" · ")[1:] for line in self.log().splitlines() if line.startswith("### ")]
+        self.assertEqual(heads, [["answer (0.90 via jev)", "claude-opus-5-5", "deep"],
+                                 ["answer (0.90 via jev)", "codex (gpt)", "light (deep requested)"],
+                                 ["answer", "no model", "light"],
+                                 ["agent", "hermes"],
+                                 ["hermes"]])
+
+    def test_refused_write_is_held_and_written_with_the_next_entry(self):
+        (self.root / "blocker").write_text("")
+        with mock.patch.object(bridge, "LOG_DIR", str(self.root / "blocker" / "talk")), \
+                mock.patch("builtins.print") as printed:
+            self.said("first question", route={"tier": "answer"})
+        self.assertIn("talk log write failed", printed.call_args.args[0])
+        self.assertTrue(Path(bridge.TALK_SPOOL).is_file())
+        self.said("second question", route={"tier": "answer"})
+        text = self.log()
+        self.assertLess(text.index("first question"), text.index("second question"))
+        self.assertFalse(Path(bridge.TALK_SPOOL).exists())
+
+    def test_held_entries_are_written_at_startup(self):
+        held = {"day": "2026-10-01", "entry": "\n### 09:00 · answer\n- **you:** earlier\n"}
+        Path(bridge.TALK_SPOOL).write_text(json.dumps(held) + "\nnot json\n")
+        bridge.flush_talk()
+        self.assertIn("earlier", (self.root / "talk" / "Talk 2026-10-01.md").read_text())
+        self.assertFalse(Path(bridge.TALK_SPOOL).exists())
 
 
 class RequestValidationTests(unittest.TestCase):

@@ -95,6 +95,24 @@ class FilingTests(VaultCase):
                 self.assertTrue(self.source.exists())
         self.assertTrue(all("status: failed" in p.read_text() for p in self.reports()))
 
+    def test_title_punctuation_is_repaired_instead_of_failing_the_capture(self):
+        titles = {"Inbox: todo/jev requests [draft]": "Inbox — todo jev requests draft",
+                  "  Notes:\n#one|two  ": "Notes — one two",
+                  "x" * 200: "x" * 160}
+        for given, filed in titles.items():
+            with self.subTest(title=given):
+                self.source.write_text("A complete original capture.")
+                self.assertEqual(self.run_sweep(lambda *_: {**result(), "title": given}), 0)
+                self.assertTrue((self.vault / "Resources" / (filed + ".md")).is_file())
+
+    def test_unusable_title_is_named_in_the_report(self):
+        for given in (None, "", "#[]", ".hidden", "../escape"):
+            with self.subTest(title=given):
+                self.assertEqual(self.run_sweep(lambda *_: {**result(), "title": given}), 1)
+                self.assertTrue(self.source.exists())
+        self.assertTrue(any("invalid model title: '../escape'" in p.read_text() for p in self.reports()))
+        self.assertEqual(list(self.vault.glob("Resources/*.md")), [])
+
     def test_public_notes_reports_and_private_archives_with_restrictive_umask(self):
         previous_umask = os.umask(0o077)
         try:
