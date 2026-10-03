@@ -201,6 +201,46 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(bridge.route_rules("How do I write a note?")["depth"], "light")
         self.assertEqual(bridge.route_rules("Compare my backup options and explain the tradeoffs")["depth"], "deep")
         self.assertEqual(bridge.route_rules("open memory")["depth"], None)
+        self.assertEqual(bridge.route_rules("What are the trade-offs of ZFS?")["depth"], "deep")
+        # light is the default: a long question is not a deep one
+        self.assertEqual(bridge.route_rules("Tell me " + "a lot " * 60 + "about my notes?")["depth"], "light")
+
+    def test_half_sure_deep_choices_take_the_light_path(self):
+        deep = {"answers": {"tier": jev_choice("answer"), "depth": jev_choice("deep", 0.6)}}
+        research = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("claude", 0.6)}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"):
+            with mock.patch.object(bridge, "post_json", return_value=deep):
+                self.assertEqual(bridge.route_jev("Tell me about my backups")["depth"], "light")
+            with mock.patch.object(bridge, "post_json", return_value=research):
+                self.assertIsNone(bridge.route_jev("Look into backups")["executor"])
+
+    def test_sure_deep_research_goes_to_claude(self):
+        response = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("claude")}}
+        everyone = {"hermes": True, "codex": True, "claude": True}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), \
+                mock.patch.object(bridge, "post_json", return_value=response), \
+                mock.patch.object(bridge, "available_agents", return_value=everyone), \
+                mock.patch.object(bridge, "start_agent", return_value={"id": "job"}) as start:
+            bridge.talk("Do deep research on ZFS tuning")
+        self.assertEqual(start.call_args.args[1], "claude")
+
+    def test_rules_send_only_deep_research_to_claude(self):
+        self.assertEqual(bridge.route_rules("Do deep research on ZFS tuning and write a report")["executor"], "claude")
+        self.assertEqual(bridge.route_rules("Research ZFS tuning thoroughly")["executor"], "claude")
+        self.assertIsNone(bridge.route_rules("Research backup strategies")["executor"])
+        self.assertIsNone(bridge.route_rules("Write a summary document")["executor"])
+
+    def test_claude_is_never_a_fallback_worker(self):
+        everyone = {"hermes": True, "codex": True, "claude": True}
+        with mock.patch.object(bridge, "available_agents", return_value=everyone):
+            self.assertEqual(bridge.pick_agent("auto"), "hermes")
+            self.assertEqual(bridge.pick_agent("auto", "claude"), "claude")
+            self.assertEqual(bridge.pick_agent("claude"), "claude")
+        with mock.patch.object(bridge, "available_agents", return_value={**everyone, "claude": False}):
+            self.assertEqual(bridge.pick_agent("auto", "claude"), "hermes")
+            self.assertIsNone(bridge.pick_agent("claude"))
+        with mock.patch.object(bridge, "available_agents", return_value={"hermes": False, "codex": False, "claude": True}):
+            self.assertIsNone(bridge.pick_agent("auto"))
 
     def test_uncertain_command_or_skill_uses_rules_and_records_reason(self):
         for uncertain in ("command", "skill"):
@@ -252,6 +292,30 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(job["status"], "failed")
         self.assertTrue(job["answer"])
 
+    def test_claude_research_is_read_only_and_confined_to_the_vault(self):
+        job = {"id": "research", "text": "Research ZFS tuning", "agent": "claude"}
+        done = mock.Mock(returncode=0, stdout="A cited report.\n", stderr="")
+        with mock.patch.object(bridge.subprocess, "run", return_value=done) as run:
+            bridge.run_claude(job)
+        command = run.call_args.args[0]
+        self.assertEqual((job["status"], job["answer"]), ("done", "A cited report."))
+        self.assertIn("Research ZFS tuning", command[2])
+        self.assertIn("--restricted", command)
+        self.assertEqual(command[command.index("--tools") + 1], bridge.RESEARCH_TOOLS)
+        self.assertFalse({"Bash", "Write", "Edit"} & set(bridge.RESEARCH_TOOLS.split(",")))
+        self.assertEqual(command[command.index("--model") + 1], bridge.CLAUDE_MODEL)
+        self.assertEqual(run.call_args.kwargs["cwd"], bridge.VAULT)
+
+    def test_failed_claude_research_fails_the_job(self):
+        job = {"id": "research", "text": "Research ZFS tuning", "agent": "claude"}
+        refused = mock.Mock(returncode=1, stdout="", stderr="usage limit reached")
+        with mock.patch.object(bridge.subprocess, "run", return_value=refused):
+            bridge.run_claude(job)
+        self.assertEqual((job["status"], job["answer"]), ("failed", "usage limit reached"))
+        with mock.patch.object(bridge.subprocess, "run", side_effect=bridge.subprocess.TimeoutExpired("claude", 1500)):
+            bridge.run_claude(job)
+        self.assertIn("out of time", job["answer"])
+
 
 class BridgeJobIntegrationTests(unittest.TestCase):
     def setUp(self):
@@ -275,6 +339,17 @@ class BridgeJobIntegrationTests(unittest.TestCase):
         self.assertTrue((self.store.vault / saved["report"]).is_file())
         self.assertEqual(log.call_args.args[1]["route"], self.route)
         self.assertIn(saved["report"][:-3], log.call_args.args[1]["answer"])
+
+    def test_claude_jobs_run_the_research_worker(self):
+        job = self.store.create("Research storage", "claude", self.route)
+        with mock.patch.object(bridge, "run_claude", side_effect=lambda j: j.update(status="done", answer="Report.")) as research, \
+                mock.patch.object(bridge, "run_codex") as codex, \
+                mock.patch.object(bridge, "log_talk") as log:
+            bridge.run_agent(job)
+        research.assert_called_once()
+        codex.assert_not_called()
+        self.assertEqual(self.store.get(job["id"])["status"], "done")
+        self.assertEqual(log.call_args.args[1]["agent"], "claude")
 
     def test_thread_start_failure_is_a_durable_failure(self):
         with mock.patch.object(bridge.threading, "Thread", side_effect=RuntimeError("Cannot start")):
@@ -381,6 +456,12 @@ class RequestValidationTests(unittest.TestCase):
                 self.assertEqual(status, 400)
                 self.assertIn("error", response)
                 talk.assert_not_called()
+
+    def test_claude_can_be_addressed_by_name(self):
+        with mock.patch.object(bridge, "talk", return_value={"answer": "On it."}) as talk:
+            status, _ = self.post({"text": "Research storage", "target": "claude"})
+        self.assertEqual(status, 200)
+        talk.assert_called_once_with("Research storage", "claude")
 
 
 class AnswerTierTests(unittest.TestCase):
