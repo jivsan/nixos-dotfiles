@@ -10,6 +10,7 @@
     ../../modules/system/users.nix       # christina + SSH key
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
+    ../../modules/apps/herdr.nix
 
     # ── mimir-local: AI / GPU stack ──
     ./modules/system/nvidia.nix
