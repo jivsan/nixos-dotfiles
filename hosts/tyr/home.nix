@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 {
   home.stateVersion = "26.05";
 
@@ -11,6 +11,11 @@
 
     ./modules/home/fastfetch.nix
     ./modules/home/rice.nix
+  ];
+
+  home.packages = [
+    inputs.helium.packages.${pkgs.stdenv.hostPlatform.system}.default   # Helium browser, as on mjolnir
+    pkgs.gcc                                                            # nvim-treesitter compiles its parsers
   ];
 
   # nvim config straight from the repo clone (what modules/home/xdg.nix does

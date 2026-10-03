@@ -193,9 +193,15 @@ oxwm.bar.set_scheme_urgent(colors.yellow, colors.bg, colors.yellow)
 oxwm.key.bind({ modkey }, "Return", oxwm.spawn_terminal())
 oxwm.key.bind({ modkey }, "Q", oxwm.client.kill())
 
--- tyr: rofi is the launcher; your dmenu build is one Shift away
-oxwm.key.bind({ modkey }, "D", oxwm.spawn({ "rofi", "-show", "drun" }))
-oxwm.key.bind({ modkey, "Shift" }, "D", oxwm.spawn({ "sh", "-c", "dmenu_run -l 10" }))
+-- Launch dmenu, as on mjolnir, riced for tyr: centred, bordered, neon.
+-- (-c WIDTH and -bw PX come from rice/dmenu-center-border.diff.)
+local dmenu = "dmenu_run -c 760 -bw 3 -l 12 -p '\u{f002}'"
+    .. " -fn 'JetBrainsMono Nerd Font:size=13'"
+    .. " -nb '" .. colors.bg .. "' -nf '" .. colors.fg .. "'"
+    .. " -sb '" .. colors.pink .. "' -sf '" .. colors.bg .. "'"
+oxwm.key.bind({ modkey }, "D", oxwm.spawn({ "sh", "-c", dmenu }))
+-- tyr: rofi for desktop apps and for switching windows
+oxwm.key.bind({ modkey, "Shift" }, "D", oxwm.spawn({ "rofi", "-show", "drun" }))
 oxwm.key.bind({ modkey }, "W", oxwm.spawn({ "rofi", "-show", "window" }))
 
 -- tyr: effects on/off (picom: glow, rounded corners, glass, animations)
@@ -249,6 +255,12 @@ oxwm.key.bind({ modkey }, "K", oxwm.client.focus_stack(-1))
 oxwm.key.bind({ modkey, "Shift" }, "J", oxwm.client.move_stack(1))
 oxwm.key.bind({ modkey, "Shift" }, "K", oxwm.client.move_stack(-1))
 
+-- Multi-monitor (same as mjolnir; a no-op while tyr has one screen)
+oxwm.key.bind({ modkey }, "Comma", oxwm.monitor.focus(-1))
+oxwm.key.bind({ modkey }, "Period", oxwm.monitor.focus(1))
+oxwm.key.bind({ modkey, "Shift" }, "Comma", oxwm.monitor.tag(-1))
+oxwm.key.bind({ modkey, "Shift" }, "Period", oxwm.monitor.tag(1))
+
 -- tyr: hop between workspaces that have windows
 oxwm.key.bind({ modkey }, "Tab", oxwm.tag.view_next_nonempty())
 oxwm.key.bind({ modkey, "Shift" }, "Tab", oxwm.tag.view_previous_nonempty())
@@ -272,5 +284,6 @@ oxwm.key.chord({
 -- Autostart
 -------------------------------------------------------------------------------
 oxwm.autostart("xsetroot -cursor_name left_ptr")
-oxwm.autostart("feh --no-fehbg --bg-fill " .. home .. "/.local/share/wallpapers/tyr-neon.png")
+-- paints the wallpaper and repaints it whenever the RDP window changes size
+oxwm.autostart(scripts .. "wallpaper.sh")
 oxwm.autostart("picom -b")

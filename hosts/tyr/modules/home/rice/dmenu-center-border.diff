@@ -1,0 +1,68 @@
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -38,6 +38,8 @@
+ static int bh, mw, mh;
+ static int inputw = 0, promptw;
+ static int lrpad; /* sum of left and right padding */
++static int centerw = 0; /* -c  option; if nonzero, centre the menu, this many pixels wide */
++static int borderw = 0; /* -bw option; border width in pixels, in the selection colour */
+ static size_t cursor;
+ static struct item *items = NULL;
+ static struct item *matches, *matchend;
+@@ -662,9 +664,15 @@
+ 				if (INTERSECT(x, y, 1, 1, info[i]) != 0)
+ 					break;
+ 
++		if (centerw > 0) {
++			mw = MIN(centerw, info[i].width);
++			x = info[i].x_org + (info[i].width - mw) / 2 - borderw;
++			y = info[i].y_org + (info[i].height - mh) / 2 - borderw;
++		} else {
+ 		x = info[i].x_org;
+ 		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
+ 		mw = info[i].width;
++		}
+ 		XFree(info);
+ 	} else
+ #endif
+@@ -672,9 +680,15 @@
+ 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
+ 			die("could not get embedding window attributes: 0x%lx",
+ 			    parentwin);
++		if (centerw > 0) {
++			mw = MIN(centerw, wa.width);
++			x = (wa.width - mw) / 2 - borderw;
++			y = (wa.height - mh) / 2 - borderw;
++		} else {
+ 		x = 0;
+ 		y = topbar ? 0 : wa.height - mh;
+ 		mw = wa.width;
++		}
+ 	}
+ 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+ 	inputw = mw / 3; /* input width: ~33% of monitor width */
+@@ -683,10 +697,11 @@
+ 	/* create menu window */
+ 	swa.override_redirect = True;
+ 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
++	swa.border_pixel = scheme[SchemeSel][ColBg].pixel;
+ 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+-	win = XCreateWindow(dpy, root, x, y, mw, mh, 0,
++	win = XCreateWindow(dpy, root, x, y, mw, mh, borderw,
+ 	                    CopyFromParent, CopyFromParent, CopyFromParent,
+-	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
++	                    CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWEventMask, &swa);
+ 	XSetClassHint(dpy, win, &ch);
+ 
+ 	/* input methods */
+@@ -745,6 +760,10 @@
+ 			mon = atoi(argv[++i]);
+ 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
+ 			prompt = argv[++i];
++		else if (!strcmp(argv[i], "-c"))   /* centre the menu, this many pixels wide */
++			centerw = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-bw"))  /* border width in pixels */
++			borderw = atoi(argv[++i]);
+ 		else if (!strcmp(argv[i], "-fn"))  /* font or font set */
+ 			fonts[0] = argv[++i];
+ 		else if (!strcmp(argv[i], "-nb"))  /* normal background color */

@@ -13,11 +13,24 @@ let
   wallpaper = pkgs.runCommand "tyr-neon-wallpaper.png"
     { nativeBuildInputs = [ pkgs.imagemagick ]; }
     "sh ${./rice/wallpaper.sh} $out";
+
+  # Your dmenu build (config/dmenu) with one tyr-only patch that adds two
+  # flags: -c WIDTH (centre the menu) and -bw PX (border). The colours are
+  # passed by the Mod+D keybind in rice/oxwm/config.lua.
+  dmenuTyr = pkgs.dmenu.overrideAttrs (_: {
+    src = ../../../../config/dmenu;
+    patches = [ ./rice/dmenu-center-border.diff ];
+  });
 in
 {
   home.packages = with pkgs; [
+    # takes the place of the unpatched build from modules/home/suckless.nix
+    (lib.hiPrio dmenuTyr)
+
     picom      # effects — started by oxwm's autostart, not as a service
     feh        # wallpaper
+    xev        # rice/oxwm/scripts/wallpaper.sh watches for screen resizes with it
+    xrandr     # ... and refreshes the monitor layout before each repaint
     maim       # Mod+S: screenshot region ...
     xclip      # ... to the clipboard
     xsetroot
