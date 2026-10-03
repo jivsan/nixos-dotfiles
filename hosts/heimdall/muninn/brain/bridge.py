@@ -35,6 +35,7 @@ SUDO = "/run/wrappers/bin/sudo"
 CODEX = os.environ.get("MUNINN_CODEX", "codex")
 CODEX_HOME = os.path.expanduser(os.environ.get("CODEX_HOME", "~/.codex"))
 USAGE_FILE = os.environ.get("MUNINN_USAGE_FILE", "/var/lib/muninn-brain/usage.json")
+STATS_FILE = os.environ.get("MUNINN_STATS_FILE", "/var/lib/muninn-brain/stats.json")
 HERMES_URL = os.environ.get("MUNINN_HERMES_URL", "http://10.0.20.21:8642").rstrip("/")
 HERMES_KEY = os.environ.get("HERMES_API_KEY", "").strip()
 # Answer tiers: light = Codex (GPT via the Codex subscription), deep = Claude
@@ -83,7 +84,8 @@ RUNNABLE = {s["id"]: s["unit"] for s in SKILLS if s["unit"]}
 VIEWS = {"neural": "galaxy", "galaxy": "galaxy", "graph": "galaxy", "brain": "galaxy", "talk": "galaxy",
          "memory": "memory", "notes": "memory", "vault": "memory", "skills": "skills", "automations": "skills",
          "systems": "systems", "system": "systems", "agents": "systems", "capture": "capture", "inbox": "memory",
-         "hermes": "hermes"}
+         "pulse": "pulse", "stats": "pulse", "statistics": "pulse", "nexus": "nexus", "topology": "nexus",
+         "map": "nexus", "hermes": "hermes"}
 
 JEV_QUESTIONS = {
     "executor": {
@@ -116,7 +118,7 @@ JEV_QUESTIONS = {
         "type": "choice",
         "instructions": "If the request in `request` is a direct command, which one is it?",
         "criteria": {
-            "open_view": "Open, show or switch to a dashboard view: neural graph, memory, skills, systems, capture",
+            "open_view": "Open, show or switch to a dashboard view: neural graph, memory, pulse, nexus, skills, systems, capture",
             "open_note": "Open or bring up one specific note, report, digest or journal entry",
             "search": "Search or filter the notes for a word or phrase",
             "capture": "Save, capture, jot down or remember a new note or thought",
@@ -592,6 +594,50 @@ def push_usage(b):
     return True
 
 
+# ── request stats: a tiny persistent counter for the Pulse view ────────────
+STATS_LOCK = threading.Lock()
+
+
+def record_stats(**fields):
+    # Counters keyed "field:value" in an all-time bucket and per-day buckets
+    # (90 days kept). Stats must never break a request, so every failure is
+    # swallowed — worst case the Pulse view shows stale numbers.
+    try:
+        with STATS_LOCK:
+            try:
+                with open(STATS_FILE, encoding="utf-8") as fh:
+                    s = json.load(fh)
+                if not isinstance(s, dict):
+                    s = {}
+            except (OSError, ValueError):
+                s = {}
+            day = datetime.date.today().isoformat()
+            cutoff = (datetime.date.today() - datetime.timedelta(days=90)).isoformat()
+            days = s.setdefault("days", {})
+            for k in [k for k in days if k < cutoff]:
+                del days[k]
+            for bucket in (s.setdefault("total", {}), days.setdefault(day, {})):
+                for f, v in fields.items():
+                    if v:
+                        key = f"{f}:{v}"
+                        bucket[key] = bucket.get(key, 0) + 1
+            tmp = STATS_FILE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(s, fh)
+            os.replace(tmp, STATS_FILE)
+    except OSError:
+        pass
+
+
+def load_stats():
+    try:
+        with open(STATS_FILE, encoding="utf-8") as fh:
+            s = json.load(fh)
+            return s if isinstance(s, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 # ── vault log: everything said goes back into memory ───────────────────────
 def log_talk(q, res):
     with TALK_LOCK:
@@ -649,6 +695,7 @@ def talk(text, target="auto"):
                    "agent": agent, "route": route}
             if jev_error:
                 res["jev_error"] = jev_error
+            record_stats(tier="agent", via=route.get("via"), who=agent)
             return res   # the job logs itself when it finishes
         res = {"answer": "That is real work for an agent, but no agent is connected yet: hermes needs its API key "
                          "on heimdall, and Codex needs codex login on heimdall.", "sources": []}
@@ -660,6 +707,8 @@ def talk(text, target="auto"):
     # opening a view or a note is not worth remembering; everything else is
     if (res.get("action") or {}).get("type") not in ("view", "open", "search"):
         log_talk(text, res)
+    record_stats(tier=route["tier"], via=route.get("via"),
+                 who=res.get("model") or route.get("command"), depth=res.get("depth"))
     return res
 
 
@@ -724,6 +773,8 @@ class H(BaseHTTPRequestHandler):
             return self._j(200, {"skills": [{**s, **(unit_state(s["unit"]) if s["unit"] else {})} for s in SKILLS]})
         if p == "/bridge/usage":
             return self._j(200, usage())
+        if p == "/bridge/stats":
+            return self._j(200, load_stats())
         if p == "/bridge/jobs":
             return self._j(200, {"jobs": job_store().recent()})
         if p.startswith("/bridge/jobs/"):
@@ -768,6 +819,7 @@ class H(BaseHTTPRequestHandler):
                 if not reply:
                     return self._j(502, {"error": "hermes returned nothing"})
                 log_talk(text, {"answer": reply, "sources": [], "route": {"via": "direct", "tier": "hermes"}})
+                record_stats(tier="hermes", via="direct", who="hermes")
                 return self._j(200, {"answer": reply, "conversation": conv})
             if p == "/bridge/run":
                 ok, msg = run_skill(b.get("skill"))

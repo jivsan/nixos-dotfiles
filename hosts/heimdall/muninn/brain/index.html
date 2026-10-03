@@ -573,6 +573,82 @@
   #hmsgs .ghost { margin:auto; }
   .msg.pending { opacity:.55; }
   .msg.pending .who::after { content:" …"; animation:jobpulse 1.4s ease-in-out infinite; }
+
+  /* ── pulse view: statistics of the brain ─────────────── */
+  #view-pulse.on { overflow-y:auto; gap:14px; }
+  .ptiles { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; flex:none; }
+  .ptile { position:relative; background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; padding:14px 16px 12px; overflow:hidden; transition:border-color .3s; }
+  .ptile:hover { border-color:rgba(138,125,255,.35); }
+  .ptile::after { content:""; position:absolute; left:0; right:0; top:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--tc, var(--violet)), transparent);
+    opacity:.7; animation:hairsweep 7s ease-in-out infinite alternate; background-size:220% 100%; }
+  .ptile b { font-family:var(--serif); font-weight:500; font-size:30px; line-height:1.1;
+    color:#fff; display:block; text-shadow:0 0 18px rgba(138,125,255,.25); }
+  .ptile span { font-size:9px; letter-spacing:1.8px; text-transform:uppercase; color:var(--ink3); }
+  .ptile small { position:absolute; right:12px; top:12px; font-size:9px; color:var(--ink3); }
+  .pgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; flex:none; }
+  .pcard { background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; min-height:196px; display:flex; flex-direction:column; }
+  .pcard .pt { font-size:9.5px; letter-spacing:2px; text-transform:uppercase; color:var(--ink2);
+    margin-bottom:12px; flex:none; }
+  .pcard .pt i { color:var(--gold); font-style:normal; margin-right:6px; }
+  .pcard .pbody { flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
+  .pcard .pfoot { flex:none; margin-top:10px; font-size:9.5px; color:var(--ink3); letter-spacing:.6px; }
+  .plegend { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; flex:none; }
+  .plegend span { font-size:9.5px; color:var(--ink2); display:inline-flex; align-items:center; gap:5px; }
+  .plegend i { width:8px; height:8px; border-radius:2px; display:inline-block; }
+  .prow2 { display:flex; gap:18px; align-items:center; justify-content:center; width:100%; flex-wrap:wrap; }
+  /* animated svg bits */
+  .barg { transform-box:fill-box; transform-origin:bottom; animation:bargrow .7s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes bargrow { from { transform:scaleY(0); } }
+  .donut { animation:din .8s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes din { from { transform:scale(.82); opacity:0; } }
+  .dnum { fill:#fff; font-family:var(--serif); font-size:26px; }
+  .dsub { fill:var(--ink3); font-size:8px; letter-spacing:2px; text-transform:uppercase; }
+  .blabel { fill:var(--ink3); font-size:8.5px; font-family:var(--mono); }
+  .hbar { margin:7px 0; width:100%; }
+  .hbar .hb-top { display:flex; justify-content:space-between; font-size:10.5px; margin-bottom:3px; }
+  .hbar .hb-top .hb-l { color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:78%; }
+  .hbar .hb-top .hb-v { color:var(--ink3); flex:none; }
+  .hbar .hb-track { height:5px; border-radius:3px; background:rgba(255,255,255,.06); overflow:hidden; }
+  .hbar .hb-fill { height:100%; border-radius:3px; animation:hbgrow .8s cubic-bezier(.2,.8,.3,1) both;
+    box-shadow:0 0 8px rgba(138,125,255,.3); }
+  @keyframes hbgrow { from { width:0; } }
+  @media (max-width:1400px){ .ptiles{grid-template-columns:repeat(3,1fr)} .pgrid{grid-template-columns:1fr 1fr} }
+  @media (max-width:1150px){ .pgrid{grid-template-columns:1fr} }
+
+  /* ── nexus view: how everything talks together ───────── */
+  #view-nexus .panel { position:relative; }
+  #nexus-svg { position:absolute; inset:0; width:100%; height:100%; }
+  .nlane { fill:rgba(255,255,255,.015); stroke:rgba(255,255,255,.04); stroke-dasharray:3 5; }
+  .nlanet { fill:var(--ink3); font-size:9px; letter-spacing:2.6px; text-transform:uppercase; }
+  .nedge { fill:none; stroke-width:1.3; opacity:.55; transition:opacity .3s, stroke .3s; }
+  .nedge.hot { opacity:1; filter:drop-shadow(0 0 5px currentColor); }
+  .nlabel { fill:var(--ink3); font-size:8.5px; letter-spacing:1.1px; font-family:var(--mono); }
+  .nlabel.hot { fill:var(--cream); }
+  .nflow { opacity:.85; }
+  .nnode { cursor:pointer; }
+  .nbox { fill:rgba(19,14,29,.94); stroke:rgba(138,125,255,.35); stroke-width:1; transition:stroke .25s; }
+  .nnode:hover .nbox { stroke:var(--cyan); filter:drop-shadow(0 0 8px rgba(45,226,230,.35)); }
+  .nnode.hub .nbox { stroke:rgba(45,226,230,.5); stroke-width:1.4; }
+  .nnode.hub .nbox2 { fill:none; stroke:rgba(45,226,230,.22); stroke-width:1;
+    animation:hubring 3.2s ease-in-out infinite; }
+  @keyframes hubring { 50% { stroke:rgba(45,226,230,.5); } }
+  .nname { fill:var(--cream); font-size:11.5px; font-family:var(--mono); text-anchor:middle; }
+  .nsub { fill:var(--ink3); font-size:8.5px; font-family:var(--mono); text-anchor:middle; letter-spacing:.8px; }
+  .ndot { stroke:rgba(0,0,0,.4); stroke-width:1; }
+  .ndot.ok { fill:var(--ok); filter:drop-shadow(0 0 4px rgba(90,209,160,.8)); }
+  .ndot.bad { fill:var(--bad); filter:drop-shadow(0 0 4px rgba(255,92,108,.8)); }
+  .ndot.unknown { fill:var(--ink3); }
+  .ntip { position:absolute; z-index:8; display:none; max-width:250px; pointer-events:none;
+    background:var(--surface2); border:1px solid var(--line2); border-radius:10px;
+    padding:9px 12px; font-size:10.5px; line-height:1.55; color:var(--ink2);
+    box-shadow:0 14px 40px rgba(0,0,0,.5); }
+  .ntip .nt-n { color:var(--cream); font-size:11.5px; }
+  .ntip .nt-s { color:var(--ink3); font-size:9px; letter-spacing:1.4px; text-transform:uppercase; margin:1px 0 5px; }
+  .ntip .nt-st { margin-top:6px; font-size:9.5px; letter-spacing:1px; text-transform:uppercase; }
+  .ntip .nt-st.ok { color:var(--ok); } .ntip .nt-st.bad { color:var(--bad); } .ntip .nt-st.unknown { color:var(--ink3); }
 </style>
 </head>
 <body>
@@ -584,6 +660,8 @@
   <div class="navsec">self</div>
   <button class="nav" data-v="galaxy"><span class="ic">✦</span><span class="lbl">Neural</span></button>
   <button class="nav on" data-v="memory"><span class="ic">◈</span><span class="lbl">Memory</span></button>
+  <button class="nav" data-v="pulse"><span class="ic">◉</span><span class="lbl">Pulse</span></button>
+  <button class="nav" data-v="nexus"><span class="ic">⌖</span><span class="lbl">Nexus</span></button>
   <button class="nav" data-v="capture"><span class="ic">✎</span><span class="lbl">Capture</span></button>
   <button class="nav" data-v="hermes"><span class="ic">⌬</span><span class="lbl">Hermes</span></button>
   <div class="navsec">system</div>
@@ -661,6 +739,25 @@
         <button id="g-clear">clear</button>
       </div>
       <div id="gsel" class="gsel" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- ── pulse: statistics of the brain ── -->
+  <section class="view" id="view-pulse">
+    <div class="ptiles" id="ptiles"></div>
+    <div class="pgrid" id="pgrid"><div class="ghost">connecting…</div></div>
+  </section>
+
+  <!-- ── nexus: how everything talks together ── -->
+  <section class="view" id="view-nexus">
+    <div class="panel">
+      <svg id="nexus-svg" viewBox="0 0 1180 620" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="ntip" id="ntip"></div>
+      <div class="gcap">
+        <div class="t1"><i>⌖</i> NEXUS</div>
+        <div class="t3">every line is a live link · dots are flowing packets · send a request and watch its path<br>
+          <i>●</i> green = healthy · red = unreachable · grey = not probed</div>
+      </div>
     </div>
   </section>
 
@@ -867,6 +964,8 @@ function focusSubgraph(id) {
 const TITLES = {
   memory:  ['Memory',  'Search the muninn vault — everything the OS remembers.'],
   galaxy:  ['Neural',  'Every memory is a neuron. Ask something and watch what fires.'],
+  pulse:   ['Pulse',   'The brain in numbers: requests, routing, models, memory growth, agent work.'],
+  nexus:   ['Nexus',   'How every part of the system talks to every other — live.'],
   capture: ['Capture', 'Quick notes go straight to _inbox/ (huginn will file them).'],
   skills:  ['Skills',  'Every domain has tasks; repeat tasks become skills; reliable skills become automations.'],
   usage:   ['Usage',   'How much of each subscription is spent: the 5-hour and the weekly window.'],
@@ -884,6 +983,8 @@ function show(v) {
   if (v === 'skills') refreshSkills();
   if (v === 'usage') refreshUsage();
   if (v === 'systems') refreshJobs();
+  if (v === 'pulse') refreshPulse();
+  if (v === 'nexus') nexusInit();
   if (v === 'hermes') hermesInit();
   if (v === 'capture') {
     setTimeout(() => { const ta = $('capture-text'); if (ta) ta.focus(); }, 60);
@@ -1242,7 +1343,7 @@ function applyGalaxyFilter() {
 }
 
 /* ── systems (same data pipeline as before) ───────────── */
-let lastActGen = -1;
+let lastActGen = -1, lastActData = null;
 function tiles(c) {
   const t = [
     { k:'notes',   v:c.notes },
@@ -1265,6 +1366,7 @@ async function refreshActivity() {
   refreshJobs();   /* cheap bridge call: keeps the jobs panel + nav dot fresh */
   try {
     const a = await (await fetch('activity.json?_=' + Date.now())).json();
+    lastActData = a;
     if (a.generated === lastActGen) return;
     lastActGen = a.generated;
     $('side-stamp').textContent = 'updated ' + new Date(a.generated * 1000).toLocaleTimeString();
@@ -1419,6 +1521,7 @@ async function send(text) {
     thinkingOn = false; addMsg('muninn', `The bridge did not answer (${e.message}).`); setOrb('idle', 'ready'); return;
   }
   thinkingOn = false; renderRoute(d.route, d.jev_error);
+  nexusFlash(d.route, d.model);
   if (d.action) await doAction(d.action);
   if (d.answer) addMsg('muninn', d.answer, { sources: d.sources,
     meta: [d.route.tier === 'answer' && d.depth === 'deep' ? 'answer·deep' : d.route.tier,
@@ -1449,6 +1552,7 @@ async function pollJob(id) {
 async function speak(text) {
   if (!health.voice) return setOrb('idle', 'ready');
   setOrb('speaking');
+  nexusFlashIds(['e7'], 4000);
   try {
     const r = await fetch('bridge/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
     if (!r.ok) throw 0;
@@ -1482,6 +1586,7 @@ async function refreshHealth() {
   if (!o.classList.contains('listening') && !o.classList.contains('thinking') && !o.classList.contains('speaking'))
     setOrb('idle', health.ok ? 'ready' : 'bridge offline');
   o.title = health.ok ? (health.voice ? 'click to talk' : 'voice server offline, type instead') : 'bridge offline';
+  nexusStatus();
 }
 $('orb').onclick = micToggle;
 $('talkin').addEventListener('keydown', e => {
@@ -1561,6 +1666,7 @@ async function refreshUsage() {
                     : 'Codex is not logged in on heimdall yet. Run codex login there.');
 }
 setInterval(() => { if (curView === 'usage') refreshUsage(); }, 30000);
+setInterval(() => { if (curView === 'pulse') refreshPulse(); }, 30000);
 
 /* ── boot ─────────────────────────────────────────────── */
 setTimeout(() => { const b = $('boot'); if (b) b.remove(); }, 2400);
@@ -1709,6 +1815,290 @@ function decodeTitle() {
     }, 25000 + Math.random() * 25000);
   })();
 })();
+
+/* ── pulse: statistics of the brain ───────────────────── */
+const TIER_C = { command:'#ece5d8', answer:'#2de2e6', agent:'#ff4fa3', hermes:'#e8c47a', notes:'#8a7dff' };
+const WHO_C = ['#8a7dff','#2de2e6','#ff4fa3','#e8c47a','#5ad1a0','#39d0ff','#ff8ac4','#b9c4ff'];
+const WHO_PRETTY = { 'minimax/minimax-m3':'minimax · floor', 'codex (gpt)':'codex · gpt', 'hermes':'hermes · agent',
+  'codex':'codex · agent', 'capture':'capture cmd', 'search':'search cmd', 'open_view':'open view cmd',
+  'run_skill':'run skill cmd', 'open_note':'open note cmd', 'none':'unclassified' };
+const localISO = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+function countup(el, to, suffix) {
+  const t0 = performance.now(), D = 900;
+  (function step(n) {
+    const p = Math.min(1, (n - t0) / D), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(to * e).toLocaleString() + (suffix || '');
+    if (p < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+function donut(parts, size, centerLabel) {
+  const total = parts.reduce((a, p) => a + p.v, 0);
+  const th = 15, r = (size - th) / 2, C = 2 * Math.PI * r;
+  if (!total) return `<svg class="donut" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+    <text x="50%" y="50%" class="dsub" text-anchor="middle" dominant-baseline="central">no data</text></svg>`;
+  let off = 0;
+  const segs = parts.filter(p => p.v > 0).map(p => {
+    const f = p.v / total;
+    const s = `<circle r="${r.toFixed(1)}" cx="${size/2}" cy="${size/2}" fill="none" stroke="${p.c}" stroke-width="${th}"
+      stroke-dasharray="${Math.max(0, f*C - 1.5).toFixed(1)} ${(C - f*C + 1.5).toFixed(1)}" stroke-dashoffset="${(-off*C).toFixed(1)}"
+      transform="rotate(-90 ${size/2} ${size/2})"><title>${esc(p.label)} · ${p.v}</title></circle>`;
+    off += f; return s;
+  }).join('');
+  return `<svg class="donut" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${segs}
+    <text x="50%" y="46%" class="dnum" text-anchor="middle" dominant-baseline="central">${total}</text>
+    <text x="50%" y="61%" class="dsub" text-anchor="middle">${esc(centerLabel || '')}</text></svg>`;
+}
+
+function vbars(days, h, cmap) {
+  // days: [{label, short, parts:{k:v}, total}] — stacked vertical bars
+  const w = Math.max(280, days.length * 16), bw = 9, gap = (w - days.length * bw) / (days.length + 1);
+  const max = Math.max(1, ...days.map(d => d.total));
+  let x = gap, out = '';
+  days.forEach((d, i) => {
+    let y = h;
+    for (const [k, v] of Object.entries(d.parts)) {
+      if (!v) continue;
+      const bh = Math.max(1.5, (v / max) * (h - 12));
+      y -= bh;
+      out += `<rect class="barg" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}"
+        fill="${(cmap && cmap[k]) || WHO_C[0]}" style="animation-delay:${i * 22}ms"><title>${esc(d.label)} · ${k}: ${v}</title></rect>`;
+    }
+    if (i % 5 === 0 || i === days.length - 1)
+      out += `<text class="blabel" x="${(x + bw / 2).toFixed(1)}" y="${h + 11}" text-anchor="middle">${esc(d.short)}</text>`;
+    x += bw + gap;
+  });
+  return `<svg viewBox="0 0 ${w} ${h + 16}" style="width:100%;height:auto;display:block">${out}</svg>`;
+}
+
+function hbars(rows) {
+  const max = Math.max(1, ...rows.map(r => r.v));
+  return rows.map((r, i) => `<div class="hbar"><div class="hb-top"><span class="hb-l">${esc(r.label)}</span><span class="hb-v">${r.v}</span></div>
+    <div class="hb-track"><div class="hb-fill" style="width:${(r.v / max * 100).toFixed(1)}%;background:${r.c};animation-delay:${i * 70}ms"></div></div></div>`).join('');
+}
+
+async function refreshPulse() {
+  let stats = null, jobs = [];
+  try { const r = await fetch('bridge/stats?_=' + Date.now()); if (r.ok) stats = await r.json(); } catch {}
+  try { jobs = ((await (await fetch('bridge/jobs?_=' + Date.now())).json()).jobs) || []; } catch {}
+
+  const tiers = {}, vias = {}, whos = {}, depths = {};
+  let reqTotal = 0;
+  if (stats && stats.total) {
+    for (const [k, v] of Object.entries(stats.total)) {
+      const f = k.slice(0, k.indexOf(':')), val = k.slice(k.indexOf(':') + 1);
+      if (f === 'tier') { tiers[val] = v; reqTotal += v; }
+      else if (f === 'via') vias[val] = v;
+      else if (f === 'who') whos[val] = (whos[val] || 0) + v;
+      else if (f === 'depth') depths[val] = v;
+    }
+  }
+  const last30 = [...Array(30)].map((_, i) => new Date(Date.now() - (29 - i) * 864e5));
+  const reqDays = last30.map(d => {
+    const iso = localISO(d), day = (stats && stats.days && stats.days[iso]) || {};
+    const parts = {};
+    for (const t of ['command', 'answer', 'agent', 'hermes']) if (day['tier:' + t]) parts[t] = day['tier:' + t];
+    return { label: iso, short: String(d.getDate()), parts,
+             total: Object.values(parts).reduce((a, b) => a + b, 0) };
+  });
+  const noteDays = last30.map(d => {
+    const iso = localISO(d), n = notesIdx.filter(x => localISO(new Date(x.mtime * 1000)) === iso).length;
+    return { label: iso, short: String(d.getDate()), parts: { notes: n }, total: n };
+  });
+  const jobsDone = jobs.filter(j => j.status === 'done').length;
+  const jobsFail = jobs.filter(j => j.status === 'failed').length;
+  const successRate = (jobsDone + jobsFail) ? Math.round(jobsDone / (jobsDone + jobsFail) * 100) : 0;
+
+  /* tiles */
+  const tileDefs = [
+    ['neurons', gData ? gData.nodes.length : 0, '', '#8a7dff'],
+    ['synapses', gData ? gData.links.length : 0, '', '#2de2e6'],
+    ['notes', notesIdx.length, '', '#5ad1a0'],
+    ['requests', reqTotal, '', '#ff4fa3'],
+    ['jobs done', jobsDone, '', '#e8c47a'],
+    ['job success', successRate, '%', '#39d0ff'],
+  ];
+  $('ptiles').innerHTML = tileDefs.map(([l, v, s, c], i) =>
+    `<div class="ptile" style="--tc:${c}"><b id="pt-${i}">–</b><span>${l}</span></div>`).join('');
+  tileDefs.forEach(([l, v, s], i) => { if (v || l === 'requests' && stats) countup($('pt-' + i), v, s); else if (l !== 'requests') countup($('pt-' + i), v, s); });
+  if (!stats) $('pt-3').textContent = '–';
+
+  /* cards */
+  const noStats = '<div class="ghost">no bridge stats yet — they appear after heimdall is rebuilt on this code and the first requests are routed</div>';
+  const tierParts = ['command', 'answer', 'agent', 'hermes'].map(t => ({ label: t, v: tiers[t] || 0, c: TIER_C[t] }));
+  const viaParts = ['jev', 'rules', 'direct'].filter(v => vias[v]).map(v => ({ label: 'sorted by ' + v, v: vias[v], c: v === 'jev' ? '#2de2e6' : '#e8c47a' }));
+  const whoRows = Object.entries(whos).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([w, v], i) => ({ label: WHO_PRETTY[w] || w, v, c: WHO_C[i % WHO_C.length] }));
+  const folderCounts = {};
+  for (const n of notesIdx) folderCounts[n.folder || 'root'] = (folderCounts[n.folder || 'root'] || 0) + 1;
+  const vaultParts = Object.entries(folderCounts).sort((a, b) => b[1] - a[1])
+    .map(([f, v]) => ({ label: f, v, c: FOLDER[f] || '#7f8cff' }));
+  if (gData) vaultParts.push({ label: 'code nodes', v: gData.nodes.filter(n => n.source === 'code').length, c: '#39d0ff' });
+  const comm = {};
+  if (gData) for (const n of gData.nodes) {
+    if (n.community == null) continue;
+    const c = comm[n.community] = comm[n.community] || { n: 0, top: null };
+    c.n++;
+    if (!c.top || (n.val || 0) > (c.top.val || 0)) c.top = n;
+  }
+  const commRows = Object.values(comm).sort((a, b) => b.n - a.n).slice(0, 8)
+    .map((c, i) => ({ label: (c.top.label || c.top.id || '?'), v: c.n, c: WHO_C[i % WHO_C.length] }));
+  const agentCounts = {};
+  for (const j of jobs) agentCounts[j.agent] = (agentCounts[j.agent] || 0) + 1;
+  const jobParts = [['done', jobsDone, '#5ad1a0'], ['failed', jobsFail, '#ff5c6c'],
+    ['running', jobs.filter(j => j.status === 'running').length, '#2de2e6']].map(([label, v, c]) => ({ label, v, c }));
+  const jevPct = reqTotal && vias.jev ? Math.round(vias.jev / (vias.jev + (vias.rules || 0)) * 100) : null;
+
+  $('pgrid').innerHTML = `
+    <div class="pcard"><div class="pt"><i>▲</i> requests per day · stacked by tier</div>
+      <div class="pbody" style="flex-direction:column">${stats ? vbars(reqDays, 120, TIER_C)
+        + `<div class="plegend">${tierParts.map(p => `<span><i style="background:${p.c}"></i>${p.label}</span>`).join('')}</div>` : noStats}</div></div>
+    <div class="pcard"><div class="pt"><i>◉</i> routing mix · who handles requests</div>
+      <div class="pbody"><div class="prow2">${stats ? donut(tierParts, 132, 'requests')
+        + (viaParts.length ? donut(viaParts, 100, 'router') : '') : noStats}</div></div>
+      ${stats ? `<div class="pfoot">deep answers: ${depths.deep || 0} · jev sorts ${jevPct == null ? '–' : jevPct + '%'} of traffic, rules cover the rest</div>` : ''}</div>
+    <div class="pcard"><div class="pt"><i>⌁</i> who answers · models + agents</div>
+      <div class="pbody" style="align-items:flex-start">${stats ? (whoRows.length ? `<div style="width:100%">${hbars(whoRows)}</div>` : '<div class="ghost">no requests routed yet</div>') : noStats}</div></div>
+    <div class="pcard"><div class="pt"><i>✎</i> notes written per day · 30 days</div>
+      <div class="pbody" style="flex-direction:column">${vbars(noteDays, 120, TIER_C)}
+        <div class="pfoot">${notesIdx.filter(n => Date.now() / 1000 - n.mtime < 86400).length} notes touched in the last 24 h</div></div></div>
+    <div class="pcard"><div class="pt"><i>◈</i> vault composition · where memory lives</div>
+      <div class="pbody"><div class="prow2">${donut(vaultParts, 132, 'nodes')}
+        <div class="plegend" style="flex-direction:column;gap:5px">${vaultParts.slice(0, 7).map(p => `<span><i style="background:${p.c}"></i>${esc(p.label)} · ${p.v}</span>`).join('')}</div></div></div></div>
+    <div class="pcard"><div class="pt"><i>✦</i> largest communities · graph clusters</div>
+      <div class="pbody" style="align-items:flex-start">${gData ? `<div style="width:100%">${hbars(commRows)}</div>` : '<div class="ghost">graph not loaded yet</div>'}</div></div>
+    <div class="pcard"><div class="pt"><i>⚙</i> agent jobs · outcomes + workers</div>
+      <div class="pbody"><div class="prow2">${donut(jobParts, 110, 'jobs')}
+        <div style="flex:1;min-width:130px">${hbars(Object.entries(agentCounts).map(([a, v], i) =>
+          ({ label: a, v, c: a === 'hermes' ? '#e8c47a' : '#ff4fa3' }))) || ''}</div></div></div>
+      <div class="pfoot">${jobs.length} jobs in the store · oldest are pruned by the bridge</div></div>`;
+}
+
+/* ── nexus: how everything talks together ─────────────── */
+var nexusBuilt = false;
+const NODES = {
+  you:      { x:120,  y:300, w:130, name:'you', sub:'voice + keys', desc:'Christina at mjolnir — talking or typing into the brain.' },
+  ui:       { x:330,  y:130, w:150, name:'brain ui', sub:'this dashboard', desc:'The page you are looking at. Served by heimdall out of the nix store; talks only to the bridge.' },
+  bridge:   { x:540,  y:300, w:176, hub:true, name:'bridge', sub:'heimdall · :8093', desc:'The front door. Every request passes through here — Jev sorts it, a tier executes it, everything is logged back into the vault.' },
+  huginn:   { x:330,  y:480, w:160, name:'huginn', sub:'agents · heimdall', desc:'The ravens: inbox sweep, daily digest, gardener, dead-link fixer, graphify runs, brain-build — on timers and events.' },
+  jev:      { x:770,  y:95,  w:160, name:'jev', sub:'router · openrouter', desc:'A tiny classifier that reads each request and picks command / answer / agent with confidence scores, in a few hundred ms.' },
+  minimax:  { x:770,  y:215, w:170, name:'minimax', sub:'floor model · openrouter', desc:'The always-on fallback: answers when no subscription is reachable, and titles every agent report for filing.' },
+  answers:  { x:770,  y:390, w:186, name:'codex + claude', sub:'answer tiers · heimdall clis', desc:'Light answers from GPT (Codex subscription), deep analysis from Opus (Claude subscription). Codex also runs the local agent tier, sandboxed to the vault.' },
+  hermes:   { x:1005, y:120, w:160, name:'hermes', sub:'hermod · :8642', desc:'Tool-using agent on its own VM: web research, investigations, deliverables the bridge files as reports.' },
+  voice:    { x:1005, y:300, w:176, name:'whisper + kokoro', sub:'mimir · :8000', desc:'Ears and mouth: faster-whisper speech-to-text and Kokoro text-to-speech on the AI box.' },
+  vault:    { x:540,  y:530, w:170, name:'vault', sub:'odyn · zfs over nfs', desc:'The Obsidian vault — everything the OS remembers. Lives on the TrueNAS, mounted into heimdall.' },
+  graphify: { x:810,  y:520, w:170, name:'graphify', sub:'knowledge graphs · mcp', desc:'Builds the vault and dotfiles graphs. Claude Code, hermes and mimir query them over ssh.' },
+};
+const EDGES = [
+  { id:'e1',  a:'you',    b:'ui',       label:'https · brain.oryxserver.org',   c:'#2de2e6', bend:.16 },
+  { id:'e2',  a:'ui',     b:'bridge',   label:'json · /bridge/*',               c:'#2de2e6', bend:.14 },
+  { id:'e3',  a:'bridge', b:'jev',      label:'every request · pick a tier',    c:'#2de2e6', bend:.15 },
+  { id:'e4',  a:'bridge', b:'minimax',  label:'fallback answers · titles',      c:'#8a7dff', bend:.12 },
+  { id:'e5',  a:'bridge', b:'answers',  label:'light = gpt · deep = opus',      c:'#8a7dff', bend:.12 },
+  { id:'e6',  a:'bridge', b:'hermes',   label:'agent tier · /v1/responses',     c:'#ff4fa3', bend:.18 },
+  { id:'e7',  a:'bridge', b:'voice',    label:'stt · tts',                      c:'#ff4fa3', bend:.12 },
+  { id:'e8',  a:'bridge', b:'vault',    label:'talk logs · reports',            c:'#e8c47a', bend:.10 },
+  { id:'e9',  a:'huginn', b:'vault',    label:'reads · files · sweeps',         c:'#e8c47a', bend:.15 },
+  { id:'e10', a:'graphify', b:'vault',  label:'indexes notes + config',         c:'#e8c47a', bend:.12 },
+  { id:'e11', a:'ui',     b:'vault',    label:'reads built snapshots',          c:'#e8c47a', bend:-.22 },
+];
+const LANES = [
+  { x:40,  y:60,  w:160, h:480, t:'mjolnir · you' },
+  { x:240, y:60,  w:400, h:480, t:'heimdall · the brain' },
+  { x:680, y:40,  w:210, h:430, t:'cloud + subscriptions' },
+  { x:915, y:60,  w:180, h:150, t:'hermod' },
+  { x:915, y:240, w:180, h:150, t:'mimir' },
+  { x:440, y:480, w:520, h:110, t:'odyn · storage' },
+];
+var nodeStatus = {};
+
+function edgePathD(a, b, bend) {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const cx = (a.x + b.x) / 2 - dy / len * len * bend, cy = (a.y + b.y) / 2 + dx / len * len * bend;
+  return { d: `M${a.x},${a.y} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x},${b.y}`, len };
+}
+
+function buildNexus() {
+  let s = LANES.map(l => `<rect class="nlane" x="${l.x}" y="${l.y}" width="${l.w}" height="${l.h}" rx="14"/>
+    <text class="nlanet" x="${l.x + 14}" y="${l.y + 22}">${esc(l.t)}</text>`).join('');
+  for (const e of EDGES) {
+    const { d, len } = edgePathD(NODES[e.a], NODES[e.b], e.bend);
+    const dur = Math.max(3, len / 55).toFixed(1);
+    s += `<path id="p-${e.id}" data-e="${e.id}" class="nedge" d="${d}" style="stroke:${e.c};color:${e.c}"/>
+      <text class="nlabel" data-e="${e.id}" dy="-4"><textPath href="#p-${e.id}" startOffset="50%" text-anchor="middle">${esc(e.label)}</textPath></text>
+      <circle class="nflow" r="2.4" fill="${e.c}"><animateMotion dur="${dur}s" repeatCount="indefinite"><mpath href="#p-${e.id}"/></animateMotion></circle>
+      <circle class="nflow" r="1.6" fill="${e.c}" opacity=".5"><animateMotion dur="${dur}s" begin="-${(dur / 2).toFixed(1)}s" repeatCount="indefinite"><mpath href="#p-${e.id}"/></animateMotion></circle>`;
+  }
+  for (const [id, n] of Object.entries(NODES)) {
+    s += `<g class="nnode${n.hub ? ' hub' : ''}" data-n="${id}" transform="translate(${n.x},${n.y})">
+      ${n.hub ? `<rect class="nbox2" x="${-n.w/2 - 7}" y="-33" width="${n.w + 14}" height="66" rx="15"/>` : ''}
+      <rect class="nbox" x="${-n.w/2}" y="-26" width="${n.w}" height="52" rx="11"/>
+      <text class="nname" y="-2">${esc(n.name)}</text><text class="nsub" y="14">${esc(n.sub)}</text>
+      <circle class="ndot unknown" cx="${n.w/2 - 13}" cy="-14" r="4"/></g>`;
+  }
+  $('nexus-svg').innerHTML = s;
+  const tip = $('ntip'), panel = $('nexus-svg').closest('.panel');
+  const svg = $('nexus-svg');
+  svg.addEventListener('mousemove', e => {
+    const g = e.target.closest('.nnode');
+    if (!g) { tip.style.display = 'none'; return; }
+    const n = NODES[g.dataset.n], st = nodeStatus[g.dataset.n] || 'unknown';
+    tip.innerHTML = `<div class="nt-n">${esc(n.name)}</div><div class="nt-s">${esc(n.sub)}</div>${esc(n.desc)}
+      <div class="nt-st ${st}">${st === 'ok' ? '● healthy' : st === 'bad' ? '● unreachable' : '○ not probed'}</div>`;
+    const pr = panel.getBoundingClientRect();
+    let tx = e.clientX - pr.left + 18, ty = e.clientY - pr.top - 10;
+    if (tx > pr.width - 270) tx -= 290;
+    if (ty > pr.height - 120) ty -= 110;
+    tip.style.left = tx + 'px'; tip.style.top = ty + 'px'; tip.style.display = 'block';
+  });
+  svg.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  nexusBuilt = true;
+}
+
+function nexusStatus() {
+  if (!nexusBuilt) return;
+  const h = health || {};
+  const agents = (lastActData && lastActData.agents) || [];
+  const failed = agents.filter(a => a.result && a.result !== 'success' && a.result !== 'unknown');
+  nodeStatus = {
+    you: 'ok', ui: h.ok ? 'ok' : 'bad', bridge: h.ok ? 'ok' : 'bad',
+    jev: h.jev ? 'ok' : 'bad', minimax: h.llm ? 'ok' : 'bad',
+    answers: (h.codex || h.claude) ? 'ok' : 'bad',
+    hermes: h.hermes ? 'ok' : 'unknown',
+    voice: h.voice ? 'ok' : 'bad',
+    huginn: agents.length ? (failed.length ? 'bad' : 'ok') : 'unknown',
+    vault: h.index ? 'ok' : 'bad',
+    graphify: h.index ? 'ok' : 'unknown',
+  };
+  document.querySelectorAll('#nexus-svg .nnode').forEach(g => {
+    const dot = g.querySelector('.ndot');
+    if (dot) dot.setAttribute('class', 'ndot ' + (nodeStatus[g.dataset.n] || 'unknown'));
+  });
+}
+
+function nexusFlashIds(ids, ms) {
+  if (!nexusBuilt) return;
+  const lit = [];
+  ids.forEach(id => {
+    document.querySelectorAll(`#nexus-svg [data-e="${id}"]`).forEach(el => { el.classList.add('hot'); lit.push(el); });
+  });
+  setTimeout(() => lit.forEach(el => el.classList.remove('hot')), ms || 5000);
+}
+
+function nexusFlash(route, model) {
+  if (!route) return;
+  const ids = ['e1', 'e2'];
+  if (route.via === 'jev') ids.push('e3');
+  if (route.tier === 'agent') ids.push(route.selected_executor === 'codex' ? 'e5' : 'e6');
+  else if (route.tier === 'answer') ids.push((model || '').toLowerCase().includes('minimax') ? 'e4' : 'e5');
+  nexusFlashIds(ids, 5200);
+}
+
+function nexusInit() {
+  if (!nexusBuilt) buildNexus();
+  nexusStatus();
+}
 
 /* ── toast: report filed (click to open) ── */
 function toast(html, onclick) {
