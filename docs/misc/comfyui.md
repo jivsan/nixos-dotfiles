@@ -5,7 +5,7 @@ Image generation runs on **two** hosts that share one model library on odyn:
 | host | GPU | ComfyUI | torch | starts |
 |---|---|---|---|---|
 | **mjolnir** (workstation) | RTX 4060 Ti 8G (Ada, sm_89) | v0.28.2 | 2.11.0+cu128 | on demand |
-| **mimir** 10.0.20.18 | GTX 1070 8G (Pascal, sm_61) | v0.28.2 | **2.6.0+cu126** | at boot |
+| **mimir** 10.0.20.18 | RTX 5070 Ti 16G (Blackwell, sm_120) | v0.28.2 | 2.11.0+cu128 | at boot |
 
 ```
 you (browser) ──▶ http://127.0.0.1:8188              (mjolnir, loopback only)
@@ -15,7 +15,7 @@ you (browser) ──▶ http://127.0.0.1:8188              (mjolnir, loopback on
            ├─ ~/comfyui                 ← odyn NFS, visible in Nautilus
            └─ /var/lib/comfyui/{user,temp}   ← host-local
 
-  mimir    ├─ podman: comfyui  (GTX 1070 via CDI)
+  mimir    ├─ podman: comfyui  (RTX 5070 Ti via CDI)
            ├─ /mnt/odyn/comfyui         ← same odyn NFS export
            └─ /var/lib/comfyui/{user,temp}   ← host-local
 
@@ -50,19 +50,15 @@ ultralytics/bbox/  ultralytics/segm/  sams/  insightface/  ipadapter/
 No scp, no ssh — both hosts read the same directory. Files land on odyn owned by
 `christina` uid 3002; that's the export's `mapall`, not a permissions bug.
 
-## The Pascal rule (mimir only — read before upgrading)
+## The Blackwell rule (mimir only — read before changing the driver)
 
-The GTX 1070 is **Pascal (sm_61)**. mimir's torch is pinned **2.6.0+cu126**, the last line
-shipping Pascal kernels, via a pip constraints file — an incompatible bump **fails the
-build loudly** instead of producing an image that can't see the GPU.
+The RTX 5070 Ti is **Blackwell (sm_120)**. It only binds with the **open** NVIDIA kernel
+modules, so `nvidia.nix` sets `open = true` on `nvidiaPackages.stable` (595.x). mimir's torch
+is pinned **2.11.0+cu128**, same as mjolnir, via a pip constraints file — an incompatible
+bump **fails the build loudly** instead of producing an image that can't see the GPU.
 
-The **ComfyUI version is independent of that pin.** 0.28.2 runs fine on torch 2.6: the only
-gate in `model_management.py` is a `>= (2, 7)` check guarding an optional optimization that
-upstream notes "works on 2.6 but doesn't actually seem to improve much." So keep both hosts
-on the same ComfyUI, and leave mimir's torch alone until the GPU changes.
-
-mimir's driver is `legacy_580` (`nvidia.nix`) — NVIDIA dropped Pascal after the 580 branch,
-so `nvidiaPackages.stable` (595.x) will not bind. Revert to `stable` when the 3090 lands.
+The old GTX 1070 (Pascal, sm_61) does not work with this config: it needs `legacy_580`,
+`open = false` and torch 2.6.0+cu126.
 
 ## ComfyUI-Manager (the non-obvious part)
 
@@ -108,7 +104,7 @@ sudo nixos-rebuild switch --flake ~/nixos-dotfiles#<host>   # --pull=never + aut
 ```
 mjolnir's copy lives at `modules/apps/comfyui/`; mimir's at
 `hosts/mimir/modules/system/comfyui/`. **Do not copy one Containerfile over the other** —
-they pin different torch builds.
+they differ in how the container is set up.
 
 **Add a permanent custom node**: on mjolnir just install it from Manager — it persists (see
 below). To pin one declaratively (or on mimir), add a `git clone` + `pip install -r` layer to
@@ -135,8 +131,8 @@ requires a restart, and the restart deleted it. Two volumes fix it:
   automatically if the image's python minor version changes (`.pyver` marker) — a venv built
   against a different python silently fails to import everything.
 
-Both are host-local on purpose: this is Python compiled against a specific torch (2.11 on
-mjolnir vs 2.6 on mimir), so the hosts must **not** share it via odyn.
+Both are host-local on purpose: this is Python compiled against a specific torch, so the
+hosts must **not** share it via odyn.
 
 ## Secrets (never in git)
 

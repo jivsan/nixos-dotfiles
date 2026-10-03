@@ -19,7 +19,6 @@
     ../../modules/apps/remote.nix
     ../../modules/apps/claude-code.nix
     ../../modules/apps/codex.nix
-    ../../modules/apps/hermes-agent.nix    # Hermes Agent (Nous Research) → OpenRouter, `hermes` CLI
     ../../modules/apps/telegram.nix
     ../../modules/apps/wowexport.nix
     ../../modules/apps/blender.nix

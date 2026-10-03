@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, pkgs-unstable, ... }:
 {
   imports = [
     ./hardware-configuration.nix
@@ -17,11 +17,11 @@
                                          # 2026-07; models live on odyn now. Kept (not
                                          # deleted) for the pinned hostId + brunnr plan.
     ./modules/system/immich-ml.nix
-    ./modules/system/ollama.nix
-    ./modules/system/open-webui.nix
     ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];
+
+  boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
 
   networking.hostName = "mimir";
   networking.useDHCP = false;

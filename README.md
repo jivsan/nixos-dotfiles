@@ -14,7 +14,7 @@ All hosts sit on VLAN 20 (`10.0.20.0/24`); the VMs run on `hella` (Proxmox).
 |----------------|---------------|-------------------------------------------------|-------------------------------------------|
 | `mjolnir`      | `10.0.20.100` | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
 | `heimdall`     | `10.0.20.17`  | Headless self-hosted services VM — Traefik, Immich, Paperless, Vaultwarden, Grafana, huginn | — |
-| `mimir`        | `10.0.20.18`  | Headless AI box (5950X, GTX 1070 — RTX 3090 pending) — Ollama, Open-WebUI, ComfyUI, Immich-ML | — |
+| `mimir`        | `10.0.20.18`  | Headless AI box (5950X, GTX 1070 — RTX 5070 Ti pending) — ComfyUI, Immich-ML | — |
 | `tyr`          | `10.0.20.19`  | Headless testing / sandbox VM — deliberately minimal | —                          |
 | `njord`        | `10.0.20.20`  | Headless finance VM — [Sure](https://github.com/we-promise/sure), isolated from the rest of the fleet | — |
 

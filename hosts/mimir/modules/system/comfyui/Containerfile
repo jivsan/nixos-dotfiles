@@ -1,14 +1,8 @@
-# ComfyUI for mimir's GTX 1070 (Pascal, sm_61).
+# ComfyUI for mimir's RTX 5070 Ti (Blackwell, sm_120).
 #
-# torch is pinned to 2.6.0+cu126 — the last line with solid Pascal support.
-# Bump TORCH consciously: newer torch/CUDA builds drop Pascal kernels.
-#
-# The ComfyUI version is NOT tied to that pin. 0.28.2 runs fine on torch 2.6:
-# the only version gate in model_management.py is a `>= (2, 7)` check guarding
-# an optional optimization ("works on 2.6 but doesn't actually seem to improve
-# much"). So this tracks mjolnir's ComfyUI/Manager versions while keeping the
-# Pascal-safe torch — the two hosts share one model library on odyn, and
-# matching versions keep workflows portable between them.
+# torch tracks mjolnir's pin (2.11.0+cu128), as do the ComfyUI/Manager
+# versions — the two hosts share one model library on odyn, and matching
+# versions keep workflows portable between them.
 #
 # Build on mimir:  ./build.sh   → localhost/comfyui:<version>
 # (Self-built local image = pinned by construction; nothing is pulled at runtime.)
@@ -19,18 +13,17 @@ ARG COMFYUI_VERSION=v0.28.2
 ARG IMPACT_PACK_VERSION=8.28
 ARG IMPACT_SUBPACK_VERSION=1.3.4
 ARG MANAGER_VERSION=4.2.2
-ARG TORCH_INDEX=https://download.pytorch.org/whl/cu126
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cu128
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git libgl1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
-# Constraints stop any transitive dep from silently replacing the cu126 torch
-# with a Pascal-less build. If a future ComfyUI needs newer torch, the build
-# fails loudly here instead.
-RUN printf 'torch==2.6.0\ntorchvision==0.21.0\ntorchaudio==2.6.0\n' > /tmp/constraints.txt \
+# Constraints stop any transitive dep from silently replacing the cu128 torch.
+# If a future ComfyUI needs newer torch, the build fails loudly here instead.
+RUN printf 'torch==2.11.0\ntorchvision==0.26.0\ntorchaudio==2.11.0\n' > /tmp/constraints.txt \
  && pip install --no-cache-dir --extra-index-url ${TORCH_INDEX} \
-      -c /tmp/constraints.txt torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0
+      -c /tmp/constraints.txt torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0
 
 RUN git clone --depth 1 --branch ${COMFYUI_VERSION} \
       https://github.com/comfyanonymous/ComfyUI.git /app/ComfyUI \
