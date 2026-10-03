@@ -13,6 +13,12 @@
 #                      (no .obsidian plugin JS) → /var/lib/huginn/graphs/vault (nightly)
 #   • gardener       — weekly vault hygiene report: orphans, dead links, stale notes
 #   • dead-link-fixer — weekly brain-API sweep: find broken wikilinks, create stub notes
+#   • morning-brief  — MiniMax overnight briefing into today's journal (daily 07:45)
+#   • weeknote       — MiniMax weekly review from the week's journals (Sundays 18:00)
+#   • todo-board     — regathers every open checkbox into MOCs/TODO MOC.md (daily 07:00)
+#   • resurface      — three >90-day-old notes back into today's journal (daily 09:00)
+#   • unlinked-mentions — offline weave check: plain-text mentions that could be links
+#   • health-report  — heimdall health note: failed units, timers, disk, memory
 #
 # Cross-cutting: every vault-writing agent auto-commits the vault git repo
 # (audit trail, author huginn), and every huginn unit has OnFailure= wired to
@@ -339,6 +345,236 @@ let
     '';
   };
 
+  # ── morning brief (MiniMax, daily 07:45) — overnight facts into today's journal ──
+  # Idempotent: a rerun replaces the brief block only, leaving the rest of the
+  # journal note (and the 23:00 digest appended below it) untouched.
+  morningBrief = pkgs.writeShellApplication {
+    name = "huginn-morning-brief";
+    runtimeInputs = [ llm vaultCommit pkgs.coreutils pkgs.findutils pkgs.gnused pkgs.gawk pkgs.git pkgs.systemd ];
+    text = ''
+      : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      today="$(date +%F)"
+      yesterday="$(date -d yesterday +%F)"
+      journal="${vault}/journal/$today.md"
+      log(){ echo "[$(date -Iseconds)] $*" | tee -a "$logdir/morning-brief.log"; }
+      log "morning-brief start (minimax)"
+      changed="$(find "${vault}" -type f -name '*.md' \
+        -newermt "$yesterday 00:00:00" ! -newermt "$today 00:00:00" \
+        -not -path '*/.obsidian/*' -not -path '*/agents/*' -not -path '*/_templates/*' \
+        -not -path '*/graphify-out/*' -not -path '*/journal/*' -not -path '*/_inbox/*' \
+        -not -name 'README.md' 2>/dev/null | sed 's|.*/||; s|\.md$||' | sort | head -40 || true)"
+      inbox_n="$(find "${vault}/_inbox" -maxdepth 1 -type f -name '*.md' ! -name README.md 2>/dev/null | wc -l)"
+      failed="$(systemctl list-units --failed --no-legend 2>/dev/null | wc -l)"
+      commits="0"
+      if [ -d "${vault}/.git" ]; then
+        commits="$(git -C "${vault}" log --since="$yesterday 00:00:00" --oneline 2>/dev/null | wc -l)"
+      fi
+      mkdir -p "${vault}/journal"
+      [ -f "$journal" ] || printf -- '---\ntype: journal\ncreated: %s\nagent: huginn\n---\n\n# %s\n' "$today" "$today" > "$journal"
+      awk '/^## morning brief/{skip=1; next} skip && /^## /{skip=0} !skip' "$journal" > "$journal.tmp" \
+        && mv "$journal.tmp" "$journal"
+      ctx="Notes changed yesterday:
+''${changed:-none}
+
+Inbox captures waiting: $inbox_n
+Vault git commits since yesterday: $commits
+Failed systemd units on heimdall: $failed"
+      sys="You are huginn writing Christina's morning briefing in her Obsidian vault. From the overnight facts, write a warm, concise brief: one greeting line, then 3-5 markdown bullets. Wikilink note names as [[Note Name]] exactly as listed. If nothing happened overnight, say so cheerfully in one line. Output only the brief, no preamble."
+      brief="$(printf '%s' "$ctx" | muninn-llm "$sys")"
+      [ -n "$brief" ] || brief="Overnight: $inbox_n capture(s) waiting, $commits vault commit(s), $failed failed unit(s). (brief model returned nothing.)"
+      printf '\n## morning brief (%s)\n%s\n' "$(date +%H:%M)" "$brief" >> "$journal"
+      muninn-vault-commit "huginn: morning brief for $today"
+      log "morning-brief done ($inbox_n inbox, $commits commits, $failed failed)"
+    '';
+  };
+
+  # ── weeknote (MiniMax, Sundays 18:00) — the week's journals → journal/YYYY-Www.md ──
+  # Fully regenerated each run, so a manual rerun after a quiet Sunday re-weaves
+  # the same week rather than stacking a second note.
+  weeknote = pkgs.writeShellApplication {
+    name = "huginn-weeknote";
+    runtimeInputs = [ llm vaultCommit pkgs.coreutils pkgs.findutils pkgs.gnused ];
+    text = ''
+      : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      week="$(date +%G-W%V)"
+      note="${vault}/journal/$week.md"
+      log(){ echo "[$(date -Iseconds)] $*" | tee -a "$logdir/weeknote.log"; }
+      log "weeknote start for $week (minimax)"
+      ctx=""
+      while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        ctx="$ctx"$'\n'"--- $(basename "$f" .md) ---"$'\n'"$(sed '/^---$/,/^---$/d' "$f" | head -c 1200)"
+      done < <(find "${vault}/journal" -maxdepth 1 -name '20*.md' -mtime -8 2>/dev/null | sort | head -14)
+      ncount="$(find "${vault}" -type f -name '*.md' -mtime -7 \
+        -not -path '*/.obsidian/*' -not -path '*/agents/*' -not -path '*/_templates/*' \
+        -not -path '*/graphify-out/*' 2>/dev/null | wc -l)"
+      mkdir -p "${vault}/journal"
+      printf -- '---\ntype: journal\nagent: huginn\nweek: %s\ncreated: %s\n---\n\n# Week %s\n' \
+        "$week" "$(date -Iseconds)" "$week" > "$note"
+      if [ -z "$ctx" ]; then
+        body="- A quiet week — no journal entries."
+      else
+        sys="You are huginn writing Christina's weekly review in her Obsidian vault. From this week's journal entries, write three sections: '## Highlights' with 3-6 bullets (wikilink notes as [[Name]] exactly as written), '## Threads' naming 2-3 ongoing themes, and '## Open loops' with anything left unfinished. Concise and warm, no preamble."
+        body="$(printf 'Notes touched in the last 7 days: %s\n%s' "$ncount" "$ctx" | muninn-llm "$sys")"
+        [ -n "$body" ] || body="- ($ncount notes touched this week; the review model returned nothing.)"
+      fi
+      printf '%s\n\n[[Home MOC]]\n' "$body" >> "$note"
+      muninn-vault-commit "huginn: weeknote $week"
+      log "weeknote done → journal/$week.md ($ncount notes this week)"
+    '';
+  };
+
+  # ── todo-board (daily 07:00) — every open checkbox → MOCs/TODO MOC.md ──
+  # Offline; only rewrites the MOC when the gathered set actually changed, so
+  # quiet days leave no commit churn.
+  todoBoard = pkgs.writeShellApplication {
+    name = "huginn-todo-board";
+    runtimeInputs = [ vaultCommit pkgs.coreutils pkgs.gnugrep pkgs.gawk ];
+    text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      moc="${vault}/MOCs/TODO MOC.md"
+      mkdir -p "${vault}/MOCs"
+      tmp="$(mktemp)"
+      {
+        printf -- '---\ntype: moc\nagent: huginn\nupdated: %s\n---\n\n' "$(date -Iseconds)"
+        echo '# TODO MOC'
+        echo
+        echo 'Every open checkbox in the vault, regathered nightly by huginn.'
+        echo
+        grep -rn --include='*.md' -E '^[[:space:]]*[-*] \[ \]' "${vault}" \
+          --exclude-dir=.obsidian --exclude-dir=.git --exclude-dir=.trash \
+          --exclude-dir=agents --exclude-dir=_templates --exclude-dir=graphify-out \
+          --exclude-dir=_inbox 2>/dev/null \
+          | grep -v "^${vault}/MOCs/TODO MOC.md:" \
+          | sort \
+          | awk -F: -v v="${vault}/" '{
+              f = $1; sub(v, "", f)
+              $1 = ""; $2 = ""; sub(/^::/, "")
+              if (f != prev) {
+                if (prev != "") print ""
+                n = f; sub(/\.md$/, "", n); gsub(".*/", "", n)
+                printf "## [[%s]]\n_%s_\n", n, f
+                prev = f
+              }
+              sub(/^[[:space:]]*/, "")
+              print
+            }' \
+          || true
+      } > "$tmp"
+      open_n="$(grep -c '^[-*] \[ \]' "$tmp" || true)"
+      if [ -f "$moc" ] && cmp -s "$tmp" "$moc"; then
+        rm -f "$tmp"
+        echo "[$(date -Iseconds)] todo-board: unchanged ($open_n open)" | tee -a "$logdir/todo-board.log"
+      else
+        chmod 0644 "$tmp"   # the vault must stay group-readable over the odyn NFS mapall
+        mv "$tmp" "$moc"
+        muninn-vault-commit "huginn: TODO board refresh ($open_n open)"
+        echo "[$(date -Iseconds)] todo-board: $open_n open loops → MOCs/TODO MOC.md" | tee -a "$logdir/todo-board.log"
+      fi
+    '';
+  };
+
+  # ── resurface (daily 09:00) — three forgotten notes back into the journal ──
+  # Spaced repetition for a personal vault: pure chance, no LLM, idempotent per day.
+  resurface = pkgs.writeShellApplication {
+    name = "huginn-resurface";
+    runtimeInputs = [ vaultCommit pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.gawk ];
+    text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      today="$(date +%F)"
+      journal="${vault}/journal/$today.md"
+      log(){ echo "[$(date -Iseconds)] $*" | tee -a "$logdir/resurface.log"; }
+      log "resurface start"
+      picks="$(find "${vault}" -type f -name '*.md' -mtime +90 \
+        -not -path '*/.obsidian/*' -not -path '*/agents/*' -not -path '*/_templates/*' \
+        -not -path '*/graphify-out/*' -not -path '*/journal/*' -not -path '*/_inbox/*' \
+        -not -path '*/MOCs/*' -not -path '*/Resources/Reports/*' -not -name 'README.md' 2>/dev/null \
+        | shuf -n 3 || true)"
+      if [ -z "$picks" ]; then
+        log "resurface: vault too young — nothing older than 90 days"
+        exit 0
+      fi
+      mkdir -p "${vault}/journal"
+      [ -f "$journal" ] || printf -- '---\ntype: journal\ncreated: %s\nagent: huginn\n---\n\n# %s\n' "$today" "$today" > "$journal"
+      awk '/^## resurfaced memories/{skip=1; next} skip && /^## /{skip=0} !skip' "$journal" > "$journal.tmp" \
+        && mv "$journal.tmp" "$journal"
+      {
+        printf '\n## resurfaced memories (%s)\n' "$(date +%H:%M)"
+        while IFS= read -r f; do
+          [ -n "$f" ] || continue
+          name="$(basename "$f" .md)"
+          snip="$(sed '/^---$/,/^---$/d' "$f" 2>/dev/null | grep -m1 -v '^[[:space:]]*$' | cut -c1-200)"
+          printf -- '- [[%s]] — %s\n' "$name" "$snip"
+        done <<< "$picks"
+      } >> "$journal"
+      muninn-vault-commit "huginn: resurfaced memories for $today"
+      log "resurface done ($(printf '%s' "$picks" | wc -l) notes)"
+    '';
+  };
+
+  # ── unlinked-mentions (Fridays 07:00) — offline weave check ──
+  unlinkedMentions = pkgs.writeShellApplication {
+    name = "huginn-unlinked-mentions";
+    runtimeInputs = [ vaultCommit pkgs.python3 pkgs.coreutils ];
+    text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      {
+        echo "[$(date -Iseconds)] unlinked-mentions start"
+        python3 ${../../muninn/unlinked-mentions.py} --vault "${vault}"
+        muninn-vault-commit "huginn: weekly unlinked-mentions report"
+        echo "[$(date -Iseconds)] unlinked-mentions done"
+      } 2>&1 | tee -a "$logdir/unlinked-mentions.log"
+    '';
+  };
+
+  # ── health-report (Mondays 07:30) — heimdall's own health note, offline ──
+  healthReport = pkgs.writeShellApplication {
+    name = "huginn-health-report";
+    runtimeInputs = [ vaultCommit pkgs.coreutils pkgs.systemd pkgs.procps pkgs.gawk ];
+    text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      day="$(date +%F)"
+      mkdir -p "${vault}/Resources/Reports"
+      report="${vault}/Resources/Reports/health-$day.md"
+      failed="$(systemctl list-units --failed --no-legend 2>/dev/null || true)"
+      {
+        printf -- '---\ntype: report\nagent: huginn\ncreated: %s\n---\n\n' "$(date -Iseconds)"
+        echo "# heimdall health — $day"
+        echo
+        echo '## failed units'
+        echo '```'
+        echo "''${failed:-(none — all quiet)}"
+        echo '```'
+        echo
+        echo '## huginn + muninn timers'
+        echo '```'
+        systemctl list-timers 'huginn-*' 'muninn-*' --no-pager 2>/dev/null || true
+        echo '```'
+        echo
+        echo '## disk'
+        echo '```'
+        df -h / /var/lib "${vault}" 2>/dev/null | awk 'NR == 1 || !seen[$1]++'
+        echo '```'
+        echo
+        echo '## memory'
+        echo '```'
+        free -h
+        echo '```'
+        echo
+        echo '## uptime'
+        echo '```'
+        uptime
+        echo '```'
+        echo
+        echo '[[MOCs/Agents MOC]]'
+      } > "$report" 2>&1
+      muninn-vault-commit "huginn: heimdall health report $day"
+      echo "[$(date -Iseconds)] health-report done → Resources/Reports/health-$day.md" | tee -a "$logdir/health-report.log"
+    '';
+  };
+
   # Common hardening + auth for the LLM-calling jobs.
   agentServiceConfig = {
     Type = "oneshot";
@@ -564,6 +800,136 @@ in
       OnCalendar = "Sun *-*-* 06:00:00";
       Persistent = true;
       RandomizedDelaySec = "15m";
+    };
+  };
+
+  # ── morning brief: overnight facts → today's journal, before the day starts ──
+  systemd.services."huginn-morning-brief" = {
+    description = "huginn: morning briefing into today's journal note";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${morningBrief}/bin/huginn-morning-brief";
+    };
+  };
+  systemd.timers."huginn-morning-brief" = {
+    description = "huginn morning brief schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 07:45:00";
+      Persistent = true;
+      RandomizedDelaySec = "5m";
+    };
+  };
+
+  # ── weeknote: the week's journals woven into a weekly review ──
+  systemd.services."huginn-weeknote" = {
+    description = "huginn: weekly review note from the week's journals";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${weeknote}/bin/huginn-weeknote";
+    };
+  };
+  systemd.timers."huginn-weeknote" = {
+    description = "huginn weeknote schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Sun *-*-* 18:00:00";
+      Persistent = true;
+      RandomizedDelaySec = "15m";
+    };
+  };
+
+  # ── todo-board: every open checkbox in the vault → the TODO MOC ──
+  systemd.services."huginn-todo-board" = {
+    description = "huginn: regather open checkboxes into the TODO MOC";
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${todoBoard}/bin/huginn-todo-board";
+    };
+  };
+  systemd.timers."huginn-todo-board" = {
+    description = "huginn TODO board schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 07:00:00";
+      Persistent = true;
+      RandomizedDelaySec = "5m";
+    };
+  };
+
+  # ── resurface: spaced repetition — forgotten notes back into the journal ──
+  systemd.services."huginn-resurface" = {
+    description = "huginn: resurface three >90-day-old notes into today's journal";
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${resurface}/bin/huginn-resurface";
+    };
+  };
+  systemd.timers."huginn-resurface" = {
+    description = "huginn resurface schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 09:00:00";
+      Persistent = true;
+      RandomizedDelaySec = "10m";
+    };
+  };
+
+  # ── unlinked-mentions: plain-text mentions that could be wikilinks ──
+  systemd.services."huginn-unlinked-mentions" = {
+    description = "huginn: weekly unlinked-mentions weave report";
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${unlinkedMentions}/bin/huginn-unlinked-mentions";
+    };
+  };
+  systemd.timers."huginn-unlinked-mentions" = {
+    description = "huginn unlinked-mentions schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Fri *-*-* 07:00:00";
+      Persistent = true;
+      RandomizedDelaySec = "10m";
+    };
+  };
+
+  # ── health-report: heimdall's own health note (failed units, disk, memory) ──
+  systemd.services."huginn-health-report" = {
+    description = "huginn: weekly heimdall health report into the vault";
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${healthReport}/bin/huginn-health-report";
+    };
+  };
+  systemd.timers."huginn-health-report" = {
+    description = "huginn health report schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "Mon *-*-* 07:30:00";
+      Persistent = true;
+      RandomizedDelaySec = "10m";
     };
   };
 }

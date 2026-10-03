@@ -916,6 +916,60 @@ let Graph = null, gData = null, gGen = -1;
 let gFilter = 'all', gQuery = '', gSel = null;
 const nodeById = new Map();
 const neighById = new Map(); // id -> array of neighbor ids (built from links)
+
+/* ── brain layout: communities become lobes on a flattened twin-hemisphere
+   shell. Notes lobe by vault folder, code by graphify community; a custom
+   d3 force pulls every node toward its lobe's centroid, so the graph reads
+   as one organ of regions instead of sparse dots. ─ */
+const rmq = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const lobeMap = new Map();   // lobeKey -> {x,y,z,color,size}
+function lobeKey(n) {
+  if (n.source === 'code') return 'c' + (n.community != null ? n.community : '?');
+  return 'f' + ((n.rel || '').split('/')[0] || 'root');
+}
+function computeLobes(nodes) {
+  const groups = new Map();   // key -> {color, count}
+  for (const n of nodes) {
+    const k = lobeKey(n);
+    let g = groups.get(k);
+    if (!g) groups.set(k, g = { color: n.color || '#8a7dff', count: 0 });
+    g.count++;
+  }
+  const keys = [...groups.entries()].sort((a, b) => b[1].count - a[1].count).map(e => e[0]);
+  lobeMap.clear();
+  const L = keys.length, R = 120;
+  keys.forEach((k, i) => {
+    const ga = i * 2.399963;                       // golden angle → even spread
+    const y = L === 1 ? 0 : 1 - (2 * i + 1) / L;   // -1..1 top to bottom
+    const rr = Math.sqrt(Math.max(0, 1 - y * y));
+    const side = i % 2 ? 1 : -1;                   // alternate hemispheres
+    const x = Math.cos(ga) * rr * 0.55 + side * 0.5;
+    lobeMap.set(k, { x: x * R, y: y * R * 0.58, z: Math.sin(ga) * rr * R,
+                     color: groups.get(k).color, size: groups.get(k).count });
+  });
+}
+let lobeGlowGroup = null;
+function rebuildLobeGlow() {
+  if (!Graph) return;
+  if (lobeGlowGroup) {
+    Graph.scene().remove(lobeGlowGroup);
+    lobeGlowGroup.traverse(o => { if (o.material) o.material.dispose(); });
+    lobeGlowGroup = null;
+  }
+  if (!lobeMap.size || rmq()) return;
+  lobeGlowGroup = new THREE.Group();
+  for (const L of lobeMap.values()) {
+    if (L.size < 4) continue;
+    const m = new THREE.SpriteMaterial({ map: starTex(L.color, false), transparent: true,
+      depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.055 });
+    const s = new THREE.Sprite(m);
+    const r = 26 + Math.sqrt(L.size) * 7;
+    s.scale.set(r, r, 1);
+    s.position.set(L.x, L.y, L.z);
+    lobeGlowGroup.add(s);
+  }
+  Graph.scene().add(lobeGlowGroup);
+}
 function buildNeighbors(links) {
   neighById.clear();
   for (const l of links) {
@@ -1281,7 +1335,7 @@ function star(n) {
   const m = new THREE.SpriteMaterial({ map: starTex(col, !!n.recent), transparent: true,
     depthWrite: false, blending: THREE.AdditiveBlending, opacity: op });
   const s = new THREE.Sprite(m);
-  const sz = (3.6 + Math.sqrt(n.val || 1) * 2.3) * (n.recent ? 1.7 : 1);
+  const sz = (4.4 + Math.sqrt(n.val || 1) * 2.7) * (n.recent ? 1.7 : 1);
   s.scale.set(sz, sz, 1);
   n.__s = s; n.__sz = sz; n.__op = op;
   // hubs carry their name, so the graph reads as regions rather than dots
@@ -1332,20 +1386,21 @@ function buildGalaxy(el) {
       const s = l.source && l.source.id !== undefined ? l.source : nodeById.get(l.source);
       return fired.has(l) ? '#2de2e6' : (s && s.color) || '#a08cff';
     })
-    .linkOpacity(0.14)
-    .linkWidth(0)
-    .linkCurvature(0.14)
+    .linkOpacity(0.16)
+    .linkWidth(l => fired.has(l) ? 1.4 : hl.has(l) ? 0.9 : 0)
+    .linkCurvature(0.2)
     .linkCurveRotation(l => ((l.index || 0) * 2.399) % (Math.PI * 2))
-    .linkDirectionalParticles(l => hl.has(l) ? 3 : 0)
-    .linkDirectionalParticleWidth(1.9)
-    .linkDirectionalParticleSpeed(0.012)
-    .linkDirectionalParticleColor(l => fired.has(l) ? '#2de2e6' : '#ffffff')
+    .linkDirectionalParticles(l => hl.has(l) ? 3 : fired.has(l) ? 2 : (!rmq() && (l.index || 0) % 6 === 0) ? 1 : 0)
+    .linkDirectionalParticleWidth(l => fired.has(l) ? 2.2 : hl.has(l) ? 1.9 : 1.1)
+    .linkDirectionalParticleSpeed(l => fired.has(l) ? 0.02 : hl.has(l) ? 0.012 : 0.005)
+    .linkDirectionalParticleColor(l => fired.has(l) ? '#2de2e6' : hl.has(l) ? '#ffffff' : '#9fd8ff')
     .onNodeHover(n => {
       hl.clear();
       if (n) for (const l of Graph.graphData().links)
         if ((l.source && l.source.id || l.source) === (n.id||n) || (l.target && l.target.id || l.target) === (n.id||n)) hl.add(l);
       el.style.cursor = n ? 'pointer' : '';
       Graph.linkDirectionalParticles(Graph.linkDirectionalParticles());
+      Graph.linkWidth(Graph.linkWidth());
     })
     .onNodeClick(n => {
       gSel = (n && n.id) || n;
@@ -1354,11 +1409,32 @@ function buildGalaxy(el) {
       const r = 1 + 95 / Math.hypot(n.x || 1, n.y || 1, n.z || 1);
       Graph.cameraPosition({ x: (n.x||0)*r, y: (n.y||0)*r, z: (n.z||0)*r }, n, 820);
     })
-    .warmupTicks(70)
-    .cooldownTime(8500);
-  Graph.d3Force('charge').strength(-52);
+    .warmupTicks(140)
+    .cooldownTime(10000)
+    .d3AlphaDecay(0.028)
+    .d3VelocityDecay(0.42);
+  /* density: weak local repulsion only, short synapses inside a lobe, longer
+     axons between lobes, and a custom force pulling every neuron home. */
+  const chargeF = Graph.d3Force('charge');
+  if (chargeF) chargeF.strength(-34).distanceMax(170);
+  const linkF = Graph.d3Force('link');
+  if (linkF) linkF.distance(l => {
+    const s = typeof l.source === 'object' ? l.source : nodeById.get(l.source);
+    const t = typeof l.target === 'object' ? l.target : nodeById.get(l.target);
+    return (s && t && lobeKey(s) === lobeKey(t)) ? 13 : 30;
+  });
+  Graph.d3Force('lobe', alpha => {
+    const k = 0.055 * alpha;
+    for (const n of Graph.graphData().nodes) {
+      const L = lobeMap.get(lobeKey(n));
+      if (!L || n.x == null) continue;
+      n.vx += (L.x - n.x) * k;
+      n.vy += (L.y - n.y) * k * 1.6;   // stronger vertical pull → brain, not ball
+      n.vz += (L.z - n.z) * k;
+    }
+  });
   const ctl = Graph.controls();
-  ctl.autoRotate = true; ctl.autoRotateSpeed = 0.38;
+  ctl.autoRotate = !rmq(); ctl.autoRotateSpeed = 0.3;
   el.addEventListener('dblclick', () => { ctl.autoRotate = !ctl.autoRotate; });
   new ResizeObserver(sizeGalaxy).observe(el);
   if (gData) feedGalaxy();
@@ -1378,8 +1454,11 @@ function feedGalaxy() {
   const ids = new Set(f.nodes.map(n => n.id));
   for (const k of [...nodeById.keys()]) if (!ids.has(k)) nodeById.delete(k);
   buildNeighbors(f.links);   // for inspector
+  computeLobes(f.nodes);
   Graph.graphData({ nodes: f.nodes, links: f.links });
   Graph.nodeThreeObject(Graph.nodeThreeObject());
+  rebuildLobeGlow();
+  if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
   $('g-stats').textContent = `${f.nodes.length}/${gData.nodes.length} neurons · ${f.links.length} synapses`;
   setTimeout(() => Graph.zoomToFit(650, 50), 650);
   if (gSel) renderSelInfo();
@@ -1508,10 +1587,14 @@ function activate(ids) {
   const set = new Set(ids), end = l => (l && l.id !== undefined) ? l.id : l;
   const links = Graph.graphData().links.filter(l => set.has(end(l.source)) || set.has(end(l.target))).slice(0, 180);
   links.forEach(l => fired.add(l));
+  Graph.linkWidth(Graph.linkWidth()); Graph.linkColor(Graph.linkColor());   // synapses light up
   let k = 0;
   const burst = setInterval(() => {
     links.forEach(l => Graph.emitParticle(l));
-    if (++k > 5) { clearInterval(burst); setTimeout(() => links.forEach(l => fired.delete(l)), 2600); }
+    if (++k > 5) { clearInterval(burst); setTimeout(() => {
+      links.forEach(l => fired.delete(l));
+      if (Graph) { Graph.linkWidth(Graph.linkWidth()); Graph.linkColor(Graph.linkColor()); }
+    }, 2600); }
   }, 380);
   const ns = ids.map(id => nodeById.get(id)).filter(n => n && n.x != null);
   if (ns.length && curView === 'galaxy') {
@@ -1597,21 +1680,43 @@ async function send(text) {
   if (d.answer) addMsg('muninn', d.answer, { sources: d.sources,
     meta: [d.route.tier === 'answer' && d.depth === 'deep' ? 'answer·deep' : d.route.tier,
       d.route.via === 'jev' ? 'sorted by jev' : 'sorted by rules', d.model].filter(Boolean).join(' · ') });
-  activate((d.sources || []).map(s => s.id).concat(codeIds(d.code_nodes || [])));
-  if (d.job) return pollJob(d.job);
+  if (d.job) return pollJob(d.job);   /* job polling first: nothing below may break it */
+  try { activate((d.sources || []).map(s => s.id).concat(codeIds(d.code_nodes || []))); } catch {}
   if (d.answer && speakOn) speak(d.answer); else setOrb('idle', 'ready');
 }
 async function pollJob(id) {
+  try { sessionStorage.setItem(JOB_KEY, id); } catch {}
   setOrb('thinking', 'agent working'); thinkingOn = true;
+  const t0 = Date.now();
+  let fails = 0;
   for (;;) {
     await new Promise(r => setTimeout(r, 4000));
     let j;
-    try { j = await (await fetch('bridge/jobs/' + id)).json(); } catch { continue; }
-    if (j.status === 'running') continue;
+    try { j = await (await fetch('bridge/jobs/' + id)).json(); fails = 0; }
+    catch {
+      if (++fails >= 10) {   /* ~40s of nothing: say so instead of spinning forever */
+        try { sessionStorage.removeItem(JOB_KEY); } catch {}
+        thinkingOn = false;
+        addMsg('muninn', 'Lost contact with the bridge while waiting. The jobs panel in Systems has the answer when it is back.');
+        return setOrb('idle', 'ready');
+      }
+      continue;
+    }
+    if (j.status === 'running') {
+      if (Date.now() - t0 > 30 * 60e3) {   /* never wait silently forever */
+        try { sessionStorage.removeItem(JOB_KEY); } catch {}
+        thinkingOn = false;
+        addMsg('muninn', 'Still working — this one is taking unusually long. The jobs panel in Systems shows it the moment it lands.');
+        return setOrb('idle', 'ready');
+      }
+      continue;
+    }
+    try { sessionStorage.removeItem(JOB_KEY); } catch {}
     thinkingOn = false;
     if (j.error) return flashState('job lost');
     addMsg(j.agent || 'agent', j.answer || '—', { meta: 'agent · ' + (j.status === 'done' ? 'finished' : 'failed') });
     refreshNotes(); refreshJobs();
+    nexusFlashIds(['e9'], 3000);
     if (j.report) {
       const rid = j.report.split('/').pop().replace(/\.md$/, '');
       toast(`<i>✦</i> report filed — ${esc(rid)} <small>open</small>`, () => openNote(rid));
@@ -1950,6 +2055,17 @@ setInterval(() => {
   el.style.opacity = 0;
   setTimeout(() => { el.textContent = t[thoughtIdx]; el.style.opacity = 1; }, 450);
 }, 9000);
+
+/* ── resume an agent job across a reload: the answer is never lost ── */
+const JOB_KEY = 'muninn-active-job';
+try {
+  const pending = sessionStorage.getItem(JOB_KEY);
+  if (pending)
+    fetch('bridge/jobs/' + pending).then(r => r.json()).then(j => {
+      if (j && j.status) pollJob(pending);        /* done jobs render their answer at once */
+      else try { sessionStorage.removeItem(JOB_KEY); } catch {}
+    }).catch(() => {});
+} catch {}
 
 /* ── boot ─────────────────────────────────────────────── */
 setTimeout(() => { const b = $('boot'); if (b) b.remove(); }, 2400);
