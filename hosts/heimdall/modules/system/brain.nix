@@ -7,6 +7,13 @@ let
   vault = "/mnt/nas/obsidian/muninn";
   www   = "/var/lib/muninn-brain/www";
 
+  # Keep the durable job store beside the bridge for its Python import.
+  bridge = pkgs.runCommand "muninn-bridge" {} ''
+    mkdir -p "$out"
+    cp ${../../muninn/brain/bridge.py} "$out/bridge.py"
+    cp ${../../muninn/brain/jobs.py} "$out/jobs.py"
+  '';
+
   # Vendored, pinned JS libs served same-origin — no CDN at runtime (the esm.sh
   # module chain proved flaky in-browser and one failed import killed all page JS).
   # three 0.160.0 is the last release shipping a classic UMD build; 3d-force-graph
@@ -342,6 +349,11 @@ if __name__ == "__main__": main()
 
 in
 {
+  # claude-code (the deep answer tier) is unfree; allow just it on heimdall,
+  # which unlike mjolnir does not import modules/apps/unfree.nix.
+  nixpkgs.config.allowUnfreePredicate = pkg:
+    builtins.elem (pkgs.lib.getName pkg) [ "claude-code" ];
+
   systemd.tmpfiles.rules = [
     "d /var/lib/muninn-brain 0755 christina users -"
     "d ${www} 0755 christina users -"
@@ -439,6 +451,9 @@ in
     path = [ pkgs.systemd pkgs.git pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.ripgrep ];
     environment.MUNINN_CODEX =
       "${inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex}/bin/codex";
+    # Deep answer tier: headless Claude on the Claude Code subscription
+    # (christina must log in once on heimdall: `claude` → /login)
+    environment.MUNINN_CLAUDE = "${pkgs.claude-code}/bin/claude";
     serviceConfig = {
       Type = "simple";
       User = "christina";
@@ -447,7 +462,7 @@ in
         "-/var/lib/secrets/graphify-openrouter.env"   # OPENAI_API_KEY (OpenRouter): Jev + MiniMax
         "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY: same value as API_SERVER_KEY on hermod
       ];
-      ExecStart = "${pkgs.python3}/bin/python3 ${../../muninn/brain/bridge.py}";
+      ExecStart = "${pkgs.python3}/bin/python3 ${bridge}/bridge.py";
       Restart = "always";
       RestartSec = "5s";
     };
