@@ -403,12 +403,20 @@ def push_usage(b):
     prov = b.get("provider")
     if prov not in ("anthropic", "openai"):
         return False
-    snap = {"host": re.sub(r"[^\w.-]", "", str(b.get("host", "")))[:40], "as_of": int(time.time()),
+    # a reporter may say when the numbers were measured; never later than now
+    now = int(time.time())
+    try:
+        seen = min(int(b.get("as_of") or now), now)
+    except (TypeError, ValueError):
+        seen = now
+    snap = {"host": re.sub(r"[^\w.-]", "", str(b.get("host", "")))[:40], "as_of": seen,
             "five_hour": _window(b.get("five_hour")), "seven_day": _window(b.get("seven_day"))}
     if not (snap["five_hour"] or snap["seven_day"]):
         return False
     with LOCK:
         u = load_usage()
+        if seen < (u.get(prov) or {}).get("as_of", 0):
+            return True   # an older measurement never replaces a newer one
         u[prov] = snap
         tmp = USAGE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
