@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 # ── muninn brain — live animated knowledge-graph frontend ────────────────────
 # A builder regenerates graph.json + activity.json from the vault every 30s
 # (fast, no LLM), nginx serves the single-page 3D force-graph app on localhost,
@@ -426,6 +426,34 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
+  # ── muninn bridge — the front door: Jev sorts every request, then a command,
+  # a quick answer (MiniMax) or an agent handles it. Also proxies the local
+  # voice server on mimir and starts skills. Reuses the OpenRouter secret.
+  # No NoNewPrivileges here: "run now" starts huginn units through sudo.
+  systemd.services."muninn-bridge" = {
+    description = "muninn bridge: Jev-routed talk, voice proxy and skills for the brain";
+    after = [ "muninn-indexer.service" "network-online.target" ];
+    wants = [ "network-online.target" ];
+    unitConfig.RequiresMountsFor = vault;
+    # git + shell tools are for the Codex agent tier, which works inside the vault
+    path = [ pkgs.systemd pkgs.git pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.ripgrep ];
+    environment.MUNINN_CODEX =
+      "${inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex}/bin/codex";
+    serviceConfig = {
+      Type = "simple";
+      User = "christina";
+      Group = "users";
+      EnvironmentFile = [
+        "-/var/lib/secrets/graphify-openrouter.env"   # OPENAI_API_KEY (OpenRouter): Jev + MiniMax
+        "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY: same value as API_SERVER_KEY on hermod
+      ];
+      ExecStart = "${pkgs.python3}/bin/python3 ${../../muninn/brain/bridge.py}";
+      Restart = "always";
+      RestartSec = "5s";
+    };
+    wantedBy = [ "multi-user.target" ];
+  };
+
   # static server on localhost; Traefik fronts it (see traefik.nix → brain router)
   services.nginx = {
     enable = true;
@@ -452,6 +480,15 @@ in
         extraConfig = ''
           proxy_http_version 1.1;
           proxy_set_header Host $host;
+        '';
+      };
+      # bridge (talk, voice, skills) — audio uploads and model calls need room and time
+      locations."/bridge/" = {
+        proxyPass = "http://127.0.0.1:8093";
+        extraConfig = ''
+          proxy_http_version 1.1;
+          proxy_read_timeout 180s;
+          client_max_body_size 25m;
         '';
       };
       # capture endpoint (dashboard quick notes → _inbox/)

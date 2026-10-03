@@ -9,6 +9,7 @@
     ../../modules/system/users.nix
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
+    ../../modules/apps/codex.nix          # the brain's agent tier runs `codex exec` (see brain.nix)
 
     ./modules/system/acme.nix
     ./modules/system/traefik.nix

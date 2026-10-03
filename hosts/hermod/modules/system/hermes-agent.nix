@@ -20,11 +20,17 @@ in
       default = "gpt-6-astra";
     };
     environmentFiles = [ "/etc/hermes/env" ];
+    environment = {
+      API_SERVER_ENABLED = "true";
+      API_SERVER_HOST = "0.0.0.0";
+    };
     mcpServers = {
       graphify-dotfiles = graphify "dotfiles";
       graphify-vault = graphify "vault";
     };
   };
+
+  networking.firewall.allowedTCPPorts = [ 8642 ];
 
   users.users.christina.extraGroups = [ config.services.hermes-agent.group ];
 
