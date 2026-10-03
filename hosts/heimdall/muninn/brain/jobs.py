@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 import tempfile
 import threading
@@ -16,10 +17,13 @@ class BusyError(Exception):
 
 
 class JobStore:
-    def __init__(self, path, vault, max_active=2):
+    def __init__(self, path, vault, max_active=2, titler=None):
         self.path = path
         self.vault = Path(vault)
         self.max_active = max_active
+        # titler(job) -> {"title": ..., "tags": [...]} or None; MiniMax names and
+        # tags reports in production, tests and offline runs get the dated template.
+        self.titler = titler
         self.lock = threading.RLock()
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
@@ -73,12 +77,24 @@ class JobStore:
                 raise OSError("report directory must not be a symlink")
             directory.mkdir(exist_ok=True)
         stamp = datetime.datetime.fromtimestamp(job["started"], datetime.timezone.utc).strftime("%Y-%m-%d")
-        name = f"Agent report {stamp} {job['id']}.md"
+        title, tags = "", []
+        if self.titler:
+            try:
+                meta = self.titler(job) or {}
+                candidate = str(meta.get("title") or "").strip()
+                if candidate and len(candidate.encode()) <= 160 and not re.search(r'[\x00-\x1f\x7f/\\\[\]#|:]', candidate):
+                    title = candidate
+                tags = [t for t in (str(t).strip().lower() for t in (meta.get("tags") or []))
+                        if re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,39}", t)][:4]
+            except Exception:
+                title, tags = "", []
+        heading = title or f"Agent report {stamp} {job['id']}"
+        name = f"{heading} ({job['id'][:8]}).md" if title else f"{heading}.md"
         path = directory / name
         route = job.get("route", {})
-        content = (f"---\ntype: report\nstatus: {job['status']}\ntags: [agents, report]\n"
+        content = (f"---\ntype: report\nstatus: {job['status']}\ntags: [{', '.join(tags or ['agents', 'report'])}]\n"
                    f"created: {stamp}\nagent: muninn-bridge\njob: {job['id']}\n---\n\n"
-                   f"# Agent report {job['id']}\n\nUp: [[Agents MOC]]\n\n"
+                   f"# {heading}\n\nUp: [[Agents MOC]]\n\n"
                    f"- Worker: {job['agent']}\n- Router: {route.get('via', 'unknown')}\n"
                    f"- Status: {job['status']}\n- Started (Unix): {job['started']}\n"
                    f"- Ended (Unix): {job.get('ended', '')}\n\n"

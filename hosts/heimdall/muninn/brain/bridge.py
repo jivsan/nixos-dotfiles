@@ -37,6 +37,12 @@ CODEX_HOME = os.path.expanduser(os.environ.get("CODEX_HOME", "~/.codex"))
 USAGE_FILE = os.environ.get("MUNINN_USAGE_FILE", "/var/lib/muninn-brain/usage.json")
 HERMES_URL = os.environ.get("MUNINN_HERMES_URL", "http://10.0.20.21:8642").rstrip("/")
 HERMES_KEY = os.environ.get("HERMES_API_KEY", "").strip()
+# Answer tiers: light = Codex (GPT via the Codex subscription), deep = Claude
+# (Opus via the Claude Code subscription); MiniMax is the always-on floor and
+# files everything into the vault. Each tier degrades gracefully to the next.
+CLAUDE = os.environ.get("MUNINN_CLAUDE", "claude")
+CLAUDE_HOME = os.path.expanduser(os.environ.get("CLAUDE_HOME", "~/.claude"))
+CLAUDE_MODEL = os.environ.get("MUNINN_CLAUDE_MODEL", "claude-opus-5-5")
 LOCK = threading.Lock()
 TALK_LOCK = threading.Lock()
 JOBS = None
@@ -76,7 +82,8 @@ RUNNABLE = {s["id"]: s["unit"] for s in SKILLS if s["unit"]}
 
 VIEWS = {"neural": "galaxy", "galaxy": "galaxy", "graph": "galaxy", "brain": "galaxy", "talk": "galaxy",
          "memory": "memory", "notes": "memory", "vault": "memory", "skills": "skills", "automations": "skills",
-         "systems": "systems", "system": "systems", "agents": "systems", "capture": "capture", "inbox": "memory"}
+         "systems": "systems", "system": "systems", "agents": "systems", "capture": "capture", "inbox": "memory",
+         "hermes": "hermes"}
 
 JEV_QUESTIONS = {
     "executor": {
@@ -95,6 +102,14 @@ JEV_QUESTIONS = {
             "command": "A direct dashboard or system command that needs no thinking: open or show a view or a named note, search for a term, capture a note, run a named skill or job",
             "answer": "A question answerable by looking things up in personal notes and server configuration: what, when, where, why, status, summaries, explanations",
             "agent": "Real work that needs an agent with tools: write or change files, research on the web, build, fix, deploy, or produce a report or document",
+        },
+    },
+    "depth": {
+        "type": "choice",
+        "instructions": "If the request in `request` is a question to be answered (not agent work), how much thinking does it need?",
+        "criteria": {
+            "light": "A simple lookup, fact, status check or short explanation, answerable in a couple of sentences",
+            "deep": "Analysis, comparison, synthesis across many notes, tradeoffs, advice, or a long detailed explanation",
         },
     },
     "command": {
@@ -165,6 +180,7 @@ def route_jev(text):
         cmd = choice("command") if tier_name == "command" else "none"
         skill = choice("skill") if cmd == "run_skill" else None
         executor = choice("executor") if tier_name == "agent" else None
+        depth = choice("depth") if tier_name == "answer" else None
         if tier_name == "command" and (cmd == "none" or (cmd == "run_skill" and skill == "none")):
             raise ValueError("Jev did not select an executable command")
     except Exception as e:
@@ -173,7 +189,7 @@ def route_jev(text):
     return {"via": "jev", "model": r.get("model", JEV_MODEL), "ms": int((time.time() - t0) * 1000),
             "tier": tier["choice"], "probabilities": tier.get("probabilities") or {tier["choice"]: 1.0},
             "confidence": tier.get("confidence"),
-            "command": cmd, "skill": skill, "executor": executor,
+            "command": cmd, "skill": skill, "executor": executor, "depth": depth,
             "decisions": {k: v for k, v in a.items() if k in JEV_QUESTIONS}}
 
 
@@ -182,6 +198,12 @@ CMD_SEARCH = re.compile(r"^(search( for)?|find|look for|filter)\b", re.I)
 CMD_CAPTURE = re.compile(r"^(capture|note( that)?|remember( that)?|jot( down)?|save a note)\b[:,]?", re.I)
 CMD_RUN = re.compile(r"^(run|start|trigger|kick off)\b", re.I)
 AGENT_HINT = re.compile(r"\b(write|create|build|make|generate|draft|fix|deploy|install|refactor|research|report on|set up)\b", re.I)
+DEPTH_HINT = re.compile(r"\b(analy[sz]e|compare|comparison|versus|trade ? ?offs?|pros and cons|in depth|deep dive|"
+                        r"explain (?:in detail|why|how)|teach me|walk me through|synthesi[sz]e|review|recommend)\b", re.I)
+
+
+def rule_depth(t):
+    return "deep" if DEPTH_HINT.search(t) or len(t) > 280 else "light"
 
 
 def route_rules(text):
@@ -200,7 +222,7 @@ def route_rules(text):
     else:
         tier, cmd = "answer", "none"
     return {"via": "rules", "ms": 0, "tier": tier, "probabilities": {tier: 1.0}, "confidence": None,
-            "command": cmd, "skill": None}
+            "command": cmd, "skill": None, "depth": rule_depth(t) if tier == "answer" else None}
 
 
 # ── tier 1: commands, no AI ────────────────────────────────────────────────
@@ -315,25 +337,83 @@ SYSTEM = ("You are muninn, the voice of Christina's personal homelab and note sy
           "read aloud, so keep it to two to four plain sentences with no markdown, lists or file paths unless "
           "she asks for detail. Name the note you used. If the context lacks the answer, say so plainly.")
 
+SYSTEM_DEEP = ("You are muninn, the deep-thinking voice of Christina's personal homelab and note system. Answer "
+               "using ONLY the provided context: notes from her Obsidian vault and a knowledge graph of her "
+               "NixOS config (hosts: mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box, hermod "
+               "agent VM). Think hard and answer in full detail: structure the reasoning, compare options when "
+               "asked, and name every note you relied on. Distinguish what the notes say from your own inference. "
+               "If the context lacks the answer, say so plainly instead of guessing.")
 
-def answer(q):
+
+def claude_ready():
+    return bool(shutil.which(CLAUDE)) and os.path.exists(os.path.join(CLAUDE_HOME, ".credentials.json"))
+
+
+def run_claude_answer(prompt):
+    # Headless Claude on the Claude Code subscription. Runs in an empty temp
+    # directory; in -p mode permission prompts are auto-denied, so the model
+    # answers from the prompt instead of roaming the filesystem.
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = subprocess.run([CLAUDE, "-p", prompt, "--model", CLAUDE_MODEL, "--output-format", "text"],
+                               capture_output=True, text=True, timeout=600, cwd=d, stdin=subprocess.DEVNULL)
+        return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
+    except Exception:
+        return None
+
+
+def run_codex_answer(prompt):
+    # Quick answers from GPT on the Codex subscription: read-only sandbox in a
+    # temp dir, nothing like the vault-writing agent tier below.
+    fd, out = tempfile.mkstemp(prefix="muninn-answer-", suffix=".txt")
+    os.close(fd)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = subprocess.run([CODEX, "exec", "--skip-git-repo-check", "-s", "read-only", "-C", d, "-o", out, prompt],
+                               capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+        with open(out, encoding="utf-8", errors="ignore") as fh:
+            msg = fh.read().strip()
+        return msg if p.returncode == 0 and msg else None
+    except Exception:
+        return None
+    finally:
+        try:
+            os.remove(out)
+        except OSError:
+            pass
+
+
+def answer(q, depth="light"):
     notes, code, code_nodes = retrieve(q)
     sources = [{"id": n["id"], "path": n["path"], "title": n["title"]} for n in notes]
-    if not KEY:
-        if notes:
-            text = "I can't reach the language model right now. The closest notes are: " + "; ".join(n["title"] for n in notes[:4]) + "."
-        else:
-            text = "I can't reach the language model right now, and no note matched."
-        return {"answer": text, "sources": sources, "code_nodes": code_nodes, "model": None}
     ctx = "\n\n".join(f"### [[{n['title']}]] ({n['path']})\n{n['body']}" for n in notes) or "(no matching notes)"
-    try:
-        r = post_json(BASE + "/chat/completions", {"model": MODEL, "temperature": 0.2, "messages": [
-            {"role": "system", "content": SYSTEM},
-            {"role": "user", "content": f"Question: {q}\n\n--- notes ---\n{ctx}\n\n--- config graph ---\n{code or '(none)'}"}]}, 60)
-        text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or r.get("error", {}).get("message") or "No reply from the model."
-    except Exception as e:
-        text = f"The language model did not answer ({str(e)[:120]})."
-    return {"answer": text.strip(), "sources": sources, "code_nodes": code_nodes, "model": MODEL}
+    user = f"Question: {q}\n\n--- notes ---\n{ctx}\n\n--- config graph ---\n{code or '(none)'}"
+    text, model = None, None
+    if depth == "deep":
+        if claude_ready():
+            text = run_claude_answer(SYSTEM_DEEP + "\n\n" + user)
+            model = CLAUDE_MODEL if text else None
+        if not text:
+            depth = "light"   # Claude not logged in or failed: degrade, never stall
+    if depth == "light" and codex_ready():
+        text = run_codex_answer(SYSTEM + "\n\n" + user)
+        model = "codex (gpt)" if text else None
+    if not text:
+        if not KEY:
+            if notes:
+                text = "I can't reach any language model right now. The closest notes are: " + "; ".join(n["title"] for n in notes[:4]) + "."
+            else:
+                text = "I can't reach any language model right now, and no note matched."
+            return {"answer": text, "sources": sources, "code_nodes": code_nodes, "model": None, "depth": depth}
+        try:
+            r = post_json(BASE + "/chat/completions", {"model": MODEL, "temperature": 0.2, "messages": [
+                {"role": "system", "content": SYSTEM},
+                {"role": "user", "content": user}]}, 60)
+            text = (r.get("choices") or [{}])[0].get("message", {}).get("content") or r.get("error", {}).get("message") or "No reply from the model."
+            model = MODEL
+        except Exception as e:
+            text = f"The language model did not answer ({str(e)[:120]})."
+    return {"answer": text.strip(), "sources": sources, "code_nodes": code_nodes, "model": model, "depth": depth}
 
 
 # ── tier 3: real work, Codex headless on this host ─────────────────────────
@@ -390,6 +470,32 @@ def available_agents():
     return {"hermes": bool(HERMES_KEY), "codex": codex_ready()}
 
 
+def report_titler(job):
+    # MiniMax is the filing clerk: it names and tags every agent report.
+    # Any failure returns None and the store falls back to a dated template.
+    if not KEY:
+        return None
+    r = post_json(BASE + "/chat/completions", {"model": MODEL, "temperature": 0.2, "messages": [
+        {"role": "system", "content": "You title agent reports for an Obsidian vault. Reply with ONLY a JSON "
+         "object (no fences, no prose): {\"title\": concise plain-text report title, max 80 chars, no slashes; "
+         "\"tags\": array of 1-4 short lowercase tags}."},
+        {"role": "user", "content": f"Request: {job['text']}\n\nResult excerpt:\n{(job.get('answer') or '')[:4000]}"}]}, 45)
+    content = (r.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+    data = json.loads(re.sub(r"^```[a-z]*|\s*```$", "", content.strip(), flags=re.M))
+    tags = data.get("tags")
+    return {"title": str(data.get("title") or "")[:90],
+            "tags": [str(t)[:40] for t in tags][:4] if isinstance(tags, list) else []}
+
+
+def hermes_chat(text, conv):
+    # Direct conversation with the hermes agent: one persistent conversation
+    # per dashboard session, unlike the per-job conversations of the agent tier.
+    r = post_json(HERMES_URL + "/v1/responses", {"model": "hermes-agent", "input": text,
+                  "conversation": "muninn-chat-" + conv}, 600, key=HERMES_KEY)
+    return " ".join(c.get("text", "") for item in r.get("output") or [] if item.get("type") == "message"
+                    for c in item.get("content") or [] if c.get("type") == "output_text").strip()
+
+
 def pick_agent(target, preferred=None):
     have = available_agents()
     if target in have:
@@ -401,7 +507,7 @@ def job_store():
     global JOBS
     with LOCK:
         if JOBS is None:
-            JOBS = JobStore(JOBS_DB, VAULT, MAX_JOBS)
+            JOBS = JobStore(JOBS_DB, VAULT, MAX_JOBS, titler=report_titler)
             JOBS.recover()
         return JOBS
 
@@ -547,7 +653,7 @@ def talk(text, target="auto"):
         res = {"answer": "That is real work for an agent, but no agent is connected yet: hermes needs its API key "
                          "on heimdall, and Codex needs codex login on heimdall.", "sources": []}
     if res is None:
-        res = answer(text)
+        res = answer(text, route.get("depth") or "light")
     res["route"] = route
     if jev_error:
         res["jev_error"] = jev_error
@@ -612,6 +718,7 @@ class H(BaseHTTPRequestHandler):
         if p == "/bridge/health":
             return self._j(200, {"ok": True, "jev": bool(JEV_KEY), "jev_model": JEV_MODEL, "llm": MODEL if KEY else None,
                                  "voice": voice_up(), "index": os.path.exists(DB), "codex": codex_ready(),
+                                 "claude": claude_ready(), "claude_model": CLAUDE_MODEL if claude_ready() else None,
                                  "hermes": bool(HERMES_KEY), "max_jobs": MAX_JOBS})
         if p == "/bridge/skills":
             return self._j(200, {"skills": [{**s, **(unit_state(s["unit"]) if s["unit"] else {})} for s in SKILLS]})
@@ -648,6 +755,20 @@ class H(BaseHTTPRequestHandler):
                 if not text:
                     return self._j(400, {"error": "missing text"})
                 return self._j(200, talk(text[:4000], b.get("target") or "auto"))
+            if p == "/bridge/hermes":
+                if not isinstance(b.get("text"), str):
+                    return self._j(400, {"error": "text must be a string"})
+                text = (b.get("text") or "").strip()
+                if not text:
+                    return self._j(400, {"error": "missing text"})
+                if not HERMES_KEY:
+                    return self._j(503, {"error": "hermes is not configured on the bridge"})
+                conv = re.sub(r"[^A-Za-z0-9-]", "", str(b.get("conversation") or ""))[:40] or uuid.uuid4().hex[:12]
+                reply = hermes_chat(text[:8000], conv)
+                if not reply:
+                    return self._j(502, {"error": "hermes returned nothing"})
+                log_talk(text, {"answer": reply, "sources": [], "route": {"via": "direct", "tier": "hermes"}})
+                return self._j(200, {"answer": reply, "conversation": conv})
             if p == "/bridge/run":
                 ok, msg = run_skill(b.get("skill"))
                 return self._j(200 if ok else 400, {"ok": ok, "message": msg})

@@ -462,6 +462,53 @@
     .crt-blink, #aura, .dust, .sweep { display:none; }
     #pg-title::before, #pg-title::after { display:none; }
   }
+  /* ── model tiers: the route readout colors who answered ── */
+  .route .tier.win[data-t=command] { color:var(--cream); }
+  .route .tier.win[data-t=command] i b { background:var(--cream); box-shadow:none; }
+  .route .tier.win[data-t=answer] { color:var(--cyan); }
+  .route .tier.win[data-t=answer] i b { background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+  .route .tier.win[data-t=deep] { color:var(--violet); }
+  .route .tier.win[data-t=deep] i b { background:var(--violet); box-shadow:0 0 8px var(--violet); }
+  .route .tier.win[data-t=agent] { color:var(--pink); }
+  .route .tier.win[data-t=agent] i b { background:var(--pink); box-shadow:0 0 8px var(--pink); }
+
+  /* ── agent jobs panel + live dot on the systems nav ── */
+  #jobs .jrow { display:flex; align-items:center; gap:8px; padding:7px 10px; cursor:pointer;
+    border-bottom:1px solid var(--line); font-size:11.5px; }
+  #jobs .jrow:hover { background:rgba(255,255,255,.03); }
+  #jobs .jrow .txt { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink2); }
+  #jobs .jrow .who2 { flex:none; font-size:9px; letter-spacing:1.2px; text-transform:uppercase; color:var(--gold); }
+  #jobs .jrow .ago { flex:none; font-size:9.5px; color:var(--ink3); }
+  .js { flex:none; position:relative; width:7px; height:7px; border-radius:50%; }
+  .js.done { background:#5ad1a0; } .js.failed { background:var(--pink); } .js.running { background:var(--cyan); }
+  .js.running::after { content:""; position:absolute; inset:0; border-radius:50%;
+    border:1.5px solid rgba(45,226,230,.5); animation:p 1.8s ease-out infinite; }
+  #nav-systems.jobs-live .ic { position:relative; }
+  #nav-systems.jobs-live .ic::after { content:""; position:absolute; top:-2px; right:-3px; width:6px; height:6px;
+    border-radius:50%; background:var(--cyan); box-shadow:0 0 8px var(--cyan); animation:jobpulse 1.8s ease-in-out infinite; }
+  @keyframes jobpulse { 50% { opacity:.3; } }
+
+  /* ── toast: report filed ── */
+  .toast { position:fixed; right:34px; bottom:96px; z-index:90; display:flex; align-items:center; gap:9px;
+    background:var(--surface2); border:1px solid var(--line2); border-radius:12px; padding:10px 16px;
+    font-size:12px; color:var(--cream); cursor:pointer; box-shadow:0 16px 44px rgba(0,0,0,.5);
+    clip-path:polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    animation:toastin .45s cubic-bezier(.2,.9,.3,1.2); }
+  .toast i { color:var(--cyan); font-style:normal; text-shadow:0 0 10px rgba(45,226,230,.6); }
+  .toast small { color:var(--ink3); }
+  .toast.out { transition:opacity .4s, transform .4s; opacity:0; transform:translateY(8px); }
+  @keyframes toastin { from { opacity:0; transform:translateY(14px) scale(.96); } }
+
+  /* ── hermes chat ── */
+  .hchat { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .hchat .phead { flex:none; }
+  .hchat .phead .tbtn { margin-left:auto; }
+  .hrow { flex:none; display:flex; gap:10px; padding:12px 16px; border-top:1px solid var(--line); }
+  .hrow .talkin { flex:1; }
+  #hmsgs { padding:16px 18px; }
+  #hmsgs .ghost { margin:auto; }
+  .msg.pending { opacity:.55; }
+  .msg.pending .who::after { content:" …"; animation:jobpulse 1.4s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -473,10 +520,11 @@
   <button class="nav" data-v="galaxy"><span class="ic">✦</span><span class="lbl">Neural</span></button>
   <button class="nav on" data-v="memory"><span class="ic">◈</span><span class="lbl">Memory</span></button>
   <button class="nav" data-v="capture"><span class="ic">✎</span><span class="lbl">Capture</span></button>
+  <button class="nav" data-v="hermes"><span class="ic">⌬</span><span class="lbl">Hermes</span></button>
   <div class="navsec">system</div>
   <button class="nav" data-v="skills"><span class="ic">⌁</span><span class="lbl">Skills</span></button>
   <button class="nav" data-v="usage"><span class="ic">◔</span><span class="lbl">Usage</span></button>
-  <button class="nav" data-v="systems"><span class="ic">⚙</span><span class="lbl">Systems</span></button>
+  <button class="nav" data-v="systems" id="nav-systems"><span class="ic">⚙</span><span class="lbl">Systems</span></button>
   <a class="nav" href="https://obsidian.oryxserver.org" target="_blank"><span class="ic">↗</span><span class="lbl">Obsidian</span></a>
   <div class="sidefoot"><span class="pulse"></span>huginn online<br><span id="side-stamp">–</span></div>
 </aside>
@@ -557,6 +605,8 @@
       <div class="card"><div class="cardsep">vault</div><div class="tiles" id="tiles"></div></div>
       <div class="card"><div class="cardsep">agents <small id="svcs"></small></div>
         <div id="agents" class="empty scroll">connecting…</div></div>
+      <div class="card" style="max-height:30%"><div class="cardsep">agent jobs <small id="jobs-n"></small></div>
+        <div id="jobs" class="empty scroll">connecting…</div></div>
       <div class="card" style="flex:1"><div class="cardsep">activity log</div>
         <div id="feed" class="scroll" style="flex:1">connecting…</div></div>
     </div>
@@ -595,6 +645,19 @@
   <!-- ── usage ── -->
   <section class="view" id="view-usage">
     <div class="usegrid" id="usegrid"><div class="ghost">connecting…</div></div>
+  </section>
+
+  <!-- ── hermes: a direct line to the agent on hermod, no router ── -->
+  <section class="view" id="view-hermes">
+    <div class="panel hchat">
+      <div class="phead"><div class="bar"></div><div class="tt"><i>⌬</i> Hermes — hermod · 10.0.20.21</div>
+        <button class="tbtn" id="h-new" title="start a fresh conversation">new chat</button></div>
+      <div class="msgs scroll" id="hmsgs" style="flex:1; min-height:0;"><div class="ghost">say something to hermes…</div></div>
+      <div class="hrow">
+        <input class="talkin" id="hinput" placeholder="Talk to hermes directly…" autocomplete="off">
+        <button class="tbtn on" id="h-send">send</button>
+      </div>
+    </div>
   </section>
 
   <!-- ── talk bar: every request goes through the bridge, Jev first ── -->
@@ -743,6 +806,7 @@ const TITLES = {
   skills:  ['Skills',  'Every domain has tasks; repeat tasks become skills; reliable skills become automations.'],
   usage:   ['Usage',   'How much of each subscription is spent: the 5-hour and the weekly window.'],
   systems: ['Systems', 'Agent health, digests, and the vault audit trail.'],
+  hermes:  ['Hermes',  'A direct line to the hermes agent on hermod — no router, no job queue.'],
 };
 let curView = 'memory';
 function show(v) {
@@ -754,6 +818,8 @@ function show(v) {
   else if (Graph) Graph.pauseAnimation();   /* hidden WebGL must not render */
   if (v === 'skills') refreshSkills();
   if (v === 'usage') refreshUsage();
+  if (v === 'systems') refreshJobs();
+  if (v === 'hermes') hermesInit();
   if (v === 'capture') {
     setTimeout(() => { const ta = $('capture-text'); if (ta) ta.focus(); }, 60);
   }
@@ -1131,6 +1197,7 @@ function badge(a) {
   return `<span class="badge bad">✗ ${esc(a.result)}</span>`;
 }
 async function refreshActivity() {
+  refreshJobs();   /* cheap bridge call: keeps the jobs panel + nav dot fresh */
   try {
     const a = await (await fetch('activity.json?_=' + Date.now())).json();
     if (a.generated === lastActGen) return;
@@ -1253,9 +1320,10 @@ function addMsg(who, text, extra) {
 function renderRoute(r, err) {
   if (!r) { $('route').innerHTML = ''; return; }
   const p = r.probabilities || {};
+  const deep = r.tier === 'answer' && r.depth === 'deep';
   $('route').innerHTML = `<span class="via">${r.via === 'jev' ? 'jev' : 'rules'}${r.ms ? ' ' + r.ms + 'ms' : ''}</span>`
     + ['command', 'answer', 'agent'].map(t =>
-        `<span class="tier${t === r.tier ? ' win' : ''}">${t}<i><b style="width:${Math.round((p[t] || 0) * 100)}%"></b></i></span>`).join('');
+        `<span class="tier${t === r.tier ? ' win' : ''}" data-t="${t === 'answer' && deep ? 'deep' : t}">${t === 'answer' && deep ? 'answer·deep' : t}<i><b style="width:${Math.round((p[t] || 0) * 100)}%"></b></i></span>`).join('');
   $('route').title = err ? `Jev did not answer (${err}), so keyword rules decided` : 'Jev sorted this request';
 }
 function codeIds(labels) {
@@ -1288,7 +1356,8 @@ async function send(text) {
   thinkingOn = false; renderRoute(d.route, d.jev_error);
   if (d.action) await doAction(d.action);
   if (d.answer) addMsg('muninn', d.answer, { sources: d.sources,
-    meta: [d.route.tier, d.route.via === 'jev' ? 'sorted by jev' : 'sorted by rules', d.model].filter(Boolean).join(' · ') });
+    meta: [d.route.tier === 'answer' && d.depth === 'deep' ? 'answer·deep' : d.route.tier,
+      d.route.via === 'jev' ? 'sorted by jev' : 'sorted by rules', d.model].filter(Boolean).join(' · ') });
   activate((d.sources || []).map(s => s.id).concat(codeIds(d.code_nodes || [])));
   if (d.job) return pollJob(d.job);
   if (d.answer && speakOn) speak(d.answer); else setOrb('idle', 'ready');
@@ -1303,7 +1372,12 @@ async function pollJob(id) {
     thinkingOn = false;
     if (j.error) return flashState('job lost');
     addMsg(j.agent || 'agent', j.answer || '—', { meta: 'agent · ' + (j.status === 'done' ? 'finished' : 'failed') });
-    refreshNotes();
+    refreshNotes(); refreshJobs();
+    if (j.report) {
+      const rid = j.report.split('/').pop().replace(/\.md$/, '');
+      toast(`<i>✦</i> report filed — ${esc(rid)} <small>open</small>`, () => openNote(rid));
+      setTimeout(() => { activate([rid]); refreshJobs(); }, 35000);   /* the indexer picks the report up within 30s */
+    }
     return speakOn ? speak(j.answer || '') : setOrb('idle', 'ready');
   }
 }
@@ -1586,6 +1660,88 @@ function decodeTitle() {
     }, 25000 + Math.random() * 25000);
   })();
 })();
+
+/* ── toast: report filed (click to open) ── */
+function toast(html, onclick) {
+  const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = html;
+  const dismiss = () => { t.classList.add('out'); setTimeout(() => t.remove(), 450); };
+  t.onclick = () => { if (onclick) onclick(); dismiss(); };
+  document.body.appendChild(t);
+  setTimeout(dismiss, 9000);
+}
+
+/* ── agent jobs panel: the bridge's durable job store, live ── */
+let jobsTimer = 0;
+async function refreshJobs() {
+  let jobs;
+  try { jobs = (await (await fetch('bridge/jobs?_=' + Date.now())).json()).jobs || []; }
+  catch { return; }
+  const running = jobs.filter(j => j.status === 'running');
+  $('nav-systems').classList.toggle('jobs-live', running.length > 0);
+  if (curView === 'systems') {
+    $('jobs-n').textContent = running.length ? `${running.length} running` : '';
+    $('jobs').innerHTML = jobs.length ? jobs.slice(0, 10).map(j => {
+      const rid = (j.report || '').split('/').pop().replace(/\.md$/, '');
+      return `<div class="jrow" data-rid="${esc(rid)}" title="${esc(j.text)}">
+        <i class="js ${j.status}"></i><span class="who2">${esc(j.agent)}</span>
+        <span class="txt">${esc(j.text)}</span><span class="ago">${rel(j.started)}</span></div>`;
+    }).join('') : '<div class="empty">no agent jobs yet — ask muninn to do something</div>';
+    document.querySelectorAll('#jobs .jrow[data-rid]').forEach(x => {
+      x.onclick = x.dataset.rid ? () => openNote(x.dataset.rid) : null;
+    });
+  }
+  clearTimeout(jobsTimer);
+  if (running.length) jobsTimer = setTimeout(refreshJobs, 8000);   /* live while anything runs */
+}
+
+/* ── hermes: a direct line, one persistent conversation per session ── */
+let hConv = null, hBusy = false;
+try { hConv = localStorage.getItem('muninn-hconv'); } catch {}
+if (!hConv) {
+  hConv = Math.random().toString(16).slice(2, 10);
+  try { localStorage.setItem('muninn-hconv', hConv); } catch {}
+}
+function hermesInit() {
+  const i = $('hinput');
+  i.disabled = !health.hermes;
+  i.placeholder = health.hermes ? 'Talk to hermes directly…' : 'hermes offline — check the bridge';
+  if (health.hermes) setTimeout(() => i.focus(), 60);
+}
+function hMsg(who, text, pending) {
+  const ghost = $('hmsgs').querySelector('.ghost');
+  if (ghost) ghost.remove();
+  const el = document.createElement('div');
+  el.className = 'msg ' + who + (pending ? ' pending' : '');
+  el.innerHTML = `<div class="who">${who}</div><div class="hbody">${wiki(text)}</div>`;
+  $('hmsgs').appendChild(el); $('hmsgs').scrollTop = 1e9;
+  return el;
+}
+async function hSend() {
+  const v = $('hinput').value.trim();
+  if (!v || hBusy) return;
+  if (!health.hermes) return hermesInit();
+  hBusy = true; hMsg('you', v); $('hinput').value = '';
+  const w = hMsg('hermes', 'thinking', true);
+  try {
+    const r = await fetch('bridge/hermes', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: v, conversation: hConv }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.status);
+    w.classList.remove('pending');
+    w.querySelector('.hbody').innerHTML = wiki(d.answer || '—');
+  } catch (e) {
+    w.classList.remove('pending');
+    w.querySelector('.hbody').textContent = `hermes did not answer (${e.message}).`;
+  }
+  $('hmsgs').scrollTop = 1e9; hBusy = false; $('hinput').focus();
+}
+$('h-send').addEventListener('click', hSend);
+$('hinput').addEventListener('keydown', e => { if (e.key === 'Enter') hSend(); });
+$('h-new').addEventListener('click', () => {
+  hConv = Math.random().toString(16).slice(2, 10);
+  try { localStorage.setItem('muninn-hconv', hConv); } catch {}
+  $('hmsgs').innerHTML = '<div class="ghost">fresh conversation — say something to hermes…</div>';
+});
 </script>
 </body>
 </html>

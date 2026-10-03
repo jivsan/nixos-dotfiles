@@ -157,7 +157,8 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(result["action"], {"type": "run", "skill": "gardener", "ok": True})
 
     def test_valid_jev_answer_ignores_irrelevant_subchoices(self):
-        response = {"answers": {"tier": jev_choice("answer"), "command": {"confidence": 0},
+        response = {"answers": {"tier": jev_choice("answer"), "depth": jev_choice("light"),
+                                "command": {"confidence": 0},
                                 "executor": {"confidence": 0}, "skill": {"confidence": 0}}}
         with mock.patch.object(bridge, "JEV_KEY", "test"), \
                 mock.patch.object(bridge, "post_json", return_value=response), \
@@ -166,9 +167,30 @@ class RoutingTests(unittest.TestCase):
                 mock.patch.object(bridge, "log_talk"):
             result = bridge.talk("When do backups run?")
         rules.assert_not_called()
-        answer.assert_called_once_with("When do backups run?")
+        answer.assert_called_once_with("When do backups run?", "light")
         self.assertEqual(result["route"]["via"], "jev")
         self.assertEqual(result["answer"], "Backups run daily.")
+
+    def test_jev_deep_answer_reaches_the_answer_tier_with_depth(self):
+        response = {"answers": {"tier": jev_choice("answer"), "depth": jev_choice("deep")}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), \
+                mock.patch.object(bridge, "post_json", return_value=response), \
+                mock.patch.object(bridge, "answer", return_value={"answer": "Detailed comparison."}) as answer, \
+                mock.patch.object(bridge, "log_talk"):
+            result = bridge.talk("Compare my backup strategies in depth")
+        answer.assert_called_once_with("Compare my backup strategies in depth", "deep")
+        self.assertEqual(result["route"]["depth"], "deep")
+
+    def test_answer_tier_without_a_depth_choice_is_malformed(self):
+        response = {"answers": {"tier": jev_choice("answer")}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), \
+                mock.patch.object(bridge, "post_json", return_value=response):
+            self.assertIn("error", bridge.route_jev("What is in my vault?"))
+
+    def test_rules_depth_heuristic(self):
+        self.assertEqual(bridge.route_rules("How do I write a note?")["depth"], "light")
+        self.assertEqual(bridge.route_rules("Compare my backup options and explain the tradeoffs")["depth"], "deep")
+        self.assertEqual(bridge.route_rules("open memory")["depth"], None)
 
     def test_uncertain_command_or_skill_uses_rules_and_records_reason(self):
         for uncertain in ("command", "skill"):
@@ -281,6 +303,126 @@ class RequestValidationTests(unittest.TestCase):
                 self.assertEqual(status, 400)
                 self.assertIn("error", response)
                 talk.assert_not_called()
+
+
+class AnswerTierTests(unittest.TestCase):
+    def setUp(self):
+        patch = mock.patch.object(bridge, "retrieve", return_value=([], "", []))
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def answer(self, depth, **patches):
+        mocks = {"run_claude_answer": mock.Mock(return_value=patches.get("claude_text")),
+                 "run_codex_answer": mock.Mock(return_value=patches.get("codex_text"))}
+        with mock.patch.multiple(bridge,
+                                 claude_ready=mock.Mock(return_value=patches.get("claude", False)),
+                                 codex_ready=mock.Mock(return_value=patches.get("codex", False)),
+                                 KEY=patches.get("key", "test-key"), **mocks):
+            result = bridge.answer("A question", depth)
+        return result, mocks
+
+    def test_deep_uses_claude_when_logged_in(self):
+        result, m = self.answer("deep", claude=True, claude_text="Deep thoughts.", codex=True, codex_text="Quick.")
+        self.assertEqual((result["answer"], result["model"], result["depth"]),
+                         ("Deep thoughts.", bridge.CLAUDE_MODEL, "deep"))
+        m["run_codex_answer"].assert_not_called()
+
+    def test_deep_degrades_to_light_when_claude_is_unavailable(self):
+        result, m = self.answer("deep", claude=False, codex=True, codex_text="Quick.")
+        self.assertEqual((result["answer"], result["depth"]), ("Quick.", "light"))
+
+    def test_deep_degrades_past_a_failed_claude_call(self):
+        result, m = self.answer("deep", claude=True, claude_text=None, codex=True, codex_text="Quick.")
+        self.assertEqual((result["answer"], result["depth"]), ("Quick.", "light"))
+
+    def test_light_uses_codex_and_never_touches_claude(self):
+        result, m = self.answer("light", claude=True, codex=True, codex_text="Quick.")
+        self.assertEqual(result["answer"], "Quick.")
+        m["run_claude_answer"].assert_not_called()
+
+    def test_minimax_is_the_floor(self):
+        payload = {"choices": [{"message": {"content": "MiniMax says."}}]}
+        off = mock.Mock(return_value=False)
+        with mock.patch.multiple(bridge, claude_ready=off, codex_ready=off, KEY="test-key"), \
+                mock.patch.object(bridge, "post_json", return_value=payload) as post:
+            result = bridge.answer("A question", "deep")
+        self.assertEqual((result["answer"], result["model"]), ("MiniMax says.", bridge.MODEL))
+        self.assertEqual(post.call_args.args[1]["model"], bridge.MODEL)
+
+    def test_no_models_at_all_still_names_notes(self):
+        note = {"id": "Backups", "path": "Resources/Backups.md", "title": "Backups", "body": "Backup notes."}
+        off = mock.Mock(return_value=False)
+        with mock.patch.object(bridge, "retrieve", return_value=([note], "", [])), \
+                mock.patch.multiple(bridge, claude_ready=off, codex_ready=off, KEY=""):
+            result = bridge.answer("A question", "light")
+        self.assertIn("Backups", result["answer"])
+        self.assertIsNone(result["model"])
+
+
+class HermesChatTests(unittest.TestCase):
+    def post(self, payload):
+        handler = bridge.H.__new__(bridge.H)
+        raw = json.dumps(payload).encode()
+        handler.path = "/bridge/hermes"
+        handler.headers = {"content-length": str(len(raw))}
+        handler.rfile = io.BytesIO(raw)
+        handler._j = mock.Mock()
+        handler.do_POST()
+        return handler._j.call_args.args
+
+    def test_chat_uses_a_persistent_sanitized_conversation(self):
+        with mock.patch.object(bridge, "HERMES_KEY", "key"), \
+                mock.patch.object(bridge, "hermes_chat", return_value="Hello.") as chat, \
+                mock.patch.object(bridge, "log_talk"):
+            status, response = self.post({"text": "hi hermes", "conversation": "abc 123!<script>"})
+        self.assertEqual(status, 200)
+        self.assertEqual(response["answer"], "Hello.")
+        self.assertEqual(chat.call_args.args, ("hi hermes", "abc123script"))
+        self.assertEqual(response["conversation"], "abc123script")
+
+    def test_chat_requires_hermes_and_text(self):
+        with mock.patch.object(bridge, "HERMES_KEY", ""):
+            status, _ = self.post({"text": "hi"})
+            self.assertEqual(status, 503)
+        with mock.patch.object(bridge, "HERMES_KEY", "key"):
+            status, _ = self.post({"text": "  "})
+            self.assertEqual(status, 400)
+            status, _ = self.post({"notext": True})
+            self.assertEqual(status, 400)
+
+    def test_empty_hermes_reply_is_a_bad_gateway(self):
+        with mock.patch.object(bridge, "HERMES_KEY", "key"), \
+                mock.patch.object(bridge, "hermes_chat", return_value=""):
+            status, response = self.post({"text": "hi"})
+        self.assertEqual(status, 502)
+        self.assertIn("error", response)
+
+
+class ReportTitlerTests(unittest.TestCase):
+    def test_minimax_title_and_tags_shape_the_report(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            titler = mock.Mock(return_value={"title": "Backup strategy review", "tags": ["backups", "Storage!!", "x"]})
+            store = JobStore(root / "jobs.db", root, titler=titler)
+            job = store.create("Review backups", "codex", {"via": "jev"})
+            job.update(status="done", answer="Findings.")
+            store.finish(job)
+            saved = store.get(job["id"])
+            self.assertTrue(saved["report"].startswith("Resources/Reports/Backup strategy review ("))
+            text = (root / saved["report"]).read_text()
+            self.assertIn("# Backup strategy review", text)
+            self.assertIn("tags: [backups, x]", text)
+
+    def test_a_failing_titler_falls_back_to_the_template(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            store = JobStore(root / "jobs.db", root, titler=mock.Mock(side_effect=RuntimeError("MiniMax down")))
+            job = store.create("Review backups", "codex", {"via": "jev"})
+            job.update(status="done", answer="Findings.")
+            store.finish(job)
+            saved = store.get(job["id"])
+            self.assertIn("Agent report", saved["report"])
+            self.assertIn("tags: [agents, report]", (root / saved["report"]).read_text())
 
 
 if __name__ == "__main__":

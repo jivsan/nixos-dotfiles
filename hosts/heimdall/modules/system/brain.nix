@@ -349,6 +349,11 @@ if __name__ == "__main__": main()
 
 in
 {
+  # claude-code (the deep answer tier) is unfree; allow just it on heimdall,
+  # which unlike mjolnir does not import modules/apps/unfree.nix.
+  nixpkgs.config.allowUnfreePredicate = pkg:
+    builtins.elem (pkgs.lib.getName pkg) [ "claude-code" ];
+
   systemd.tmpfiles.rules = [
     "d /var/lib/muninn-brain 0755 christina users -"
     "d ${www} 0755 christina users -"
@@ -446,6 +451,9 @@ in
     path = [ pkgs.systemd pkgs.git pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.ripgrep ];
     environment.MUNINN_CODEX =
       "${inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex}/bin/codex";
+    # Deep answer tier: headless Claude on the Claude Code subscription
+    # (christina must log in once on heimdall: `claude` → /login)
+    environment.MUNINN_CLAUDE = "${pkgs.claude-code}/bin/claude";
     serviceConfig = {
       Type = "simple";
       User = "christina";
