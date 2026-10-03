@@ -5,7 +5,10 @@
   services.hermes-agent = {
     enable = true;
     addToSystemPackages = true;                          # puts the `hermes` CLI on PATH
-    settings.model.default = "kimi/kimi-k3";
+    settings.model = {
+      provider = "openai-codex";
+      default = "gpt-6-astra";
+    };
     environmentFiles = [ "/etc/hermes/env" ];            # secret file — NOT in git (you manage this)
   };
 
