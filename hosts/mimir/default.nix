@@ -20,6 +20,7 @@
                                          # deleted) for the pinned hostId + brunnr plan.
     ./modules/system/immich-ml.nix
     ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
+    ./modules/system/voice.nix            # Whisper + Kokoro for the muninn brain (heimdall's bridge)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];
 
