@@ -14,8 +14,9 @@
     --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--cream);
+  html,body { margin:0; height:100%; color:var(--cream);
     font-family:var(--mono); font-size:13px; overflow:hidden; }
+  html { background:var(--bg); }  /* body stays transparent so the aurora shows through */
   ::-webkit-scrollbar { width:7px; height:7px; }
   ::-webkit-scrollbar-thumb { background:rgba(138,125,255,.25); border-radius:4px; }
 
@@ -191,12 +192,14 @@
   /* ── HUD chrome: thin lines, glass, one glow ─────────── */
   main { background:
       linear-gradient(rgba(138,125,255,.028) 1px, transparent 1px) 0 0 / 100% 44px,
-      linear-gradient(90deg, rgba(138,125,255,.028) 1px, transparent 1px) 0 0 / 44px 100%; }
+      linear-gradient(90deg, rgba(138,125,255,.028) 1px, transparent 1px) 0 0 / 44px 100%;
+    animation:griddrift 120s linear infinite; }
+  @keyframes griddrift { to { background-position:0 44px, 44px 0; } }
   .panel, .card { background:rgba(20,16,25,.72); backdrop-filter:blur(10px);
     border-color:rgba(138,125,255,.16); }
   .pghead h1 { letter-spacing:1px; }
   .pgmeta { letter-spacing:2.6px; }
-  .nav.on { box-shadow:inset 2px 0 0 var(--cyan); }
+  .nav.on { box-shadow:inset 2px 0 0 var(--cyan), inset 16px 0 20px -14px rgba(45,226,230,.55); }
 
   /* ── talk bar (every view) ───────────────────────────── */
   .talkbar { flex:none; display:flex; align-items:center; gap:14px; padding:10px 16px;
@@ -302,12 +305,104 @@
   .meter.warn .pct { color:var(--gold); }
   .ufoot { margin-top:22px; font-size:10.5px; color:var(--ink3); line-height:1.7; }
   @media (max-width:1150px){ .usegrid{grid-template-columns:1fr} }
+
+  /* ── hliðskjálf pass: boot, aurora, shards, living chrome ──
+     rules: glow only touches live things · ambient loops stay slow ·
+     flicker is rare and settles · reduced-motion freezes everything */
+
+  /* boot: CRT power-on — a bright line snaps open, once per load */
+  #boot { position:fixed; inset:0; z-index:100; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; pointer-events:none;
+    animation:bootfade .45s ease 1.05s forwards; }
+  #boot i { width:3px; height:2px; background:var(--cyan);
+    box-shadow:0 0 22px 3px rgba(45,226,230,.75);
+    animation:poweron 1s cubic-bezier(.25,.7,.2,1) forwards; }
+  @keyframes poweron {
+    0%   { width:3px; height:2px; opacity:0; }
+    10%  { opacity:1; }
+    40%  { width:min(64vw,760px); height:2px; }
+    58%  { width:min(64vw,760px); height:2px; }
+    100% { width:min(64vw,760px); height:100vh; opacity:0; }
+  }
+  @keyframes bootfade { to { opacity:0; visibility:hidden; } }
+
+  /* brand: flickers twice as it lights, then burns steady (with the odd stutter) */
+  .brand em { text-shadow:0 0 14px rgba(138,125,255,.4); }
+  .brand.ignite { animation:ignite 1.2s linear 1s both, neonflick 17s linear 2.6s infinite; }
+  @keyframes ignite {
+    0% { opacity:0; } 9% { opacity:1; } 14% { opacity:.15; } 21% { opacity:1; }
+    27% { opacity:.35; } 37% { opacity:1; } 100% { opacity:1; }
+  }
+  @keyframes neonflick {
+    0%, 91.6%, 93%, 95.6%, 100% { opacity:1; }
+    92% { opacity:.55; } 94.2% { opacity:.8; }
+  }
+  .sidefoot { animation:neonflick 23s linear 6s infinite; }
+
+  /* ambient scene: slow aurora beneath the content, scanlines + vignette above */
+  body::before { content:""; position:fixed; inset:-18%; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(ellipse 34% 28% at 26% 30%, rgba(138,125,255,.06), transparent 70%),
+      radial-gradient(ellipse 30% 26% at 74% 64%, rgba(45,226,230,.045), transparent 70%),
+      radial-gradient(ellipse 26% 22% at 56% 16%, rgba(255,79,163,.03), transparent 70%);
+    animation:aurora 68s ease-in-out infinite alternate; }
+  body::after { content:""; position:fixed; inset:0; z-index:90; pointer-events:none;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px),
+      radial-gradient(ellipse 125% 95% at 50% 42%, transparent 60%, rgba(4,2,9,.4) 100%); }
+  @keyframes aurora {
+    from { transform:translate3d(-1.6%,-1%,0) scale(1); }
+    to   { transform:translate3d(1.6%,1.4%,0) scale(1.05); }
+  }
+
+  /* nebula drifting behind the neural net */
+  .panel.gal::before { content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(ellipse 42% 34% at 68% 24%, rgba(45,226,230,.05), transparent 70%),
+      radial-gradient(ellipse 36% 30% at 22% 72%, rgba(255,79,163,.045), transparent 70%);
+    animation:aurora 74s ease-in-out infinite alternate-reverse; }
+  #g3d { z-index:1; }
+
+  /* chamfered shards on the small actions — corners cut, glow follows the silhouette */
+  .chip, .tbtn, .badge, .gtools button, .fbox .run, #capture-btn, .gsel .acts button {
+    border-radius:0;
+    clip-path:polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+  .chip:hover, .tbtn:hover, .gtools button:hover, .fbox .run:hover, .gsel .acts button:hover {
+    filter:drop-shadow(0 0 6px rgba(45,226,230,.35)); }
+  #capture-btn:hover { filter:drop-shadow(0 0 8px rgba(138,125,255,.55)); }
+
+  /* the orb holds a slow plasma swirl; it spins up with the orb's state */
+  .orb .core { position:absolute; inset:5px; border-radius:50%; filter:blur(1.5px);
+    background:conic-gradient(from 0deg, transparent, rgba(45,226,230,.42) 12%, transparent 34%,
+      transparent 52%, rgba(138,125,255,.38) 68%, transparent 88%);
+    animation:orbswirl 13s linear infinite; }
+  .orb.listening .core { background:conic-gradient(from 0deg, transparent, rgba(255,79,163,.55) 18%, transparent 46%);
+    animation-duration:2.6s; }
+  .orb.thinking .core { animation-duration:1.7s; }
+  .orb.speaking .core { animation-duration:3.4s; }
+  @keyframes orbswirl { to { transform:rotate(360deg); } }
+
+  /* living chrome: panel spines breathe, the talk bar glows when addressed */
+  .phead .bar { animation:sigbar 4.4s ease-in-out infinite; }
+  @keyframes sigbar { 0%,100% { opacity:.7; box-shadow:0 0 0 rgba(138,125,255,0); }
+    50% { opacity:1; box-shadow:0 0 10px rgba(138,125,255,.85); } }
+  .talkbar:focus-within { border-color:rgba(45,226,230,.45);
+    box-shadow:0 0 38px rgba(45,226,230,.12), inset 0 0 0 1px rgba(255,255,255,.03); }
+  .msg { animation:arrive .38s ease-out; }
+  @keyframes arrive { from { opacity:0; transform:translateY(6px); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important;
+      animation-iteration-count:1 !important; transition:none !important; }
+    #boot { display:none; }
+  }
 </style>
 </head>
 <body>
+<div id="boot" aria-hidden="true"><i></i></div>
 
 <aside>
-  <div class="brand">muninn <em>OS</em></div>
+  <div class="brand ignite">muninn <em>OS</em></div>
   <div class="navsec">self</div>
   <button class="nav" data-v="galaxy"><span class="ic">✦</span><span class="lbl">Neural</span></button>
   <button class="nav on" data-v="memory"><span class="ic">◈</span><span class="lbl">Memory</span></button>
@@ -438,7 +533,7 @@
 
   <!-- ── talk bar: every request goes through the bridge, Jev first ── -->
   <div class="talkbar">
-    <div class="orb idle" id="orb" title="click to talk"></div>
+    <div class="orb idle" id="orb" title="click to talk"><i class="core"></i></div>
     <div class="tstate" id="tstate">ready</div>
     <input class="talkin" id="talkin" placeholder="Talk to muninn — ask, open, search, capture, run…" autocomplete="off">
     <div class="route" id="route"></div>
@@ -1006,7 +1101,7 @@ async function refreshActivity() {
 }
 
 /* ── neural activity: ambient firing, and recall lighting up ─ */
-const active = new Map();   // node id → when it fired
+const active = new Map();   // node id → {t0, s} firing strength (1 = recall, .5 = ambient)
 let thinkingOn = false;
 function fire(n) {
   if (!Graph || curView !== 'galaxy') return;
@@ -1014,9 +1109,21 @@ function fire(n) {
   for (let i = 0; i < n && links.length; i++) Graph.emitParticle(links[(Math.random() * links.length) | 0]);
 }
 setInterval(() => fire(thinkingOn ? 16 : 2), 420);
+/* spontaneous background activity — a neuron glows softly now and then,
+   the way a resting network is never fully quiet */
+setInterval(() => {
+  if (curView !== 'galaxy' || !Graph) return;
+  const ns = Graph.graphData().nodes;
+  if (!ns.length) return;
+  for (let i = 0; i < 2; i++) {
+    const n = ns[(Math.random() * ns.length) | 0];
+    if (n && n.id != null && !active.has(n.id))
+      active.set(n.id, { t0: performance.now() - 5200, s: .5 });
+  }
+}, 3400);
 function activate(ids) {
   const now = performance.now();
-  ids.forEach(id => active.set(id, now));
+  ids.forEach(id => active.set(id, { t0: now, s: 1 }));
   if (!Graph || !ids.length) return;
   const set = new Set(ids), end = l => (l && l.id !== undefined) ? l.id : l;
   const links = Graph.graphData().links.filter(l => set.has(end(l.source)) || set.has(end(l.target))).slice(0, 180);
@@ -1036,12 +1143,13 @@ function activate(ids) {
 }
 (function pulse() {
   const now = performance.now();
-  for (const [id, t0] of active) {
-    const n = nodeById.get(id), age = (now - t0) / 1000;
+  for (const [id, f] of active) {
+    const n = nodeById.get(id), age = (now - f.t0) / 1000;
     if (age > 9) { if (n && n.__s) { n.__s.scale.set(n.__sz, n.__sz, 1); n.__s.material.opacity = n.__op; } active.delete(id); continue; }
     if (!n || !n.__s) continue;
-    const k = 1 + (1.5 + Math.sin(age * 6) * .5) * (1 - age / 9);
-    n.__s.scale.set(n.__sz * k, n.__sz * k, 1); n.__s.material.opacity = 1;
+    const k = 1 + (1.5 + Math.sin(age * 6) * .5) * f.s * (1 - age / 9);
+    n.__s.scale.set(n.__sz * k, n.__sz * k, 1);
+    n.__s.material.opacity = Math.min(1, n.__op + f.s * (1 - n.__op));
   }
   requestAnimationFrame(pulse);
 })();
@@ -1239,6 +1347,7 @@ async function refreshUsage() {
 setInterval(() => { if (curView === 'usage') refreshUsage(); }, 30000);
 
 /* ── boot ─────────────────────────────────────────────── */
+setTimeout(() => { const b = $('boot'); if (b) b.remove(); }, 2400);
 const tick = () => $('clock').textContent =
   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 tick(); setInterval(tick, 20000);
