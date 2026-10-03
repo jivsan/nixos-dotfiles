@@ -52,6 +52,26 @@ failure. Each nonempty sweep files a report in `Resources/Reports/`; failures
 return nonzero to systemd. Inputs above 128,000 bytes remain in the
 inbox for manual handling.
 
+Jev decides where a note goes: it chooses the folder and the MOC from the
+existing ones, reading each MOC's first line of prose as its description.
+MiniMax writes the title, tags and body. A capture above 2,000 characters is
+already a note: MiniMax only titles and tags it and its text is filed unchanged,
+which is faster and cannot lose content. If Jev is below `JEV_MIN_CONFIDENCE`
+on the MOC, the capture moves to `_inbox/review/`, which the sweep never reads;
+edit it and move it back to retry, or file it by hand. An unsure folder keeps
+MiniMax's folder. If Jev is unreachable, MiniMax's folder and MOC are used and
+the report says so.
+
+A capture whose first line (after any frontmatter) starts with `todo:` or `jev:`
+is a request, not a note. The sweep archives it and posts the rest to
+`/bridge/talk`, so Jev routes it like anything said to the dashboard: an agent
+job, an answer (written into the sweep report and the talk log) or a skill run.
+If Jev reads it as something to capture or show, it is filed as an ordinary
+note. A busy bridge leaves the capture in the inbox for the next sweep without
+failing the unit; an unreachable bridge or a missing worker is a recorded
+failure. Requests above 4,000 characters are refused. Anything that can write
+to `_inbox/` can start agent work with these markers.
+
 The vault's `CLAUDE.md` defines note conventions. `_inbox/` holds captures;
 `Areas/` and `Resources/` hold organized knowledge; `MOCs/` holds hub notes;
 `journal/` holds daily notes; `agents/` holds logs and archives. Templates and
@@ -86,17 +106,23 @@ journalctl -u muninn-bridge -u huginn-inbox-sweep -n 60
 `/vault/<report-path>` reader serves its Markdown. History is retained until
 an operator removes records; back up SQLite alongside vault snapshots.
 
-Schedules: inbox on local changes plus 08:15/14:15/20:15; digest 23:00; vault graph
+Schedules: inbox on local changes, within about 20 seconds of a capture written
+from another host, plus 08:15/14:15/20:15; digest 23:00; vault graph
 23:30; repo graph Sunday 04:00; gardener Saturday 08:30; dead-link fixer Sunday
 06:00; brain builder every 30 seconds. Some timers add a short randomized delay.
-NFS writes from other clients may miss inotify; the inbox timer is the fallback.
+NFS writes from other clients never reach inotify, so `huginn-inbox-poll` lists
+the inbox every 20 seconds and starts the sweep for captures it has not seen
+(`/var/lib/huginn/inbox-seen`). A capture that failed stays seen and is retried
+by the timer, by a manual run, or once it is edited.
 
 ## Configuration and deployment
 
 Secrets remain outside git:
 
 - `/var/lib/secrets/graphify-openrouter.env`: `OPENAI_API_KEY`, optionally
-  `OPENAI_BASE_URL` and `OPENAI_MODEL` (default `minimax/minimax-m3`).
+  `OPENAI_BASE_URL` and `OPENAI_MODEL` (default `minimax/minimax-m3`). The
+  inbox sweep loads only this file, so `JEV_*` overrides for filing and
+  `MUNINN_BRIDGE_URL` (default `http://127.0.0.1:8093`) go here too.
 - `/var/lib/secrets/muninn-bridge.env`: `HERMES_API_KEY`, matching hermod's
   `API_SERVER_KEY`. Optional bridge overrides: `JEV_API_KEY`, `JEV_URL`,
   `JEV_MODEL`, `JEV_MIN_CONFIDENCE`, `MUNINN_MAX_JOBS`, `MUNINN_JOBS_DB`,

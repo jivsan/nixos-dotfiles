@@ -418,12 +418,76 @@
   .bootlog .cur::after { content:"▌"; animation:curblink .5s steps(1) infinite; }
   @keyframes curblink { 50% { opacity:0; } }
 
-  /* cursor aura: soft radial glow trailing the pointer over <main> */
-  #aura { position:fixed; left:0; top:0; width:400px; height:400px; z-index:70;
-    pointer-events:none; opacity:0; transition:opacity .6s ease;
-    background:radial-gradient(circle, rgba(45,226,230,.07) 0%, rgba(138,125,255,.05) 42%, transparent 70%);
-    border-radius:50%; will-change:transform; }
-  #aura.on { opacity:1; }
+  /* ── eye-candy pack II: HUD brackets, hairline sweep, twinkle ── */
+
+  /* corner brackets: a HUD frame that brightens when the panel is hovered */
+  .panel, .card, .talkbar { position:relative; }
+  .panel::before, .card::before, .talkbar::before { content:""; position:absolute; inset:0;
+    pointer-events:none; border-radius:inherit; opacity:.45; transition:opacity .45s ease;
+    background:
+      linear-gradient(var(--violet),var(--violet)) left 0 top 0 / 15px 1px,
+      linear-gradient(var(--violet),var(--violet)) left 0 top 0 / 1px 15px,
+      linear-gradient(var(--violet),var(--violet)) right 0 top 0 / 15px 1px,
+      linear-gradient(var(--violet),var(--violet)) right 0 top 0 / 1px 15px,
+      linear-gradient(var(--violet),var(--violet)) left 0 bottom 0 / 15px 1px,
+      linear-gradient(var(--violet),var(--violet)) left 0 bottom 0 / 1px 15px,
+      linear-gradient(var(--violet),var(--violet)) right 0 bottom 0 / 15px 1px,
+      linear-gradient(var(--violet),var(--violet)) right 0 bottom 0 / 1px 15px;
+    background-repeat:no-repeat; }
+  .panel:hover::before, .card:hover::before, .talkbar:hover::before { opacity:1; }
+
+  /* phead: hairline gradient slowly sweeping under the title + breathing bar */
+  .phead { position:relative; }
+  .phead::after { content:""; position:absolute; left:18px; right:18px; bottom:-1px; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(138,125,255,.6), rgba(45,226,230,.6), transparent);
+    background-size:220% 100%; opacity:.4; animation:hairsweep 11s ease-in-out infinite alternate; }
+  @keyframes hairsweep { from { background-position:0% 0; } to { background-position:100% 0; } }
+  .phead .bar { box-shadow:0 0 8px rgba(138,125,255,.55); animation:barbreathe 4.5s ease-in-out infinite; }
+  @keyframes barbreathe { 50% { background:var(--cyan); box-shadow:0 0 14px rgba(45,226,230,.75); } }
+
+  /* nav: icons ignite on the active view, rows get a hover hairline */
+  .nav { transition:transform .18s ease, background .18s ease, color .18s ease; }
+  .nav:hover { transform:translateX(3px); }
+  .nav.on .ic { color:var(--cyan); text-shadow:0 0 9px rgba(45,226,230,.85); }
+  .row { transition:background .15s ease, box-shadow .15s ease; }
+  .row:hover { box-shadow:inset 2px 0 0 rgba(45,226,230,.35); }
+  .row.sel .dot { box-shadow:0 0 7px rgba(255,255,255,.6); }
+
+  /* orb: a little lift under the pointer */
+  .orb { transition:transform .25s ease; }
+  .orb:hover { transform:scale(1.07); }
+
+  /* meters: fills ease in and carry a slow shine */
+  .meter .fill { position:relative; transition:width .9s cubic-bezier(.2,.8,.25,1); }
+  .meter .fill::after { content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+    background-size:60% 100%; background-repeat:no-repeat; animation:fillshine 3.2s ease-in-out infinite; }
+  @keyframes fillshine { 0% { background-position:-80% 0; } 60%,100% { background-position:180% 0; } }
+
+  /* route readout: the winning tier breathes */
+  .route .tier.win i b { animation:tierwin 2.4s ease-in-out infinite; }
+  @keyframes tierwin { 50% { filter:brightness(1.5); } }
+
+  /* twinkling starfield behind everything (sits with aurora + dust at z -1) */
+  .stars { position:fixed; inset:0; z-index:-1; pointer-events:none; }
+  .stars i { position:absolute; inset:0; display:block; }
+  .stars i:nth-child(1) { background:
+      radial-gradient(circle, rgba(236,229,216,.8) 1px, transparent 1.5px) 12% 18% / 340px 340px,
+      radial-gradient(circle, rgba(45,226,230,.7) 1px, transparent 1.5px) 66% 42% / 470px 470px;
+    animation:twinkle 6.5s ease-in-out infinite; }
+  .stars i:nth-child(2) { background:
+      radial-gradient(circle, rgba(138,125,255,.75) 1px, transparent 1.5px) 38% 74% / 410px 410px,
+      radial-gradient(circle, rgba(255,79,163,.55) 1px, transparent 1.5px) 84% 12% / 560px 560px;
+    animation:twinkle 9.5s ease-in-out -3s infinite reverse; }
+  @keyframes twinkle { 0%,100% { opacity:.05; } 50% { opacity:.16; } }
+
+  /* quiet polish: selection, caret, scrollbar, wikilink glow, ghost breath */
+  ::selection { background:rgba(138,125,255,.38); color:#fff; }
+  .talkin, #q, .gsearch, #capture-text { caret-color:var(--cyan); }
+  ::-webkit-scrollbar-thumb:hover { background:rgba(45,226,230,.45); }
+  .wl:hover { text-shadow:0 0 9px rgba(255,79,163,.6); }
+  .ghost { animation:ghostpulse 5.5s ease-in-out infinite; }
+  @keyframes ghostpulse { 50% { opacity:.55; } }
 
   /* synaptic dust: two drifting dot layers + pointer parallax */
   .dust { position:fixed; inset:0; z-index:-1; pointer-events:none; will-change:transform; }
@@ -459,7 +523,7 @@
   @keyframes glitchr { 0%{transform:translate(2px,-1px)} 50%{transform:translate(-2px,1px)} 100%{transform:translate(0)} }
 
   @media (prefers-reduced-motion: reduce) {
-    .crt-blink, #aura, .dust, .sweep { display:none; }
+    .crt-blink, .dust, .sweep, .stars { display:none; }
     #pg-title::before, #pg-title::after { display:none; }
   }
   /* ── model tiers: the route readout colors who answered ── */
@@ -513,6 +577,7 @@
 </head>
 <body>
 <div id="boot" aria-hidden="true"><i></i></div>
+<div class="stars" aria-hidden="true"><i></i><i></i></div>
 
 <aside>
   <div class="brand ignite">muninn <em>OS</em></div>
@@ -1595,22 +1660,6 @@ function decodeTitle() {
       setTimeout(typeLine, 90);
     })();
   }, 260);
-})();
-
-/* cursor aura over <main> */
-(function aura() {
-  if (RM.matches) return;
-  const el = document.createElement('div'); el.id = 'aura'; document.body.appendChild(el);
-  const main = document.querySelector('main');
-  let ax = -500, ay = -500, raf = 0;
-  const paint = () => { raf = 0;
-    el.style.transform = `translate3d(${ax - 200}px, ${ay - 200}px, 0)`; };
-  main.addEventListener('pointermove', e => {
-    ax = e.clientX; ay = e.clientY;
-    el.classList.add('on');
-    if (!raf) raf = requestAnimationFrame(paint);
-  });
-  main.addEventListener('pointerleave', () => el.classList.remove('on'));
 })();
 
 /* synaptic dust layers + parallax */

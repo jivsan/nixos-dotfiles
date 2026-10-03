@@ -4,7 +4,9 @@
 # Anthropic credit. systemd-timer jobs:
 #   • inbox-sweep    — MiniMax turns each _inbox note into a titled, frontmattered,
 #                      MOC-linked note with archived originals and a sweep report;
-#                      also path-triggered (inotify on _inbox) for instant filing
+#                      also path-triggered (inotify on _inbox) for instant filing.
+#                      Jev picks the folder + MOC (unsure → _inbox/review/); a
+#                      capture starting `todo:` or `jev:` goes to the bridge instead
 #   • daily-digest   — MiniMax summarises the day into today's journal note
 #   • graphify-repo  — offline code extraction + MiniMax community labeling (weekly)
 #   • graphify-vault — the NOTES graph: staged copy of the vault's markdown only
@@ -227,15 +229,43 @@ let
     '';
   };
 
+  # One line per waiting capture (mtime + name). The sweep records what it saw
+  # when it started; the poll below starts it again only for lines not in there.
+  inboxSeen = "${agentHome}/inbox-seen";
+  listCaptures = "find ${vault}/_inbox -maxdepth 1 -type f -name '*.md' ! -name README.md -printf '%T@ %f\\n'";
+
   # ── inbox filing: preserve full originals and file a durable sweep report ──
   inboxSweep = pkgs.writeShellApplication {
     name = "huginn-inbox-sweep";
-    runtimeInputs = [ vaultCommit pkgs.python3 ];
+    runtimeInputs = [ vaultCommit pkgs.python3 pkgs.findutils pkgs.coreutils ];
     text = ''
+      ${listCaptures} > ${inboxSeen} || true
       status=0
       python3 ${../../muninn/inbox.py} --vault "${vault}" || status=$?
       muninn-vault-commit "huginn: inbox filing and report (status $status)"
       exit "$status"
+    '';
+  };
+
+  # ── inbox poll: a capture written from another NFS client (mjolnir, tyr,
+  # hermod) never reaches the path unit's inotify, and one that lands while a
+  # sweep is running is missed by it too. Look every 20 s and start the sweep
+  # for anything it has not seen. A capture that failed stays seen, so it is
+  # left to the timer instead of being retried every 20 s.
+  inboxPoll = pkgs.writeShellApplication {
+    name = "huginn-inbox-poll";
+    runtimeInputs = [ pkgs.findutils pkgs.coreutils pkgs.gnugrep pkgs.systemd ];
+    text = ''
+      while sleep 20; do
+        state="$(systemctl is-active huginn-inbox-sweep.service || true)"
+        [ "$state" = activating ] && continue   # look again once it is done
+        now="$(${listCaptures})" || continue    # vault briefly unreachable
+        [ -n "$now" ] || continue
+        touch ${inboxSeen}
+        if grep -qFxvf ${inboxSeen} <<< "$now"; then
+          /run/wrappers/bin/sudo -n systemctl start --no-block huginn-inbox-sweep.service || true
+        fi
+      done
     '';
   };
 
@@ -361,6 +391,19 @@ in
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${inboxSweep}/bin/huginn-inbox-sweep";
+    };
+  };
+  # No NoNewPrivileges here: the poll starts the sweep through sudo, like the bridge.
+  systemd.services."huginn-inbox-poll" = {
+    description = "huginn: start the inbox sweep for captures written over NFS";
+    wantedBy = [ "multi-user.target" ];
+    unitConfig.RequiresMountsFor = vault;
+    serviceConfig = {
+      User = "christina";
+      Group = "users";
+      ExecStart = "${inboxPoll}/bin/huginn-inbox-poll";
+      Restart = "always";
+      RestartSec = "30s";
     };
   };
   # instant filing: fire the sweep when something lands in _inbox. Only sees
