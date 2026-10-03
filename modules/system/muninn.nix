@@ -52,6 +52,32 @@ let
         'sudo systemd-run --wait --pipe --quiet --uid=christina --gid=users -p EnvironmentFile=/var/lib/secrets/graphify-openrouter.env -p Environment=HOME=/var/lib/huginn /run/current-system/sw/bin/muninn-ask'
     '';
   };
+  # Reports Codex's 5-hour and weekly usage to the brain (Usage tab). Codex
+  # writes a rate-limit snapshot into its session log after every turn; this
+  # sends the newest one, stamped with when it was measured. Does nothing on a
+  # host where Codex has never run, and never fails the unit if the brain is down.
+  codexUsage = pkgs.writeShellApplication {
+    name = "muninn-codex-usage";
+    runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.hostname ];
+    text = ''
+      dir="''${CODEX_HOME:-$HOME/.codex}/sessions"
+      [ -d "$dir" ] || exit 0
+      f="$(find "$dir" -name '*.jsonl' -printf '%T@ %p\n' | sort -n | tail -n 1 | cut -d' ' -f2-)"
+      [ -n "$f" ] || exit 0
+      line="$(tail -n 400 "$f" | grep '"rate_limits"' | tail -n 1 || true)"
+      [ -n "$line" ] || exit 0
+      body="$(printf '%s' "$line" | jq -c --arg h "$(hostname)" --argjson t "$(stat -c %Y "$f")" '
+        [.. | objects | select(has("rate_limits")) | .rate_limits] | last
+        | select(. != null)
+        | { provider: "openai", host: $h, as_of: $t,
+            five_hour: (.primary | if . then {used_percent, resets_at} else null end),
+            seven_day: (.secondary | if . then {used_percent, resets_at} else null end) }' || true)"
+      [ -n "$body" ] || exit 0
+      curl -fsS -m 10 https://brain.oryxserver.org/bridge/usage -H 'Content-Type: application/json' -d "$body" >/dev/null \
+        || echo "muninn-codex-usage: the brain did not accept the report" >&2
+    '';
+  };
+
   # Claude Code status line that also reports the subscription's 5-hour and
   # weekly usage to the brain (Usage tab). Claude Code only exposes these
   # numbers to a status line command. Enable in ~/.claude/settings.json:
@@ -102,7 +128,23 @@ in
     ];
   };
 
-  environment.systemPackages = [ capture ask usageStatusline ];
+  environment.systemPackages = [ capture ask usageStatusline codexUsage ];
+
+  systemd.user.services.muninn-codex-usage = {
+    description = "report Codex usage to the muninn brain";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${codexUsage}/bin/muninn-codex-usage";
+    };
+  };
+  systemd.user.timers.muninn-codex-usage = {
+    description = "report Codex usage to the muninn brain every few minutes";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnStartupSec = "2m";
+      OnUnitActiveSec = "5m";
+    };
+  };
 
   programs.ssh.knownHosts."10.0.20.17".publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMafsna8LlSXtsC1h7kSPV3Y3gcTnXdmTNvHArpIUoQZ";
