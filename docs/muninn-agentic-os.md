@@ -1,125 +1,145 @@
 # muninn — the agentic OS
 
-An "agentic OS" whose memory lives in an **Obsidian vault** (`muninn`) on the homelab.
-Humans and agents (Claude Code, headless) read and write the same plain-markdown notes;
-wikilinks between notes form a knowledge graph. Everything runs **server-side on
-`heimdall`** — the desktop (`mjolnir`) is just a consumer.
+Muninn is the Obsidian vault on odyn, mounted at `/mnt/nas/obsidian/muninn`
+on heimdall. The dashboard, bridge, indexer and huginn automations run on
+heimdall. Jev routes requests; MiniMax answers questions; Hermes or Codex does
+tool work. The desktop consumes these services.
 
-- **Vault (memory):** `muninn` — markdown on `odyn` (TrueNAS) NFS.
-- **Agents (mind):** `huginn` — Claude Code on timers, filing/summarising/graphing.
-- **Graph:** [Graphify](https://github.com/safishamsi/graphify) turns the config repo into a
-  queryable knowledge graph; a live 3D "brain" renders it.
+## Request and memory loop
 
-## Mental model
+1. Typed or spoken requests enter `POST /bridge/talk`. Local Whisper and Kokoro
+   on mimir provide transcription and speech.
+2. **Jev** chooses a tier, command/skill, and worker from bounded choices. It sees
+   which workers are configured. An explicit `target: hermes` or `target: codex`
+   overrides dispatch while preserving Jev's classification in the job record.
+3. **Commands** open views, search, capture notes, or start an allowlisted systemd
+   skill. **Answers** use MiniMax with vault search and the config graph.
+   **Agent work** goes to Hermes on hermod or Codex on heimdall.
+4. Before dispatch, the bridge saves the job and routing decision in
+   `/var/lib/muninn-brain/jobs.db`. At most two agent jobs run concurrently;
+   excess requests receive `busy: true` and can be retried later.
+5. The bridge files each terminal response in
+   `Resources/Reports/Agent report <date> <job-id>.md`, including frontmatter,
+   an Agents MOC link, request, route, worker, timestamps, status and result.
+   Agents are asked to include findings, source URLs and actual output paths.
+   A remote worker without vault access returns its deliverable for the bridge
+   to file. Agent-created files normally go in `Resources/Outputs/`.
+6. Reports enter the existing index and graph. Substantive conversations go
+   into `Resources/Talk logs/`; nightly digests summarize changed notes.
 
-```
-        YOU
-         ├─ obsidian.oryxserver.org   ← read/write notes like a human (Obsidian in the browser)
-         ├─ brain.oryxserver.org      ← watch the live 3D knowledge graph
-         └─ claude (mjolnir terminal)  ← capture + ask, wired to the graph via MCP
-                       │
-   ────────────────────────────────────────────────────────────────
-   heimdall (server) — the OS runs here
-     • linuxserver/obsidian container (KasmVNC) + the muninn vault (odyn NFS)
-     • huginn agents (systemd timers)         • Graphify + graphify-mcp
-     • the "brain" (nginx + 30s graph builder)
-   odyn (TrueNAS, 10.0.20.6) — vault dataset vault/obsidian, ZFS snapshots
-```
+Jev uses `https://openrouter.ai/api/v1/systemone`, `typesafe/jev-1.13` and the
+existing OpenRouter key. Invalid, unavailable or low-confidence decisions fall
+back to local rules, with `jev_error` and `route.fallback_reason` exposed.
+Confidence is checked separately for the tier and its relevant command, skill
+or worker. `JEV_MIN_CONFIDENCE=0.5` is application policy, not an accuracy guarantee.
+Configured-worker flags do not prove remote reachability.
 
-**The one idea:** the vault is the OS; everyone edits the same files. You drop rough notes
-in `_inbox/`, an agent turns them into titled, frontmattered, linked notes, and the graph
-grows.
+Hermes jobs use separate conversations. Codex retains its `workspace-write`
+sandbox. On bridge restart, unfinished execution becomes failed and receives an
+interruption report. Tool actions are never automatically replayed. If execution
+finished but filing was pending, startup files the saved result. Report-write
+errors fail the job and retain its response plus `report_error` in SQLite.
+Inspect that record before retrying work.
 
-## Daily cheat-sheet
+## Capture and filing
 
-| I want to… | Do this |
-|---|---|
-| 💭 **Capture a thought** | `capture "rough idea..."` (mjolnir) → huginn files & links it |
-| 🗣️ **Ask about my config / knowledge** | open a new `claude`, ask *"what connects traefik to acme?"* — it queries the graph via the `graphify-dotfiles` MCP |
-| 📖 **Browse notes in the terminal** | Claude Code can read `~/muninn/` directly (NFS mount) |
-| 🖥️ **Read/write like a human** | <https://obsidian.oryxserver.org> — the Home note is the dashboard |
-| 🧠 **Watch it think** | <https://brain.oryxserver.org> — live 3D graph (hard-refresh after deploys) |
+`capture "rough thought"`, the dashboard, or `POST /api/inbox` creates an inbox
+note. Huginn validates the model's JSON and files a titled, frontmattered note
+into `Areas/` or `Resources/`, linked to an existing MOC. Full originals are
+archived under `agents/inbox/archive/`; source notes are not deleted after a
+truncated model request. Invalid output and concurrent edits cause a recorded
+failure. Each nonempty sweep files a report in `Resources/Reports/`; failures
+return nonzero to systemd. Inputs above 128,000 bytes remain in the
+inbox for manual handling.
 
-Both web apps are gated by Traefik's `lan-only` middleware (LAN + Tailscale) plus the
-KasmVNC login.
+The vault's `CLAUDE.md` defines note conventions. `_inbox/` holds captures;
+`Areas/` and `Resources/` hold organized knowledge; `MOCs/` holds hub notes;
+`journal/` holds daily notes; `agents/` holds logs and archives. Templates and
+Obsidian settings live in `_templates/` and `.obsidian/`.
 
-## How you interact (the loop)
+## API and operations
 
-1. **Capture** — `capture "..."` writes `~/muninn/_inbox/capture-<ts>.md` and nudges huginn.
-   (Or write anywhere in the vault directly; `_inbox/` is the "let the OS sort it" lane.)
-2. **File** — `huginn-inbox-sweep` gives it a title + frontmatter, wikilinks it to a MOC in
-   `MOCs/`, and moves it into `Areas/` or `Resources/`.
-3. **Digest** — nightly, `huginn-daily-digest` appends a summary to `journal/<date>.md`.
-4. **Graph** — weekly, `huginn-graphify-repo` rebuilds the code knowledge graph; the brain
-   builder merges it with the vault wikilinks every 30s.
-
-## Vault layout & note conventions
-
-The vault root `CLAUDE.md` is the source of truth for agents. In short:
-
-- `_inbox/` — capture queue · `journal/` — daily notes · `MOCs/` — hub notes (the graph
-  backbone) · `Areas/`, `Resources/` — filed notes · `_templates/` — Templater templates ·
-  `agents/logs/` — agent run logs · `graphify-out/` — generated graph.
-- **Every note wikilinks to at least one MOC.** Frontmatter: `type, status, tags, created,
-  agent`.
-- Plugins: Dataview, Templater, Homepage. Theme: Tokyo Night + pink/cyan graph colours.
-
-## Admin & operations
-
-Run agents on demand (on `heimdall`); otherwise they run on their timers:
+Dashboard: <https://brain.oryxserver.org>. Hosted Obsidian:
+<https://obsidian.oryxserver.org>. Traefik restricts access to LAN/Tailscale.
 
 ```bash
-sudo systemctl start huginn-inbox-sweep.service     # file the _inbox now
-sudo systemctl start huginn-daily-digest.service    # write today's journal digest
-sudo systemctl start huginn-graphify.service        # rebuild the VAULT semantic graph
-sudo systemctl start huginn-graphify-repo.service   # rebuild the DOTFILES code graph (MCP + brain)
-systemctl list-timers 'huginn*' 'muninn*'           # when does each run next?
-journalctl -u huginn-inbox-sweep -n 40              # what did it do?
+curl -sS https://brain.oryxserver.org/bridge/talk \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Research my backup options and file a report","target":"auto"}'
+curl -sS https://brain.oryxserver.org/bridge/jobs
+curl -sS https://brain.oryxserver.org/bridge/jobs/JOB_ID
+curl -sS https://brain.oryxserver.org/bridge/skills
+curl -sS https://brain.oryxserver.org/bridge/health
+
+# On heimdall:
+sudo systemctl start huginn-inbox-sweep.service
+sudo systemctl start huginn-daily-digest.service
+sudo systemctl start huginn-graphify-vault.service
+sudo systemctl start huginn-graphify-repo.service
+systemctl list-timers 'huginn*' 'muninn*'
+journalctl -u muninn-bridge -u huginn-inbox-sweep -n 60
 ```
 
-Schedules: inbox-sweep 08/10/12/14/16/18/20 at :15 · daily-digest 23:00 · vault graphify
-23:30 · repo graphify Sun 04:00 · brain builder every 30s.
+`GET /bridge/jobs` returns the latest 50 records. Job states remain `running`,
+`done` and `failed` for existing clients. Individual records include `route`,
+`answer` and, when filed, the vault-relative `report` path. The existing
+`/vault/<report-path>` reader serves its Markdown. History is retained until
+an operator removes records; back up SQLite alongside vault snapshots.
 
-### Model / cost
+Schedules: inbox on local changes plus 08:15/14:15/20:15; digest 23:00; vault graph
+23:30; repo graph Sunday 04:00; gardener Saturday 08:30; dead-link fixer Sunday
+06:00; brain builder every 30 seconds. Some timers add a short randomized delay.
+NFS writes from other clients may miss inotify; the inbox timer is the fallback.
 
-Everything the OS runs is **Claude Sonnet 4.6**. Change the single `model` variable at the
-top of `hosts/heimdall/modules/system/huginn.nix` (e.g. `claude-haiku-4-5-20251001` for
-cheaper, `claude-opus-4-8` for max reasoning), then rebuild. Your interactive terminal
-Claude is separate — set it with `/model`.
+## Configuration and deployment
 
-### Auth / secrets (out of git)
+Secrets remain outside git:
 
-- `heimdall:/var/lib/secrets/claude-code.env` → `ANTHROPIC_API_KEY=...` (drives the agents
-  **and** Graphify's markdown extraction).
-- `heimdall:/var/lib/secrets/obsidian.env` → `CUSTOM_USER` / `PASSWORD` for the KasmVNC login.
-- `heimdall:/var/lib/secrets/cloudflare-dns-token` → wildcard TLS (existing).
+- `/var/lib/secrets/graphify-openrouter.env`: `OPENAI_API_KEY`, optionally
+  `OPENAI_BASE_URL` and `OPENAI_MODEL` (default `minimax/minimax-m3`).
+- `/var/lib/secrets/muninn-bridge.env`: `HERMES_API_KEY`, matching hermod's
+  `API_SERVER_KEY`. Optional bridge overrides: `JEV_API_KEY`, `JEV_URL`,
+  `JEV_MODEL`, `JEV_MIN_CONFIDENCE`, `MUNINN_MAX_JOBS`, `MUNINN_JOBS_DB`,
+  `MUNINN_HERMES_URL`. Native TypeSafe uses its key,
+  `JEV_URL=https://api.typesafe.ai/v1/systemone` and `JEV_MODEL=jev-latest`.
+- Codex needs its existing login on heimdall. Hermes uses its configured provider
+  on hermod. Neither worker's credentials are supplied to Jev.
+- `/var/lib/secrets/obsidian.env`: browser login.
 
-## Where it lives (module map)
+After review and merge, deploy the heimdall NixOS configuration using the usual
+host rebuild procedure. Startup creates the jobs database. The Nix package
+includes both bridge modules. Check health, submit a small job, verify its report,
+and test an inbox capture. Offline tests mock model and worker calls; they do
+not establish that live credentials or remote tools work.
 
-| Piece | File |
+## Development and source map
+
+```bash
+python3 -m unittest discover -s hosts/heimdall/muninn/brain -p 'test_*.py'
+python3 -m unittest discover -s hosts/heimdall/muninn -p 'test_inbox.py'
+nix-instantiate --parse hosts/heimdall/modules/system/brain.nix >/dev/null
+nix-instantiate --parse hosts/heimdall/modules/system/huginn.nix >/dev/null
+```
+
+| Component | Source |
 |---|---|
-| Obsidian container + vault NFS mount | `hosts/heimdall/modules/system/obsidian.nix` |
-| huginn agents + Graphify jobs | `hosts/heimdall/modules/system/huginn.nix` |
-| the brain (nginx + builder) | `hosts/heimdall/modules/system/brain.nix` |
-| brain builder + web app | `hosts/heimdall/muninn/brain/{build-graph.py,index.html}` |
-| Traefik routers (`obsidian`, `brain`) | `hosts/heimdall/modules/system/traefik.nix` |
-| vault bootstrap (folders, plugins, theme) | `hosts/heimdall/muninn/bootstrap.sh` |
-| mjolnir `~/muninn` mount + `capture` | `modules/system/muninn.nix` |
+| Routing, voice, worker adapters | `hosts/heimdall/muninn/brain/bridge.py` |
+| Durable jobs and report filing | `hosts/heimdall/muninn/brain/jobs.py` |
+| Inbox validation and archiving | `hosts/heimdall/muninn/inbox.py` |
+| Services, API, indexer, nginx | `hosts/heimdall/modules/system/brain.nix` |
+| Scheduled automations | `hosts/heimdall/modules/system/huginn.nix` |
+| Vault/NFS and hosted Obsidian | `hosts/heimdall/modules/system/obsidian.nix` |
+| Remote worker | `hosts/hermod/modules/system/hermes-agent.nix` |
+| Desktop commands | `modules/system/muninn.nix` |
 
-**Key hosts/paths:** heimdall `10.0.20.17` · odyn `10.0.20.6` · vault export
-`odyn:/mnt/vault/obsidian` → `heimdall:/mnt/nas/obsidian` and `mjolnir:~/muninn` · code graph
-`heimdall:/var/lib/huginn/graphs/dotfiles/graph.json`.
+## Research basis
 
-## The terminal ↔ knowledge link (MCP)
-
-`mjolnir` Claude Code has a user-scope MCP server `graphify-dotfiles` (in `~/.claude.json`)
-that runs `graphify-mcp` on `heimdall` over SSH, serving the dotfiles graph:
-
-```
-ssh christina@10.0.20.17 env HOME=/var/lib/huginn \
-  /var/lib/huginn/.local/bin/graphify-mcp /var/lib/huginn/graphs/dotfiles/graph.json
-```
-
-Tools it exposes: `query_graph`, `get_node`, `get_neighbors`, `get_community`, `god_nodes`,
-`shortest_path`, `graph_stats`. Re-add with `claude mcp add graphify-dotfiles -s user -- …`
-if you ever wipe `~/.claude.json`.
+The [requested video](https://www.youtube.com/watch?v=EOdXR6lU5ZA) did not expose
+a transcript to the research tools. The creator's
+[companion article](https://www.chaseai.io/blog/how-to-build-an-agentic-os-claude-os)
+describes three routing tiers and a vault receiving conversations and skill
+outputs. This implementation keeps the existing vault layout and providers.
+[OpenRouter's TypeSafe API documentation](https://openrouter.ai/docs/guides/community/typesafe-sdk)
+confirms the endpoint and model namespace;
+[TypeSafe's confidence documentation](https://docs.typesafe.ai/confidence)
+explains confidence versus an option's probability.

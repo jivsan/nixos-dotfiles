@@ -3,7 +3,7 @@
 # All agents run on OpenRouter/MiniMax (OpenAI-compatible) — NO Claude, NO
 # Anthropic credit. systemd-timer jobs:
 #   • inbox-sweep    — MiniMax turns each _inbox note into a titled, frontmattered,
-#                      MOC-linked note (model returns JSON → shell writes the file);
+#                      MOC-linked note with archived originals and a sweep report;
 #                      also path-triggered (inotify on _inbox) for instant filing
 #   • daily-digest   — MiniMax summarises the day into today's journal note
 #   • graphify-repo  — offline code extraction + MiniMax community labeling (weekly)
@@ -15,6 +15,7 @@
 # Cross-cutting: every vault-writing agent auto-commits the vault git repo
 # (audit trail, author huginn), and every huginn unit has OnFailure= wired to
 # drop an alert note into _inbox/ so failures surface on the Home dashboard.
+# Inbox-sweep alerts go directly to Resources/Reports to avoid retrigger loops.
 #
 # Runs as `christina` (uid 1000, matches the vault's NFS ownership), hardened with
 # NoNewPrivileges + ProtectHome. LLM creds live in the out-of-git secret
@@ -68,10 +69,16 @@ let
     name = "huginn-notify";
     runtimeInputs = [ pkgs.coreutils pkgs.systemd ];
     text = ''
+      umask 0022  # nginx serves these reports through /vault
       unit="''${1:-unknown-unit}"
-      mkdir -p "${vault}/_inbox"
-      f="${vault}/_inbox/alert-$unit-$(date +%Y%m%d-%H%M%S).md"
+      dest="${vault}/_inbox"
+      case "$unit" in
+        huginn-inbox-sweep|huginn-inbox-sweep.service) dest="${vault}/Resources/Reports" ;;
+      esac
+      mkdir -p "$dest"
+      f="$dest/alert-$unit-$(date +%Y%m%d-%H%M%S-%N).md"
       {
+        printf -- '---\ntype: report\nagent: huginn\nstatus: failed\ncreated: %s\n---\n\n' "$(date -Iseconds)"
         echo "huginn alert: $unit FAILED on heimdall at $(date -Iseconds)."
         echo
         echo "Recent log lines:"
@@ -80,6 +87,8 @@ let
         echo '```'
         echo
         echo "Inspect: ssh christina@10.0.20.17 'systemctl status $unit'"
+        echo
+        echo '[[MOCs/Agents MOC]]'
       } > "$f"
     '';
   };
@@ -218,50 +227,15 @@ let
     '';
   };
 
-  # ── inbox sweep (MiniMax) — file each _inbox note into a titled, linked note ──
+  # ── inbox filing: preserve full originals and file a durable sweep report ──
   inboxSweep = pkgs.writeShellApplication {
     name = "huginn-inbox-sweep";
-    runtimeInputs = [ llm vaultCommit pkgs.jq pkgs.coreutils ];
+    runtimeInputs = [ vaultCommit pkgs.python3 ];
     text = ''
-      : "''${OPENAI_API_KEY:?not set — needs /var/lib/secrets/graphify-openrouter.env}"
-      inbox="${vault}/_inbox"
-      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
-      today="$(date +%F)"
-      log(){ echo "[$(date -Iseconds)] $*" | tee -a "$logdir/inbox-sweep.log"; }
-      mocs=""
-      for m in "${vault}/MOCs"/*.md; do [ -e "$m" ] && mocs="$mocs, $(basename "$m" .md)"; done
-      mocs="''${mocs#, }"; [ -n "$mocs" ] || mocs="Home MOC"
-      log "inbox-sweep start (minimax)"
-      filed=0
-      shopt -s nullglob
-      for f in "$inbox"/*.md; do
-        bn="$(basename "$f")"
-        [ "$bn" = "README.md" ] && continue
-        [ -r "$f" ] || { log "  ! skip $bn (unreadable — foreign NFS uid? fix perms on odyn)"; continue; }
-        raw="$(head -c 8000 "$f")"
-        [ -n "$raw" ] || { log "  ! skip $bn (empty)"; continue; }
-        sys="You file a rough inbox note into an Obsidian vault. Reply with ONLY a JSON object (no code fences, no prose) with keys: title (concise, no slashes or newlines), folder (exactly Areas or Resources), moc (choose the single best from: $mocs), tags (array of 1-4 short lowercase strings), body (the note rewritten as clean markdown, keeping every fact, inventing nothing)."
-        j="$(printf '%s' "$raw" | muninn-llm "$sys" | sed '/^```/d')"
-        if ! printf '%s' "$j" | jq -e 'type=="object"' >/dev/null 2>&1; then
-          log "  ! skip $bn (no JSON from model)"; continue
-        fi
-        title="$(printf '%s' "$j" | jq -r '.title // empty' | tr -d '\r\n' | tr '/' '-' | cut -c1-90)"
-        [ -n "$title" ] || { log "  ! skip $bn (no title)"; continue; }
-        folder="$(printf '%s' "$j" | jq -r 'if .folder=="Areas" then "Areas" else "Resources" end')"
-        moc="$(printf '%s' "$j" | jq -r '.moc // "Home MOC"')"
-        tags="$(printf '%s' "$j" | jq -r '(.tags // []) | map(tostring) | join(", ")')"
-        body="$(printf '%s' "$j" | jq -r '.body // ""')"
-        dest="${vault}/$folder"; mkdir -p "$dest"
-        target="$dest/$title.md"; k=2
-        while [ -e "$target" ]; do target="$dest/$title ($k).md"; k=$((k+1)); done
-        printf -- '---\ntype: note\nstatus: active\ntags: [%s]\ncreated: %s\nagent: huginn\n---\n\n# %s\n\n%s\n\nSee also: [[%s]]\n' \
-          "$tags" "$today" "$title" "$body" "$moc" > "$target"
-        rm -f "$f"
-        log "  + $bn -> $folder/$(basename "$target")  [[$moc]]"
-        filed=$((filed+1))
-      done
-      if [ "$filed" -gt 0 ]; then muninn-vault-commit "huginn: inbox-sweep filed $filed note(s)"; fi
-      log "inbox-sweep done ($filed filed)"
+      status=0
+      python3 ${../../muninn/inbox.py} --vault "${vault}" || status=$?
+      muninn-vault-commit "huginn: inbox filing and report (status $status)"
+      exit "$status"
     '';
   };
 
