@@ -17,6 +17,7 @@ All hosts sit on VLAN 20 (`10.0.20.0/24`); the VMs run on `hella` (Proxmox).
 | `mimir`        | `10.0.20.18`  | Headless AI box (5950X, GTX 1070 — RTX 5070 Ti pending) — ComfyUI, Immich-ML | — |
 | `tyr`          | `10.0.20.19`  | Headless testing / sandbox VM — deliberately minimal | —                          |
 | `njord`        | `10.0.20.20`  | Headless finance VM — [Sure](https://github.com/we-promise/sure), isolated from the rest of the fleet | — |
+| `hermod`       | `10.0.20.21`  | Headless Hermes Agent VM — minimal sandbox for the agent, linked to the muninn vault | — |
 
 > These are the **NixOS** hosts in this flake. The homelab also runs non-NixOS
 > infrastructure — the Arista switch, pfSense, TrueNAS, a Pi-hole LXC — described in the

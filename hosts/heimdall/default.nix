@@ -57,6 +57,7 @@
 
   users.users.christina.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJzbgLEOUP00lHJUp6MYDOm2kDyHjr9khWaGc84YnpXL mimir"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqRu0/cwcMKm5+Rxm8jx8GfpaqCtPieqGaxetVH8Prj hermod"
   ];
 
   environment.systemPackages = with pkgs; [
