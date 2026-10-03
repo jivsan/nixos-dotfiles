@@ -63,4 +63,7 @@ in
   };
 
   environment.systemPackages = [ capture ask ];
+
+  programs.ssh.knownHosts."10.0.20.17".publicKey =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMafsna8LlSXtsC1h7kSPV3Y3gcTnXdmTNvHArpIUoQZ";
 }

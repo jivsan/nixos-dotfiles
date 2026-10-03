@@ -11,7 +11,7 @@
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
     ../../modules/apps/herdr.nix
-    ../../modules/apps/hermes-agent.nix
+    ../../modules/system/muninn.nix
 
     # ── mimir-local: AI / GPU stack ──
     ./modules/system/nvidia.nix
