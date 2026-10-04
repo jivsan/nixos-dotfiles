@@ -185,10 +185,10 @@ JEV_QUESTIONS = {
     },
     "needs_web": {
         "type": "noul",
-        "instructions": "Does carrying out `request` need information from the internet?",
+        "instructions": "Does carrying out `request` need information from the public internet: a web search or reading web pages?",
         "criteria": {
             "true": "It asks for research, news, current versions, prices, documentation or anything else that has to be looked up online",
-            "false": "It can be done from her own notes, files and systems alone",
+            "false": "It is about her own notes, files, servers and services, including how they are doing right now, or it needs no lookup at all",
         },
     },
     "changes_vault": {
@@ -272,6 +272,7 @@ def route_jev(text):
     if not JEV_KEY:
         return None
     t0 = time.time()
+    a = None
     try:
         r = post_json(JEV_URL, {"model": JEV_MODEL, "state": {"request": text},
                               "questions": JEV_QUESTIONS}, 2.5, key=JEV_KEY)
@@ -310,9 +311,10 @@ def route_jev(text):
         settled = {}   # what Jev was unsure of, and how each was settled instead
         tier_name, sure = read("tier")
         if sure < JEV_MIN_CONFIDENCE:
-            # Torn between answering and working: what the task needs decides. A
-            # command it is unsure of stays with the rules, which know the commands.
-            if tier_name == "command" or needs["web"] is None or needs["writes"] is None:
+            # Torn: a half-sure command is never acted on. If the rules know the
+            # request as a command by its first word it is theirs; otherwise what
+            # the task needs decides between answering it and working on it.
+            if needs["web"] is None or needs["writes"] is None or route_rules(text)["tier"] == "command":
                 raise ValueError("uncertain Jev tier choice")
             works = max(needs["web"], needs["writes"]) >= NEED_MIN or (needs["deep"] or 0) >= JEV_DEEP_MIN_CONFIDENCE
             settled["tier"] = f"Jev was unsure ({tier_name} {sure:.2f}); decided by what the task needs"
@@ -346,7 +348,9 @@ def route_jev(text):
             # Opus is the costly path: a half-sure "deep" is answered light.
             depth = "deep" if picked == "deep" and sure >= JEV_DEEP_MIN_CONFIDENCE else "light"
     except Exception as e:
-        return {"error": str(e)[:160]}
+        # what Jev did say goes along, so a fallback to the rules can be understood afterwards
+        said = {k: v for k, v in a.items() if k in JEV_QUESTIONS} if isinstance(a, dict) else None
+        return {"error": str(e)[:160], **({"decisions": said} if said else {})}
     tier = a["tier"]
     return {"via": "jev", "model": r.get("model", JEV_MODEL), "ms": int((time.time() - t0) * 1000),
             "tier": tier_name, "probabilities": tier.get("probabilities") or {tier["choice"]: 1.0},
@@ -1283,7 +1287,14 @@ def decide(text, target="auto"):
     route = route_jev(text)
     if not route or route.get("error"):
         jev_error = (route or {}).get("error", "no key")
-        route = {**route_rules(text), "fallback_reason": jev_error}
+        route = {**route_rules(text), "fallback_reason": jev_error,
+                 **({"decisions": route["decisions"]} if (route or {}).get("decisions") else {})}
+    elif route["tier"] != "command" and CMD_CAPTURE.match(text.strip()):
+        # "capture ...", "remember that ...", "note: ..." is her way of saying write
+        # this down. Jev reads the words after it and may take them for a task
+        # ("capture: buy a backup disk" looked like shopping research to it).
+        route = {**route, "tier": "command", "command": "capture", "executor": None, "depth": None,
+                 "settled": {**route.get("settled", {}), "tier": f"begins with a capture word; Jev read it as {route['tier']}"}}
     if target in AGENTS:
         route = {**route, "classified_tier": route["tier"], "tier": "agent", "override": target}
     return route, jev_error

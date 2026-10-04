@@ -108,9 +108,36 @@ class RoutingTests(unittest.TestCase):
         for web, writes in ((0.9, 0.1), (0.1, 0.8)):
             with self.subTest(web=web, writes=writes):
                 self.assertEqual(route(web, writes)["tier"], "agent")
-        # without those answers, or when it is a command Jev is unsure of, the rules decide
-        self.assertEqual(route(None, 0.2)["error"], "uncertain Jev tier choice")
-        self.assertEqual(route(0.1, 0.2, ("command", 0.4))["error"], "uncertain Jev tier choice")
+        # a half-sure command is not acted on either: the same two facts decide
+        self.assertEqual(route(0.1, 0.2, ("command", 0.4))["tier"], "answer")
+        # without those answers the rules decide, and what Jev did say goes along
+        lost = route(None, 0.2)
+        self.assertEqual(lost["error"], "uncertain Jev tier choice")
+        self.assertEqual(lost["decisions"]["tier"]["confidence"], 0.45)
+
+    def test_request_the_rules_know_as_a_command_stays_theirs_when_jev_is_unsure(self):
+        response = {"answers": {"tier": jev_choice("agent", 0.4), "needs_web": {"type": "noul", "noul": 0.1},
+                                "changes_vault": {"type": "noul", "noul": 0.1}}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), mock.patch.object(bridge, "post_json", return_value=response), \
+                mock.patch.object(bridge, "run_skill", return_value=(True, "Started daily-digest.")) as run, \
+                mock.patch.object(bridge, "log_talk"):
+            result = bridge.talk("run daily-digest")
+        run.assert_called_once_with("daily-digest")
+        self.assertEqual((result["route"]["via"], result["route"]["fallback_reason"]), ("rules", "uncertain Jev tier choice"))
+        self.assertEqual(result["route"]["decisions"]["tier"]["choice"], "agent")
+
+    def test_capture_words_capture_whatever_jev_makes_of_the_rest(self):
+        response = {"answers": {"tier": jev_choice("agent", 0.71), "executor": jev_choice("hermes"),
+                                "needs_web": {"type": "noul", "noul": 0.73}}}
+        for text in ("capture: buy a new backup disk", "remember that the backups moved to odyn"):
+            with self.subTest(text=text), mock.patch.object(bridge, "JEV_KEY", "test"), \
+                    mock.patch.object(bridge, "post_json", return_value=response), \
+                    mock.patch.object(bridge, "start_agent") as start, mock.patch.object(bridge, "log_talk"):
+                result = bridge.talk(text)
+            start.assert_not_called()
+            self.assertEqual(result["action"]["type"], "capture")
+            self.assertEqual((result["route"]["via"], result["route"]["tier"]), ("jev", "command"))
+            self.assertIn("Jev read it as agent", result["route"]["settled"]["tier"])
 
     def test_deep_research_reaches_claude_on_either_signal(self):
         def executor(choice, deep):
