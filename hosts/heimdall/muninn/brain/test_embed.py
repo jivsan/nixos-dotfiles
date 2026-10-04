@@ -39,6 +39,10 @@ class EmbedCase(unittest.TestCase):
         db.close()
         embed._QUERIES.clear()
         embed._LOADED.update(stamp=None, rows=[])
+        # the notes here are a few words long; the tests about near-empty notes set the real floor
+        floor = mock.patch.object(embed, "MIN_SUBSTANCE", 0)
+        floor.start()
+        self.addCleanup(floor.stop)
 
     def note(self, path, mtime=1, title="", body="Text."):
         db = sqlite3.connect(self.index)
@@ -84,6 +88,42 @@ class SyncTests(EmbedCase):
         self.drop("Areas/hermod.md")
         self.assertEqual(self.sync(lambda _: vec(1.0)), (0, 1))
         self.assertEqual(self.stored(), {"Resources/Reports/A real report (8a1f2879).md"})
+
+    def test_notes_that_say_nothing_and_files_about_the_vault_are_left_out(self):
+        quiet = "\n# 2026-09-10\n\n## huginn digest (23:04)\n- Quiet day — no notes changed.\n\n[[Home MOC]]\n"
+        stub = ("\n# heimdall\n\n> [!missing] This note was auto-created because it was linked but missing.\n\n"
+                "Linked from:\n- [[Nexterm SSH Key Rollout and Fleet Inventory 2026-08-12]]\n\nSee also: [[Homelab MOC]]\n")
+        capture = "\n# Save to vault request\n\nsave it to my vault\n\nSee also: [[MOCs/Home MOC]]\n\nOriginal: [[agents/inbox/archive/9441/original]]\n"
+        short = "\n# Codex and Claude login on heimdall\n\nLogging into Codex and Claude on heimdall is done.\n\nSee also: [[MOCs/Agents MOC]]\n"
+        notes = {"journal/2026-09-10.md": quiet, "Resources/heimdall.md": stub, "Resources/Save to vault request.md": capture,
+                 "CLAUDE.md": "Vault conventions for agents, a long enough text to count as a note.",
+                 "Home.md": "The dashboard of the vault, a long enough text to count as a note.",
+                 "journal/README.md": "Daily notes; huginn appends a digest each night, long enough to count.",
+                 "Resources/Codex and Claude login on heimdall.md": short,
+                 "Areas/CLAUDE.md notes.md": "A note of hers that only happens to have a similar name, with real text in it."}
+        for path, body in notes.items():
+            self.note(path, body=body)
+        with mock.patch.object(embed, "MIN_SUBSTANCE", 40):
+            self.assertEqual(self.sync(lambda _: vec(1.0)), (2, 0))
+            # a short note that states a fact is still a note
+            self.assertEqual(self.stored(), {"Resources/Codex and Claude login on heimdall.md", "Areas/CLAUDE.md notes.md"})
+            # a stub that someone has filled in is a note again
+            self.note("Resources/heimdall.md", mtime=2, body="\n# heimdall\n\nThe services VM on hella: bridge, huginn, Grafana and Immich.\n")
+            self.assertEqual(self.sync(lambda _: vec(1.0)), (1, 0))
+            self.assertIn("Resources/heimdall.md", self.stored())
+
+    def test_a_note_that_becomes_empty_loses_its_vector(self):
+        self.note("Areas/a.md", body="A note with enough in it to be about something real.")
+        with mock.patch.object(embed, "MIN_SUBSTANCE", 40):
+            self.assertEqual(self.sync(lambda _: vec(1.0)), (1, 0))
+            self.note("Areas/a.md", mtime=2, body="# a\n\nSee also: [[Home MOC]]\n")
+            self.assertEqual(self.sync(lambda _: vec(1.0)), (0, 1))
+        self.assertEqual(self.stored(), set())
+
+    def test_substance_is_what_a_note_says_in_its_own_words(self):
+        self.assertEqual(embed.substance("# Title\n\nUp: [[Agents MOC]]\nRelated: [[a]] · [[b]]\n- [[only a link]]\n"), "")
+        self.assertEqual(embed.substance("## Notes\nThe switch is at 10.0.20.2, see [[bifrost]].\n\nOriginal: [[x/original]]"),
+                         "The switch is at 10 0 20 2 see")
 
     def test_work_done_before_the_server_went_away_is_kept(self):
         self.note("Areas/a.md")

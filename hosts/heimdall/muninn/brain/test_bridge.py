@@ -1015,8 +1015,9 @@ class RetrievalTests(unittest.TestCase):
             db.execute("INSERT INTO notes_fts VALUES (?, '', ?)", (path, body))
         db.commit()
         db.close()
-        for name, value in (("DB", database), ("GRAPHIFY", "/nonexistent")):
-            patch = mock.patch.object(bridge, name, value)
+        # the notes here are a few words long; the test about near-empty notes sets the real floor
+        for patch in (mock.patch.object(bridge, "DB", database), mock.patch.object(bridge, "GRAPHIFY", "/nonexistent"),
+                      mock.patch.object(bridge.embed, "MIN_SUBSTANCE", 0)):
             patch.start()
             self.addCleanup(patch.stop)
 
@@ -1047,6 +1048,20 @@ class RetrievalTests(unittest.TestCase):
         db.close()
         # an agent's report is a source; the logs are not, however well they match
         self.assertEqual(self.found("kernel", []), ["Kernel report (1a2b3c4d)", "Kernel fix"])
+
+    def test_notes_that_say_nothing_are_not_answer_sources(self):
+        db = bridge.sqlite3.connect(bridge.DB)
+        empty = {"journal/2026-09-10.md": "# 2026-09-10\n\n- Quiet day, no kernel notes changed.\n\n[[Home MOC]]",
+                 "Resources/kernel.md": "# kernel\n\n> [!missing] This note was auto-created because it was linked but missing.\n\nLinked from:\n- [[Kernel fix]]",
+                 "CLAUDE.md": "Vault conventions for agents: the kernel of how notes are filed, linked and committed here.",
+                 "Resources/Kernel upgrade plan.md": "The kernel on mimir moves to 7.2 once the RTX 5070 Ti is installed and tested."}
+        for path, body in empty.items():
+            db.execute("INSERT INTO notes VALUES (?, 1, '', ?, '')", (path, body))
+            db.execute("INSERT INTO notes_fts VALUES (?, '', ?)", (path, body))
+        db.commit()
+        db.close()
+        with mock.patch.object(bridge.embed, "MIN_SUBSTANCE", 40):
+            self.assertEqual(self.found("kernel", []), ["Kernel upgrade plan"])
 
 
 class ReportTitlerTests(unittest.TestCase):

@@ -200,7 +200,14 @@ searched by meaning.
   waited 17-30 s for the note being embedded.
 - **Index:** `muninn-embedder` on heimdall keeps one vector per note in
   `/var/lib/muninn-brain/embeddings.db`, re-embedding a note when it changes.
-  Talk logs, sweep reports, alerts and the inbox are left out. A note is
+  Talk logs, sweep reports, alerts and the inbox are left out. So are files
+  about the vault itself (`CLAUDE.md`, `Home.md`, any `README.md`), stubs the
+  dead-link fixer left, and notes with fewer than 40 characters of their own
+  text once headings, link lines and links are taken away (a quiet journal
+  day, a test capture): a text that says nothing sits about equally near every
+  question and crowds out a real note that is only a little closer. The same
+  rule keeps them out of the keyword ranking for answers; vault search still
+  finds them. `MUNINN_EMBED_MIN_SUBSTANCE` sets the floor. A note is
   embedded by its title and first 8,000 characters (`MUNINN_EMBED_MAX_CHARS`).
   The first run takes about an hour. A different model name means every note is
   embedded again, since vectors of two models cannot be compared.

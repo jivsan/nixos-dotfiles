@@ -539,9 +539,10 @@ def retrieve(q):
                 for path, title, body in c.execute(
                         "SELECT n.path, n.title, n.body FROM notes_fts JOIN notes n ON n.path = notes_fts.path "
                         "WHERE notes_fts MATCH ? ORDER BY bm25(notes_fts, 0, 4.0, 1.0) LIMIT 40", (fts,)):
-                    # Talk logs, sweep reports and alerts repeat what was said or filed. They
-                    # stay searchable, but like the embedder the answer does not use them.
-                    if embed.wanted(path) and len(keyword) < 8:
+                    # Talk logs, sweep reports and alerts repeat what was said or filed, and a
+                    # stub or a quiet journal day says nothing. They stay searchable, but
+                    # like the embedder the answer does not use them.
+                    if embed.wanted(path, body or "") and len(keyword) < 8:
                         found[path] = (title, body)
                         keyword.append(path)
             missing = [path for path in semantic if path not in found]

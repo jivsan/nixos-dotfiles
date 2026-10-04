@@ -12,6 +12,7 @@ import json
 import math
 import operator
 import os
+import re
 import sqlite3
 import sys
 import threading
@@ -37,8 +38,18 @@ MAX_CHARS = int(os.environ.get("MUNINN_EMBED_MAX_CHARS", "8000"))
 # Qwen3 is instruction-aware: a query says what it is looking for, a note is embedded as it is.
 INSTRUCT = ("Instruct: Given a question or a piece of writing, retrieve the notes from a personal "
             "knowledge base that are about the same subject\nQuery:")
-# Logs of what was said or filed are searchable by keyword; as neighbours they are noise.
+# What is not a source, for an answer or as a neighbour. All of it stays searchable by keyword.
+# Logs of what was said or filed:
 SKIP = ("Resources/Talk logs/", "Resources/Reports/inbox-", "Resources/Reports/alert-", "_inbox/")
+# files that are about the vault rather than in it:
+META = ("CLAUDE.md", "Home.md")
+# and notes that say nothing yet: a quiet journal day, a test capture, a stub the
+# dead-link fixer left. An empty text has no subject, so its vector sits about
+# equally near every question (0.35-0.38 measured, right at the bridge's floor)
+# and crowds out a real note that is only a little closer.
+MIN_SUBSTANCE = int(os.environ.get("MUNINN_EMBED_MIN_SUBSTANCE", "40"))
+STUB = "[!missing]"
+_LINKS = re.compile(r"^\s*(?:[-*>]\s*)?(?:See also|Related|Up|Original)\s*:", re.I)
 _LOCK = threading.Lock()
 _QUERIES = {}                    # recent query text -> vector: retrieval and placement ask the same thing
 _LOADED = {"stamp": None, "rows": []}
@@ -84,8 +95,21 @@ def connect(path=None):
     return db
 
 
-def wanted(path):
-    return not path.startswith(SKIP)
+def substance(body):
+    """What a note says in its own words: its text without headings, link lines and links."""
+    said = []
+    for line in (body or "").splitlines():
+        if line.lstrip().startswith("#") or _LINKS.match(line):
+            continue
+        said.append(re.sub(r"[\W_]+", " ", re.sub(r"\[\[[^\]]*\]\]", " ", line)).strip())
+    return " ".join(part for part in said if part)
+
+
+def wanted(path, body=None):
+    """Whether a note is a source. Judged by its path alone when the body is not at hand."""
+    if path.startswith(SKIP) or path in META or os.path.basename(path) == "README.md":
+        return False
+    return body is None or (STUB not in body and len(substance(body)) >= MIN_SUBSTANCE)
 
 
 def sync(embedder=embed, index=None, store=None, log=print):
@@ -96,7 +120,7 @@ def sync(embedder=embed, index=None, store=None, log=print):
     notes = sqlite3.connect(f"file:{index or INDEX}?mode=ro", uri=True)
     try:
         current = {path: (mtime, title, body) for path, mtime, title, body
-                   in notes.execute("SELECT path, mtime, title, body FROM notes") if wanted(path)}
+                   in notes.execute("SELECT path, mtime, title, body FROM notes") if wanted(path, body or "")}
     finally:
         notes.close()
     db = connect(store)
