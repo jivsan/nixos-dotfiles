@@ -22,6 +22,7 @@
     ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
     ./modules/system/voice.nix            # Whisper + Kokoro for the muninn brain (heimdall's bridge)
     ./modules/system/embeddings.nix       # Qwen3-Embedding-4B for vault search and placement (heimdall)
+    ../../modules/apps/octane-node.nix    # OctaneRender render node for mjolnir (needs the RTX 5070 Ti)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];
 

@@ -1,4 +1,7 @@
 # modules/system/octane-shutdown.nix
+# At shutdown/reboot, SIGTERM Blender and OctaneServer and wait for them to exit,
+# so Octane logs its license out of OTOY's server. A hard power-off or SIGKILL
+# leaves the license bound to this machine until OTOY support frees it.
 { config, pkgs, ... }:
 
 {
@@ -14,16 +17,24 @@
       RemainAfterExit = true;
       ExecStart = "${pkgs.coreutils}/bin/true";  # no-op on start
       ExecStop = pkgs.writeShellScript "octane-release" ''
+        pg=${pkgs.procps}/bin/pgrep
+        pk=${pkgs.procps}/bin/pkill
         echo "Releasing Octane licenses before shutdown..."
-        # Gracefully terminate Blender (SIGTERM lets Octane plugin clean up)
-        ${pkgs.procps}/bin/pkill -TERM -f blender || true
-        # Also kill octane_server / OctaneServer if running (network rendering)
-        ${pkgs.procps}/bin/pkill -TERM -f octane || true
-        # Give Octane time to release the license back to OTOY
-        sleep 10
-        echo "Octane license release window complete."
+        # SIGTERM lets the Octane plugin / server run its license logout
+        $pk -TERM -x blender || true
+        $pk -TERM -x OctaneServer || true
+        $pk -TERM -f 'octane_(node|daemon)' || true
+        for _ in $(seq 1 30); do
+          if ! $pg -x blender >/dev/null && ! $pg -x OctaneServer >/dev/null \
+             && ! $pg -f 'octane_(node|daemon)' >/dev/null; then
+            echo "Octane processes exited, licenses released."
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "Octane still running after 30s; continuing shutdown."
       '';
-      TimeoutStopSec = 20;
+      TimeoutStopSec = 45;
     };
   };
 }

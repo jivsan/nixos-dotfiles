@@ -86,7 +86,7 @@ home.nix             # shared home-manager imports
 hosts/               # per-host config (default.nix, home.nix, hardware, host-local modules)
 modules/system/      # shared OS modules (boot, networking, nix, users, hyprland, …)
 modules/home/        # shared home modules (git, neovim, shell, terminal, …)
-modules/apps/        # workstation app bundles (blender, octane, gaming, nvidia, …)
+modules/apps/        # workstation app bundles (blender, octane, gaming, nvidia, …)  — Octane runbook: docs/misc/octane.md
 config/              # program configs / suckless sources (nvim, rofi, dwm, st, …)
 network/             # homelab network: Arista EOS config + pfSense runbook (not NixOS)
 docs/                # documentation
