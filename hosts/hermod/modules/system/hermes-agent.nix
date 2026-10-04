@@ -19,6 +19,11 @@ in
       provider = "openai-codex";
       default = "gpt-6-astra";
     };
+    # With the Codex login hermes picks OpenAI's native web search as its one web
+    # backend, and that backend can only search: every web_extract failed. Pages
+    # are read through Firecrawl's public tier instead, which needs no key; when
+    # it throttles, hermes moves on to Keenable, Exa and Parallel by itself.
+    settings.web.extract_backend = "firecrawl";
     environmentFiles = [ "/etc/hermes/env" ];
     environment = {
       API_SERVER_ENABLED = "true";
