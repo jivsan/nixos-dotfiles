@@ -26,9 +26,14 @@ let
   octaneLibs = import ./octane-libs.nix { inherit config; };
 
   # Generic FHS shell: `octane-node-env <cmd>` runs <cmd> with OTOY's expected libs.
+  # Octane stores third-party downloads (cuDNN) under /etc/OctaneRender; the FHS
+  # sandbox has its own /etc, so bind a user-writable dir there (see octane.nix).
+  etcBind = [ "--bind ${octaneBase}/etc /etc/OctaneRender" ];
+
   octane-node-env = pkgs.buildFHSEnv {
     name = "octane-node-env";
     targetPkgs = octaneLibs;
+    extraBwrapArgs = etcBind;
     runScript = "bash";
   };
 
@@ -37,6 +42,7 @@ let
   octane-standalone = pkgs.buildFHSEnv {
     name = "octane-standalone";
     targetPkgs = octaneLibs;
+    extraBwrapArgs = etcBind;
     runScript = pkgs.writeShellScript "octane-standalone-run" ''
       export LD_LIBRARY_PATH="${standaloneBase}:${standaloneBase}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
       cd ${standaloneBase}
@@ -120,6 +126,8 @@ in
     "d ${octaneBase}       0755 root root -"
     "d ${nodeBase}         0755 ${nodeUser} users -"
     "d ${standaloneBase}   0755 ${nodeUser} users -"
+    "d ${octaneBase}/etc             0755 ${nodeUser} users -"
+    "d ${octaneBase}/etc/thirdparty  0755 ${nodeUser} users -"
   ];
 
   environment.systemPackages = [

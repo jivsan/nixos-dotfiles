@@ -25,9 +25,15 @@ let
   # The 31.x server zip is flat (liboctane.so, libcef.so next to the binary) and
   # the binary's RUNPATH points at OTOY's build tree, so add the install dir
   # (and lib/, the pre-31 layout) to the library path ourselves.
+  #
+  # Octane keeps third-party downloads (cuDNN, ...) under /etc/OctaneRender.
+  # The FHS sandbox builds its own /etc, so the host's is invisible, and the
+  # real one is root-owned anyway. Bind a user-writable dir there instead so the
+  # in-app "Download" button works and the files persist across rebuilds.
   octane-server = pkgs.buildFHSEnv {
     name = "octane-server";
     targetPkgs = octaneLibs;
+    extraBwrapArgs = [ "--bind ${octaneBase}/etc /etc/OctaneRender" ];
     runScript = pkgs.writeShellScript "octane-server-run" ''
       export LD_LIBRARY_PATH="${octaneBase}/server:${octaneBase}/server/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
       cd ${octaneBase}/server
@@ -171,6 +177,9 @@ in
     "d ${octaneBase}         0755 root root -"
     "d ${octaneBase}/server  0755 root root -"
     "d ${octaneBase}/addon   0755 root root -"
+    # appears as /etc/OctaneRender inside the sandbox; Octane writes cuDNN etc. here
+    "d ${octaneBase}/etc              0755 christina users -"
+    "d ${octaneBase}/etc/thirdparty   0755 christina users -"
   ];
 
   environment.systemPackages = [
