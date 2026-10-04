@@ -430,6 +430,19 @@ class RestartLogTests(unittest.TestCase):
         self.assertEqual(log.call_args.args[1]["agent"], "hermes")
 
 
+class HealthTests(unittest.TestCase):
+    def test_embed_up_probes_the_question_instance(self):
+        with mock.patch.object(bridge.urllib.request, "urlopen") as urlopen:
+            urlopen.return_value.__enter__.return_value.status = 200
+            self.assertTrue(bridge.embed_up())
+            self.assertEqual(urlopen.call_args.args[0], bridge.embed.QUERY_URL + "/health")
+            self.assertEqual(urlopen.call_args.kwargs["timeout"], 1.5)
+            urlopen.return_value.__enter__.return_value.status = 503
+            self.assertFalse(bridge.embed_up())
+            urlopen.side_effect = OSError("mimir down")
+            self.assertFalse(bridge.embed_up())
+
+
 class TalkLogTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()

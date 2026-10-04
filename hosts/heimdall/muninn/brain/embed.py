@@ -18,7 +18,11 @@ import threading
 import time
 import urllib.request
 
+# Two instances of the same model on mimir: notes go to one, questions to the
+# other. In a single instance a question waits for whatever note is being
+# embedded (17-30 s instead of half a second).
 URL = os.environ.get("MUNINN_EMBED_URL", "http://10.0.20.18:8081").rstrip("/")
+QUERY_URL = os.environ.get("MUNINN_EMBED_QUERY_URL", "http://10.0.20.18:8082").rstrip("/")
 MODEL = os.environ.get("MUNINN_EMBED_MODEL", "Qwen3-Embedding-4B-Q8_0")
 DB = os.environ.get("MUNINN_EMBED_DB", "/var/lib/muninn-brain/embeddings.db")
 INDEX = os.environ.get("MUNINN_DB", "/var/lib/muninn-brain/index.db")
@@ -49,10 +53,10 @@ def shorten(vector):
     return array.array("f", (x / norm for x in head))
 
 
-def embed(text, timeout=120):
-    """One vector for a text, from the embedding server."""
+def embed(text, timeout=120, url=None):
+    """One vector for a text, from the embedding server (the notes instance by default)."""
     request = urllib.request.Request(
-        URL + "/v1/embeddings",
+        (url or URL) + "/v1/embeddings",
         data=json.dumps({"model": MODEL, "input": text[:MAX_CHARS]}).encode(),
         headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -67,7 +71,7 @@ def embed_query(text, timeout=10):
         if text not in _QUERIES:
             if len(_QUERIES) > 64:
                 _QUERIES.clear()
-            _QUERIES[text] = embed(INSTRUCT + text, timeout)
+            _QUERIES[text] = embed(INSTRUCT + text, timeout, QUERY_URL)
         return _QUERIES[text]
 
 
@@ -155,7 +159,7 @@ def similar(text, k=6, timeout=10, store=None):
 
 def main():
     pause = int(os.environ.get("MUNINN_EMBED_INTERVAL", "60"))
-    print(f"muninn-embedder: {URL} model={MODEL} dim={DIM} store={DB}", flush=True)
+    print(f"muninn-embedder: notes={URL} questions={QUERY_URL} model={MODEL} dim={DIM} store={DB}", flush=True)
     while True:
         try:
             done, gone = sync(log=lambda line: print(line, flush=True))

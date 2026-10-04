@@ -99,9 +99,11 @@ nothing when a question shares no word with the note. So notes are also
 searched by meaning.
 
 - **Model:** Qwen3-Embedding-4B (8-bit GGUF, Apache 2.0) served by llama.cpp on
-  mimir at `:8081` (`hosts/mimir/modules/system/embeddings.nix`), on CPU until
-  the GPU is in. Measured there: a question about 0.3 s, a 4,000-character
-  note about 25 s.
+  mimir (`hosts/mimir/modules/system/embeddings.nix`), on CPU until the GPU is
+  in. Two instances share the model file: `:8081` embeds notes (about 25 s for
+  4,000 characters), `:8082` embeds questions (about 0.5 s). They are separate
+  because one instance runs all its slots in the same pass, so a question
+  waited 17-30 s for the note being embedded.
 - **Index:** `muninn-embedder` on heimdall keeps one vector per note in
   `/var/lib/muninn-brain/embeddings.db`, re-embedding a note when it changes.
   Talk logs, sweep reports, alerts and the inbox are left out. A note is
@@ -116,7 +118,9 @@ searched by meaning.
   the bridge for them at `POST /bridge/similar {"text", "k"}`.
 - **If mimir is down** the embedder waits, lookups return nothing and
   everything falls back to keyword search and the newest-notes list.
-  `/bridge/health` reports `embedded`, the number of notes in the index.
+  `/bridge/health` reports `embedded`, the number of notes in the index, and
+  `embed`, whether the model itself answers — with `embed_model` and
+  `embed_dim` alongside, so the dashboard can show it as a node.
 
 ## The dashboard's graph
 

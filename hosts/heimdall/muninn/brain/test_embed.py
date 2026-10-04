@@ -127,6 +127,9 @@ class SearchTests(EmbedCase):
         self.assertEqual(first[0][0], "Areas/hermod.md")
         model.assert_called_once()
         self.assertEqual(model.call_args.args[0], embed.INSTRUCT + "where does hermes run?")
+        # questions have their own instance: one that is embedding a note makes them wait for it
+        self.assertEqual(model.call_args.args[2], embed.QUERY_URL)
+        self.assertNotEqual(embed.QUERY_URL, embed.URL)
 
     def test_no_server_or_no_vectors_means_no_results_not_an_error(self):
         with mock.patch.object(embed, "embed", side_effect=OSError("mimir unreachable")):
