@@ -18,14 +18,20 @@ tool work. The desktop consumes these services.
 4. Before dispatch, the bridge saves the job and routing decision in
    `/var/lib/muninn-brain/jobs.db`. At most two agent jobs run concurrently;
    excess requests receive `busy: true` and can be retried later.
-5. The bridge files each terminal response in
-   `Resources/Reports/Agent report <date> <job-id>.md`, including frontmatter,
-   an Agents MOC link, request, route, worker, timestamps, status and result.
+5. The bridge files each terminal response in `Resources/Reports/`, including
+   frontmatter, request, route, worker, timestamps, status and result. MiniMax
+   names, tags and places it: `Up:` is the MOC it is about and `Related:` links
+   up to four existing notes on the same subject. Only names that exist are
+   written. A failed run, or one MiniMax could not place, stays under the
+   Agents MOC, and a report it could not name is `Agent report <date> <job-id>.md`.
    Agents are asked to include findings, source URLs and actual output paths.
    A remote worker without vault access returns its deliverable for the bridge
    to file. Agent-created files normally go in `Resources/Outputs/`.
 6. Reports enter the existing index and graph. Substantive conversations go
-   into `Resources/Talk logs/`; nightly digests summarize changed notes.
+   into `Resources/Talk logs/`; nightly digests summarize changed notes. While
+   an answer is being made, MiniMax picks the notes the exchange is about and
+   the entry links those as `related:`. If MiniMax did not answer, the notes
+   retrieved for the answer are linked as `sources:` instead.
 
 Jev uses `https://openrouter.ai/api/v1/systemone`, `typesafe/jev-1.13` and the
 existing OpenRouter key. Invalid, unavailable or low-confidence decisions fall
@@ -54,7 +60,9 @@ inbox for manual handling.
 
 Jev decides where a note goes: it chooses the folder and the MOC from the
 existing ones, reading each MOC's first line of prose as its description.
-MiniMax writes the title, tags and body. A capture above 2,000 characters is
+MiniMax writes the title, tags and body, and links up to four existing notes on
+the same subject as `Related:` (names that do not exist are dropped). The
+generated `TODO MOC` is never offered as a hub. A capture above 2,000 characters is
 already a note: MiniMax only titles and tags it and its text is filed unchanged,
 which is faster and cannot lose content. If Jev is below `JEV_MIN_CONFIDENCE`
 on the MOC, the capture moves to `_inbox/review/`, which the sweep never reads;

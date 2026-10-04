@@ -12,8 +12,21 @@ import time
 import uuid
 
 
+UNSAFE = re.compile(r'[\x00-\x1f\x7f/\\\[\]#|:]')   # not allowed in a note title
+
+
 class BusyError(Exception):
     pass
+
+
+def tidy_title(title):
+    # The titler likes "topic: detail" and "a/b" titles. Punctuation that cannot be
+    # in a file name or wikilink is repaired instead of costing the report its title.
+    if not isinstance(title, str):
+        return ""
+    title = " ".join(UNSAFE.sub(" ", re.sub(r"\s*:\s+", " — ", title)).split())
+    title = title.encode()[:160].decode("utf-8", "ignore").strip()
+    return "" if title.startswith(".") else title
 
 
 class JobStore:
@@ -21,8 +34,9 @@ class JobStore:
         self.path = path
         self.vault = Path(vault)
         self.max_active = max_active
-        # titler(job) -> {"title": ..., "tags": [...]} or None; MiniMax names and
-        # tags reports in production, tests and offline runs get the dated template.
+        # titler(job) -> {"title": ..., "tags": [...], "moc": ..., "related": [...]} or
+        # None; MiniMax names, tags and places reports in production, tests and
+        # offline runs get the dated template under the agents hub.
         self.titler = titler
         self.lock = threading.RLock()
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -77,24 +91,37 @@ class JobStore:
                 raise OSError("report directory must not be a symlink")
             directory.mkdir(exist_ok=True)
         stamp = datetime.datetime.fromtimestamp(job["started"], datetime.timezone.utc).strftime("%Y-%m-%d")
-        title, tags = "", []
+        title, tags, hub, related = "", [], "Agents MOC", []
+
+        def note_in(name, *folders):
+            # Only a link that resolves is written: a guessed name never becomes a dead link.
+            return (isinstance(name, str) and bool(name) and not name.startswith(".")
+                    and not UNSAFE.search(name) and any((root / f / (name + ".md")).is_file() for f in folders))
+
         if self.titler:
             try:
                 meta = self.titler(job) or {}
-                candidate = str(meta.get("title") or "").strip()
-                if candidate and len(candidate.encode()) <= 160 and not re.search(r'[\x00-\x1f\x7f/\\\[\]#|:]', candidate):
-                    title = candidate
+                title = tidy_title(meta.get("title"))
                 tags = [t for t in (str(t).strip().lower() for t in (meta.get("tags") or []))
                         if re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,39}", t)][:4]
+                # Where the report sits in the graph: its hub and the notes beside it.
+                # A run that failed says nothing about its subject, so it stays with the agents.
+                if job["status"] == "done":
+                    if note_in(meta.get("moc"), "MOCs"):
+                        hub = meta["moc"]
+                    picks = meta.get("related") if isinstance(meta.get("related"), list) else []
+                    related = [n for n in dict.fromkeys(p for p in picks if isinstance(p, str))
+                               if note_in(n, "Areas", "Resources")][:4]
             except Exception:
-                title, tags = "", []
+                title, tags, hub, related = "", [], "Agents MOC", []
         heading = title or f"Agent report {stamp} {job['id']}"
         name = f"{heading} ({job['id'][:8]}).md" if title else f"{heading}.md"
         path = directory / name
         route = job.get("route", {})
         content = (f"---\ntype: report\nstatus: {job['status']}\ntags: [{', '.join(tags or ['agents', 'report'])}]\n"
                    f"created: {stamp}\nagent: muninn-bridge\njob: {job['id']}\n---\n\n"
-                   f"# {heading}\n\nUp: [[Agents MOC]]\n\n"
+                   f"# {heading}\n\nUp: [[{hub}]]\n"
+                   + ("Related: " + " · ".join(f"[[{n}]]" for n in related) + "\n" if related else "") + "\n"
                    f"- Worker: {job['agent']}\n- Router: {route.get('via', 'unknown')}\n"
                    f"- Status: {job['status']}\n- Started (Unix): {job['started']}\n"
                    f"- Ended (Unix): {job.get('ended', '')}\n\n"

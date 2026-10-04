@@ -418,6 +418,16 @@ class TalkLogTests(unittest.TestCase):
                                  ["agent", "hermes"],
                                  ["hermes"]])
 
+    def test_minimax_related_notes_replace_the_retrieved_sources(self):
+        hits = [{"id": "Test Capture"}]
+        self.said("How is hermod set up?", route={"tier": "answer"}, sources=hits, related=["hermod", "Backups"])
+        self.said("Hello, this is a test", route={"tier": "answer"}, sources=hits, related=[])
+        self.said("Anyone there?", route={"tier": "answer"}, sources=hits)
+        log = self.log()
+        self.assertIn("- related: [[hermod]] [[Backups]]\n", log)
+        self.assertEqual(log.count("- related:"), 1)   # nothing related: no links at all
+        self.assertEqual(log.count("- sources: [[Test Capture]]"), 1)   # MiniMax not asked: the hits stand in
+
     def test_refused_write_is_held_and_written_with_the_next_entry(self):
         (self.root / "blocker").write_text("")
         with mock.patch.object(bridge, "LOG_DIR", str(self.root / "blocker" / "talk")), \
@@ -557,6 +567,63 @@ class HermesChatTests(unittest.TestCase):
         self.assertIn("error", response)
 
 
+class PlacementTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        for note, text in (("MOCs/Knowledge MOC.md", "---\ntype: moc\n---\n# Knowledge MOC\nHub for filed knowledge.\n"),
+                           ("MOCs/TODO MOC.md", "# TODO MOC\nEvery open checkbox in the vault.\n"),
+                           ("Areas/hermod.md", "The Hermes VM."), ("Resources/Backups.md", "Backups."),
+                           ("Resources/Reports/inbox-1.md", "A sweep report.")):
+            (root / note).parent.mkdir(parents=True, exist_ok=True)
+            (root / note).write_text(text)
+        for name, value in (("VAULT", str(root)), ("KEY", "test-key")):
+            patch = mock.patch.object(bridge, name, value)
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def reply(self, content):
+        return mock.patch.object(bridge, "post_json", return_value={"choices": [{"message": {"content": content}}]})
+
+    def test_minimax_chooses_among_the_real_hubs_and_notes(self):
+        picked = {"title": "Backup review", "tags": ["backups"], "moc": "Knowledge MOC",
+                  "related": ["Backups", "A note nobody wrote", "Backups", "inbox-1"]}
+        with self.reply("Here it is:\n```json\n" + json.dumps(picked) + "\n```") as post:
+            placed = bridge.place("an agent report", "Request: review backups")
+        self.assertEqual(placed, {**picked, "related": ["Backups"]})
+        offered = post.call_args.args[1]["messages"][1]["content"]
+        self.assertIn("- Knowledge MOC: Hub for filed knowledge.", offered)
+        self.assertNotIn("TODO MOC", offered)   # a generated board is not a subject
+        for note in ("- hermod", "- Backups"):
+            self.assertIn(note, offered)
+        self.assertNotIn("inbox-1", offered)
+
+    def test_unknown_hub_is_not_passed_on(self):
+        with self.reply(json.dumps({"title": "T", "tags": [], "moc": "TODO MOC", "related": "Backups"})):
+            self.assertEqual(bridge.place("an agent report", "x"), {"title": "T", "tags": [], "moc": None, "related": []})
+
+    def test_nothing_is_asked_without_a_key_and_a_bad_reply_falls_back(self):
+        with mock.patch.object(bridge, "KEY", ""), mock.patch.object(bridge, "post_json") as post:
+            self.assertEqual(bridge.place("a conversation", "hello"), {})
+            self.assertIsNone(bridge.report_titler({"text": "x", "answer": "y"}))
+        post.assert_not_called()
+        with self.reply("I cannot file this."):
+            self.assertIsNone(bridge.placing("hello")())
+            with self.assertRaises(ValueError):
+                bridge.report_titler({"text": "x", "answer": "y"})
+
+    def test_answers_are_placed_while_they_are_made(self):
+        with mock.patch.object(bridge, "JEV_KEY", ""), \
+                mock.patch.object(bridge, "place", return_value={"related": ["Backups"]}) as place, \
+                mock.patch.object(bridge, "answer", return_value={"answer": "Daily.", "sources": [{"id": "hermod"}]}), \
+                mock.patch.object(bridge, "log_talk") as log:
+            result = bridge.talk("Where is my report?")
+        self.assertEqual(place.call_args.args[:2], ("a conversation", "Said to muninn: Where is my report?"))
+        self.assertEqual(result["related"], ["Backups"])
+        self.assertEqual(log.call_args.args[1]["related"], ["Backups"])
+
+
 class ReportTitlerTests(unittest.TestCase):
     def test_minimax_title_and_tags_shape_the_report(self):
         with tempfile.TemporaryDirectory() as d:
@@ -571,6 +638,38 @@ class ReportTitlerTests(unittest.TestCase):
             text = (root / saved["report"]).read_text()
             self.assertIn("# Backup strategy review", text)
             self.assertIn("tags: [backups, x]", text)
+
+    def filed(self, root, meta, status="done"):
+        store = JobStore(root / "jobs.db", root, titler=mock.Mock(return_value=meta))
+        job = store.create("Review backups", "codex", {"via": "jev"})
+        job.update(status=status, answer="Findings.")
+        store.finish(job)
+        saved = store.get(job["id"])
+        return saved["report"], (root / saved["report"]).read_text()
+
+    def test_title_punctuation_is_repaired_instead_of_costing_the_title(self):
+        with tempfile.TemporaryDirectory() as d:
+            name, text = self.filed(Path(d), {"title": "Best GPUs for Local AI: RTX 5070 Ti vs 3090/4090", "tags": ["gpu"]})
+        self.assertTrue(name.startswith("Resources/Reports/Best GPUs for Local AI — RTX 5070 Ti vs 3090 4090 ("))
+        self.assertIn("# Best GPUs for Local AI — RTX 5070 Ti vs 3090 4090\n", text)
+
+    def test_minimax_places_the_report_among_notes_that_exist(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for note in ("MOCs/Knowledge MOC.md", "Areas/ComfyUI on mjolnir.md", "Resources/Backups.md"):
+                (root / note).parent.mkdir(exist_ok=True)
+                (root / note).write_text("A note.")
+            meta = {"title": "Chroma in ComfyUI", "tags": ["comfyui"], "moc": "Knowledge MOC",
+                    "related": ["ComfyUI on mjolnir", "A note nobody wrote", "../CLAUDE", "Backups", "ComfyUI on mjolnir", 7]}
+            _, text = self.filed(root, meta)
+            self.assertIn("\n\nUp: [[Knowledge MOC]]\nRelated: [[ComfyUI on mjolnir]] · [[Backups]]\n\n- Worker: codex\n", text)
+            self.assertNotIn("nobody wrote", text)
+            self.assertNotIn("CLAUDE", text)
+            # a hub that does not exist, or a run that failed, stays with the agents
+            for meta, status in (({**meta, "moc": "No such MOC", "related": []}, "done"), (meta, "failed")):
+                with self.subTest(moc=meta["moc"], status=status):
+                    _, text = self.filed(root, meta, status)
+                    self.assertIn("\n\nUp: [[Agents MOC]]\n\n- Worker: codex\n", text)
 
     def test_a_failing_titler_falls_back_to_the_template(self):
         with tempfile.TemporaryDirectory() as d:

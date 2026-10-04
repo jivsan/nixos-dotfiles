@@ -54,7 +54,7 @@ class VaultCase(unittest.TestCase):
         self.source = self.vault / "_inbox/capture.md"
         self.source.write_text("A complete original capture.")
 
-    def run_sweep(self, model=lambda raw, mocs: result(), place=no_jev, bridge=no_bridge):
+    def run_sweep(self, model=lambda *_: result(), place=no_jev, bridge=no_bridge):
         return inbox.sweep(self.vault, model, place, bridge)
 
     def reports(self):
@@ -66,7 +66,7 @@ class FilingTests(VaultCase):
         raw = "Facts exceeding the old 8000-byte truncation.\n" * 500
         self.source.write_text(raw)
         seen = []
-        self.assertEqual(self.run_sweep(lambda text, mocs: (seen.append(text), result())[1]), 0)
+        self.assertEqual(self.run_sweep(lambda text, *_: (seen.append(text), result())[1]), 0)
         self.assertEqual(seen, [raw])
         self.assertFalse(self.source.exists())
         original = next(self.vault.glob("agents/inbox/archive/*/original.md"))
@@ -138,7 +138,7 @@ class FilingTests(VaultCase):
 
     def test_one_failure_does_not_prevent_other_captures_filing(self):
         (self.vault / "_inbox/second.md").write_text("Second capture")
-        def model(raw, _):
+        def model(raw, *_):
             if raw == "Second capture":
                 return result()
             raise TimeoutError("model timeout")
@@ -268,6 +268,15 @@ class WriterTests(unittest.TestCase):
             self.classify("A short capture", "I cannot file this.")
         self.assertIn("I cannot file this.", str(caught.exception))
 
+    def test_existing_notes_are_offered_as_link_targets(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "key"}), \
+                patch.object(inbox.urllib.request, "urlopen") as urlopen:
+            urlopen.return_value = Reply({"choices": [{"message": {"content": json.dumps(result())}}]})
+            inbox.classify("A short capture", ["Home MOC"], ["Backups on odyn"])
+        prompt = json.loads(urlopen.call_args.args[0].data)["messages"][0]["content"]
+        self.assertIn('Existing notes: ["Backups on odyn"]', prompt)
+        self.assertIn("related (0-4 titles", prompt)
+
     def test_long_capture_keeps_its_own_text(self):
         text = "# My heading\n\n" + "A fact worth keeping exactly.\n" * 100
         reply = {k: v for k, v in result().items() if k != "body"}
@@ -281,6 +290,32 @@ class PlacementTests(VaultCase):
         super().setUp()
         (self.vault / "MOCs/Knowledge MOC.md").write_text(
             "---\ntype: moc\n---\n# Knowledge MOC\nHub for filed knowledge.\n\n- [[A note]]\n")
+
+    def test_related_notes_are_linked_only_when_they_exist(self):
+        (self.vault / "Resources").mkdir()
+        (self.vault / "Resources/Backups on odyn.md").write_text("Backups.")
+        seen = []
+        def model(raw, mocs, notes):
+            seen.append(notes)
+            return {**result(), "related": ["Backups on odyn", "A note nobody wrote", "Backups on odyn", 7]}
+        self.assertEqual(self.run_sweep(model), 0)
+        self.assertEqual(seen, [["Backups on odyn"]])
+        filed = (self.vault / "Resources/A filed note.md").read_text()
+        self.assertIn("[[MOCs/Home MOC]]\n\nRelated: [[Backups on odyn]]\n\nOriginal: ", filed)
+        self.assertNotIn("nobody wrote", filed)
+        report = self.reports()[0].read_text()
+        self.assertIn('- related: ["Backups on odyn"]', report)
+        self.assertIn("- filed: [[Resources/A filed note]]", report)
+
+    def test_note_without_related_notes_gets_no_related_line(self):
+        self.assertEqual(self.run_sweep(lambda *_: {**result(), "related": "Home MOC"}), 0)
+        self.assertNotIn("Related:", (self.vault / "Resources/A filed note.md").read_text())
+
+    def test_generated_todo_board_is_never_offered_as_a_hub(self):
+        (self.vault / "MOCs/TODO MOC.md").write_text("# TODO MOC\nEvery open checkbox in the vault.")
+        seen = []
+        self.assertEqual(self.run_sweep(lambda raw, mocs, notes: (seen.append(mocs), result())[1]), 0)
+        self.assertEqual(seen, [["Home MOC", "Knowledge MOC"]])
 
     def test_jev_decides_folder_and_moc(self):
         seen = []

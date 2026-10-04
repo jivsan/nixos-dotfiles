@@ -1366,6 +1366,14 @@ function labelSprite(text, color) {
 }
 const hl = new Set();
 const fired = new Set();   // links carrying a recall right now
+let wdT = null;            // galaxy watchdog timer
+function webglOK() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext &&
+      (c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl')));
+  } catch (e) { return false; }
+}
 function initGalaxy() {
   const el = $('g3d');
   sizeGalaxy();
@@ -1376,6 +1384,8 @@ function initGalaxy() {
   }
 }
 function buildGalaxy(el) {
+  if (!webglOK()) throw new Error('WebGL unavailable — the brain view needs GPU/WebGL. ' +
+    'On a GPU-less session (xrdp/Remmina) launch the browser with --enable-unsafe-swiftshader, or open this from mjolnir.');
   Graph = ForceGraph3D()(el)
     .backgroundColor('rgba(0,0,0,0)')
     .showNavInfo(false)
@@ -1436,12 +1446,47 @@ function buildGalaxy(el) {
   const ctl = Graph.controls();
   ctl.autoRotate = !rmq(); ctl.autoRotateSpeed = 0.3;
   el.addEventListener('dblclick', () => { ctl.autoRotate = !ctl.autoRotate; });
+  const cv = el.querySelector('canvas');
+  if (cv) cv.addEventListener('webglcontextlost', e => {
+    e.preventDefault();
+    $('g-stats').textContent = 'GPU context lost — hard-reload (ctrl+shift+r) to restart the brain';
+  });
   new ResizeObserver(sizeGalaxy).observe(el);
   if (gData) feedGalaxy();
 }
 function sizeGalaxy() {
   const el = $('g3d');
   if (Graph && el.clientWidth) Graph.width(el.clientWidth).height(el.clientHeight);
+}
+function galaxyWatchdog() {
+  /* A black canvas with a live counter means the render layer died silently:
+     0×0 canvas (built while hidden), lost GPU context, or NaN positions. */
+  const el = $('g3d');
+  if (!Graph || !el) return;
+  const cv = el.querySelector('canvas');
+  if (cv && el.clientWidth && (cv.width < 8 || cv.height < 8)) sizeGalaxy();
+  try {
+    const ctx = Graph.renderer && Graph.renderer().getContext();
+    if (ctx && ctx.isContextLost && ctx.isContextLost()) {
+      $('g-stats').textContent = 'GPU context lost — hard-reload (ctrl+shift+r) to restart the brain';
+      return;
+    }
+  } catch (e) {}
+  const ns = Graph.graphData().nodes;
+  let bad = 0;
+  for (let i = 0; i < ns.length && i < 200; i++) {
+    const n = ns[i];
+    if (!isFinite(n.x) || !isFinite(n.y) || !isFinite(n.z)) bad++;
+  }
+  if (bad) {   // NaN positions render nothing: re-seed on a shell and reheat
+    for (const n of ns) if (!isFinite(n.x) || !isFinite(n.y) || !isFinite(n.z)) {
+      const a = Math.random() * Math.PI * 2, b = Math.acos(2 * Math.random() - 1), r = 40 + Math.random() * 80;
+      n.x = r * Math.sin(b) * Math.cos(a); n.y = r * Math.cos(b) * 0.6; n.z = r * Math.sin(b) * Math.sin(a);
+      n.vx = n.vy = n.vz = 0;
+    }
+    if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
+    Graph.zoomToFit(650, 50);
+  }
 }
 function feedGalaxy() {
   if (!Graph || !gData) return;
@@ -1461,6 +1506,7 @@ function feedGalaxy() {
   if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
   $('g-stats').textContent = `${f.nodes.length}/${gData.nodes.length} neurons · ${f.links.length} synapses`;
   setTimeout(() => Graph.zoomToFit(650, 50), 650);
+  clearTimeout(wdT); wdT = setTimeout(galaxyWatchdog, 1600);
   if (gSel) renderSelInfo();
 }
 async function refreshGraph() {
