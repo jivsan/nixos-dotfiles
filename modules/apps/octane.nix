@@ -22,10 +22,17 @@ let
   octaneBase = "/opt/octane";
   octaneLibs = import ./octane-libs.nix { inherit config; };
 
+  # The 31.x server zip is flat (liboctane.so, libcef.so next to the binary) and
+  # the binary's RUNPATH points at OTOY's build tree, so add the install dir
+  # (and lib/, the pre-31 layout) to the library path ourselves.
   octane-server = pkgs.buildFHSEnv {
     name = "octane-server";
     targetPkgs = octaneLibs;
-    runScript = "${octaneBase}/server/OctaneServer";
+    runScript = pkgs.writeShellScript "octane-server-run" ''
+      export LD_LIBRARY_PATH="${octaneBase}/server:${octaneBase}/server/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      cd ${octaneBase}/server
+      exec ./OctaneServer "$@"
+    '';
   };
 
   # Legacy wrapper for the old "Blender Octane Edition" build still in

@@ -32,10 +32,16 @@ let
     runScript = "bash";
   };
 
+  # OTOY's Linux zips are flat (liboctane.so next to the binary) and the RUNPATH
+  # points at their build tree, so the install dir goes on the library path.
   octane-standalone = pkgs.buildFHSEnv {
     name = "octane-standalone";
     targetPkgs = octaneLibs;
-    runScript = "${standaloneBase}/octane";
+    runScript = pkgs.writeShellScript "octane-standalone-run" ''
+      export LD_LIBRARY_PATH="${standaloneBase}:${standaloneBase}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      cd ${standaloneBase}
+      exec ./octane "$@"
+    '';
   };
 
   # What the service runs. install-daemon.sh (interactive, run once) writes
@@ -43,6 +49,7 @@ let
   # daemon directly with our port.
   daemon-start = pkgs.writeShellScript "octane-node-start" ''
     cd ${nodeBase} || exit 1
+    export LD_LIBRARY_PATH="${nodeBase}:${nodeBase}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     if [ -x ./run_octane_daemon.sh ]; then
       exec ./run_octane_daemon.sh
     fi
