@@ -35,6 +35,14 @@ let
     targetPkgs = octaneLibs;
     extraBwrapArgs = [ "--bind ${octaneBase}/etc /etc/OctaneRender" ];
     runScript = pkgs.writeShellScript "octane-server-run" ''
+      # Single instance. A second server starts a second OTOY session while the
+      # first still holds the one workstation seat -> "no available licenses".
+      if ${pkgs.procps}/bin/pgrep -x OctaneServer >/dev/null; then
+        msg="OctaneServer is already running. Use octane-stop first."
+        echo "$msg" >&2
+        ${pkgs.libnotify}/bin/notify-send "Octane" "$msg" 2>/dev/null || true
+        exit 0
+      fi
       export LD_LIBRARY_PATH="${octaneBase}/server:${octaneBase}/server/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
       cd ${octaneBase}/server
       exec ./OctaneServer "$@"

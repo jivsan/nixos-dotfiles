@@ -108,3 +108,13 @@ Stop/update the node: `sudo systemctl stop octane-node` (SIGTERM, waits) —
   handles both and links it into the right Blender directory.
 - How a headless node signs in. The Standalone-over-`ssh -X` path above is the
   documented fallback ("a render node requires an activated Standalone license").
+
+## Seen 2026-10-04: "no available licenses on your account"
+
+Caused by launching `octane-server` again (dmenu, after a rebuild) while the
+previous instance was still signed in: two sessions, one workstation seat. Not a
+machine-identity change (machine-id, hostname and MACs are stable inside the
+sandbox). The wrapper now refuses a second instance; stop with `octane-stop`,
+then launch. If it ever happens with a single instance: "Sign out and start
+again" in the dialog releases every license bound to this machine; the web
+"Unlock" on the OTOY account page is the last resort and has a limited counter.
