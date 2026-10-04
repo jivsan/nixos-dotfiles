@@ -54,8 +54,8 @@ class VaultCase(unittest.TestCase):
         self.source = self.vault / "_inbox/capture.md"
         self.source.write_text("A complete original capture.")
 
-    def run_sweep(self, model=lambda *_: result(), place=no_jev, bridge=no_bridge):
-        return inbox.sweep(self.vault, model, place, bridge)
+    def run_sweep(self, model=lambda *_: result(), place=no_jev, bridge=no_bridge, near=lambda *_: []):
+        return inbox.sweep(self.vault, model, place, bridge, near)
 
     def reports(self):
         return list((self.vault / "Resources/Reports").glob("*.md"))
@@ -307,6 +307,46 @@ class PlacementTests(VaultCase):
         self.assertIn('- related: ["Backups on odyn"]', report)
         self.assertIn("- filed: [[Resources/A filed note]]", report)
 
+    def test_notes_nearest_in_meaning_lead_the_list_the_writer_chooses_from(self):
+        (self.vault / "Resources").mkdir()
+        for index, name in enumerate(("Old note", "Backups on odyn", "Newest note")):
+            (self.vault / f"Resources/{name}.md").write_text("Text.")
+            os.utime(self.vault / f"Resources/{name}.md", (index, index))
+        seen = []
+        def model(raw, mocs, notes):
+            seen.append(notes)
+            return {**result(), "related": ["Backups on odyn"]}
+        asked = []
+        def near(text):
+            asked.append(text)
+            return ["Backups on odyn", "A note the index knows but the vault lost", "Backups on odyn"]
+        self.assertEqual(self.run_sweep(model, near=near), 0)
+        self.assertEqual(asked, ["A complete original capture."])
+        self.assertEqual(seen, [["Backups on odyn", "Newest note", "Old note"]])
+        self.assertIn("Related: [[Backups on odyn]]", (self.vault / "Resources/A filed note.md").read_text())
+
+    def test_without_the_embedding_index_the_newest_notes_are_offered(self):
+        (self.vault / "Resources").mkdir()
+        (self.vault / "Resources/Backups on odyn.md").write_text("Text.")
+        def down(_):
+            raise OSError("bridge unreachable")
+        for near in (down, lambda _: []):
+            with self.subTest(near=near):
+                seen = []
+                self.source.write_text("A complete original capture.")
+                self.assertEqual(self.run_sweep(lambda raw, mocs, notes: (seen.append(notes), result())[1], near=near), 0)
+                self.assertEqual(seen[0][-1], "Backups on odyn")
+
+    def test_nearest_asks_the_bridge_and_keeps_the_names(self):
+        sent = []
+        def urlopen(request, timeout):
+            sent.append((request.full_url, json.loads(request.data)))
+            return Reply({"notes": [{"path": "Areas/hermod.md", "name": "hermod", "score": 0.61}, "junk", {"name": 7}]})
+        with patch.object(inbox.urllib.request, "urlopen", urlopen):
+            self.assertEqual(inbox.nearest("x" * 5000), ["hermod"])
+        self.assertTrue(sent[0][0].endswith("/bridge/similar"))
+        self.assertEqual((len(sent[0][1]["text"]), sent[0][1]["k"]), (2000, inbox.NEAR))
+
     def test_note_without_related_notes_gets_no_related_line(self):
         self.assertEqual(self.run_sweep(lambda *_: {**result(), "related": "Home MOC"}), 0)
         self.assertNotIn("Related:", (self.vault / "Resources/A filed note.md").read_text())
@@ -341,35 +381,30 @@ class PlacementTests(VaultCase):
         self.assertEqual(self.run_sweep(place=jev(folder=0.2)), 0)
         self.assertIn("[[MOCs/Knowledge MOC]]", (self.vault / "Resources/A filed note.md").read_text())
 
-    def test_unsure_moc_parks_capture_for_review_once(self):
-        def unexpected(*_):
-            self.fail("held capture sent to the writer")
-        self.assertEqual(self.run_sweep(unexpected, place=jev(moc=0.3)), 0)
+    def test_unsure_moc_is_the_writers_call_and_nothing_is_parked(self):
+        self.assertEqual(self.run_sweep(place=jev(moc=0.3)), 0)
         self.assertFalse(self.source.exists())
-        self.assertEqual((self.vault / "_inbox/review/capture.md").read_text(),
-                         "A complete original capture.")
-        self.assertFalse((self.vault / "Resources/A filed note.md").exists())
+        self.assertFalse((self.vault / "_inbox/review").exists())
+        self.assertIn("[[MOCs/Home MOC]]", (self.vault / "Areas/A filed note.md").read_text())
         report = self.reports()[0].read_text()
         self.assertIn("status: completed", report)
-        self.assertIn("_inbox/review/capture.md", report)
-        self.assertEqual(self.run_sweep(unexpected, place=jev(moc=0.3)), 0)
-        self.assertEqual(len(self.reports()), 1)
+        self.assertIn("minimax (jev unsure: Knowledge MOC 0.30, Areas 0.90)", report)
 
-    def test_parking_never_overwrites_an_earlier_review_note(self):
-        (self.vault / "_inbox/review").mkdir()
-        (self.vault / "_inbox/review/capture.md").write_text("Earlier")
-        self.assertEqual(self.run_sweep(place=jev(moc=0.3)), 0)
-        self.assertEqual((self.vault / "_inbox/review/capture.md").read_text(), "Earlier")
-        self.assertEqual((self.vault / "_inbox/review/capture (2).md").read_text(),
-                         "A complete original capture.")
-
-    def test_edit_while_jev_decides_is_not_parked(self):
+    def test_edit_while_jev_decides_is_kept_for_the_next_sweep(self):
         def editing_place(*_):
             self.source.write_text("New user edit")
             return jev(moc=0.3)()
         self.assertEqual(self.run_sweep(place=editing_place), 1)
         self.assertEqual(self.source.read_text(), "New user edit")
-        self.assertFalse((self.vault / "_inbox/review").exists())
+        self.assertFalse((self.vault / "Areas/A filed note.md").exists())
+
+    def test_padded_body_is_replaced_by_the_captures_own_words(self):
+        self.source.write_text("---\ntype: note\n---\n\nMake a report of what changed today.")
+        padded = "## Todo\n" + "- [ ] A step nobody asked for\n" * 20
+        self.assertEqual(self.run_sweep(lambda *_: {**result(), "body": padded}), 0)
+        filed = (self.vault / "Resources/A filed note.md").read_text()
+        self.assertIn("\n\nMake a report of what changed today.\n\n", filed)
+        self.assertNotIn("nobody asked for", filed)
 
     def test_jev_failure_falls_back_to_the_writers_choice(self):
         self.assertEqual(self.run_sweep(), 0)
@@ -482,12 +517,14 @@ class RequestTests(VaultCase):
         self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/original.md")).read_text(),
                          "todo: research my backup options")
 
-    def test_note_like_request_with_unsure_moc_is_parked_from_the_archive(self):
+    def test_note_like_request_with_unsure_moc_is_filed_from_the_archive(self):
         (self.vault / "MOCs/Knowledge MOC.md").write_text("# Knowledge MOC")
         note = self.answer(action={"type": "view", "view": "skills"}, route={"tier": "command", "via": "jev"})
         self.assertEqual(self.run_sweep(place=jev(moc=0.1), bridge=lambda _: note), 0)
         self.assertFalse(self.source.exists())
-        self.assertEqual((self.vault / "_inbox/review/capture.md").read_text(),
+        self.assertFalse((self.vault / "_inbox/review").exists())
+        self.assertIn("[[MOCs/Home MOC]]", (self.vault / "Areas/A filed note.md").read_text())
+        self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/original.md")).read_text(),
                          "todo: research my backup options")
 
     def test_note_like_request_that_fails_filing_is_restored(self):

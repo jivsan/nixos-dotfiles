@@ -21,6 +21,7 @@
     ./modules/system/immich-ml.nix
     ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
     ./modules/system/voice.nix            # Whisper + Kokoro for the muninn brain (heimdall's bridge)
+    ./modules/system/embeddings.nix       # Qwen3-Embedding-4B for vault search and placement (heimdall)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];
 

@@ -18,6 +18,7 @@ DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 MAX_INPUT = 128_000  # Reject oversized captures; never silently truncate them.
 MAX_REQUEST = 4000   # The bridge cuts longer requests; refuse them here instead.
 VERBATIM = 2000      # A longer capture is already a note: keep its text, never rewrite it.
+PADDING = 200        # A written body may outgrow twice its capture by this much, no more.
 JEV_URL = os.environ.get("JEV_URL", "https://openrouter.ai/api/v1/systemone")
 JEV_MODEL = os.environ.get("JEV_MODEL", "typesafe/jev-1.13")
 JEV_MIN_CONFIDENCE = float(os.environ.get("JEV_MIN_CONFIDENCE", "0.5"))
@@ -33,6 +34,8 @@ FOLDERS = {
 }
 GENERATED_HUBS = {"TODO MOC"}   # rebuilt by huginn every morning: a board, not a subject
 CATALOGUE = 300                 # the newest filed notes are offered as link targets
+NEAR = 30                       # with the embedding index: this many of the closest notes ...
+RECENT = 30                     # ... and this many of the newest others
 UNLINKABLE = re.compile(r'[\x00-\x1f\x7f\[\]#|]')
 
 
@@ -120,7 +123,8 @@ def classify(raw, mocs, notes=()):
         "folder (Areas or Resources), moc (one exact name from the supplied list), "
         "tags (1-4 short lowercase tags), related (0-4 titles copied exactly from the "
         "existing notes that are about the same subject; empty when none is)"
-        + ("" if keep else ", body (clean markdown preserving all facts without inventing any)")
+        + ("" if keep else ", body (clean markdown of only what the capture says, preserving all facts "
+           "without inventing any; a request in it is written down, never carried out)")
         + ". Available MOCs: " + json.dumps(mocs)
         + ". Existing notes: " + json.dumps(list(notes), ensure_ascii=False)
     )
@@ -172,6 +176,18 @@ def catalogue(vault):
         except OSError:
             continue   # a folder that is missing or unreadable has nothing to link to
     return [name for _, name in sorted(found, reverse=True)[:CATALOGUE]]
+
+
+def nearest(text):
+    """Names of the notes closest in meaning to a capture, from the bridge's embedding index."""
+    call = urllib.request.Request(
+        BRIDGE_URL.rstrip("/") + "/bridge/similar",
+        data=json.dumps({"text": text[:2000], "k": NEAR}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(call, timeout=40) as response:
+        notes = json.load(response).get("notes")
+    return [n["name"] for n in notes if isinstance(n, dict) and isinstance(n.get("name"), str)]
 
 
 def locate(text, hubs):
@@ -260,19 +276,6 @@ def settle(result, record):
     return True
 
 
-def hold(vault, source, name, label):
-    """Park a capture in _inbox/review, which the sweep never reads, without overwriting."""
-    review = vault.directory("_inbox/review", create=True, mode=0o755)
-    for index in range(1, 10001):
-        target = label[:-3] + (f" ({index})" if index > 1 else "") + ".md"
-        try:
-            os.stat(target, dir_fd=review, follow_symlinks=False)
-        except FileNotFoundError:
-            os.rename(name, target, src_dir_fd=source, dst_dir_fd=review)
-            return "_inbox/review/" + target
-    raise ValueError("too many review name collisions")
-
-
 def tidy_title(title):
     # The writer likes "topic: detail" and "a/b" titles. Punctuation that cannot be
     # in a file name or wikilink is repaired instead of failing the capture on
@@ -309,7 +312,7 @@ def validate(note, mocs, notes=()):
     return note
 
 
-def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge):
+def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, near):
     raw, info = read_note(inbox, name)
     if not raw.strip():
         raise ValueError("empty capture; retained for review")
@@ -355,22 +358,30 @@ def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge):
         except Exception as exc:
             picks = None
             record["placement"] = f"minimax (jev: {str(exc)[:160]})"
-        if picks and picks["moc"][1] < JEV_MIN_CONFIDENCE:
-            # Jev cannot tell which hub this belongs to: park it instead of guessing.
-            if not claimed:
-                unchanged()
-            record["placement"] = "jev unsure: %s %.2f" % picks["moc"]
-            record["held"] = hold(vault, archive if claimed else inbox,
-                                  "original.md" if claimed else name, name)
-            return
+        sure = bool(picks) and picks["moc"][1] >= JEV_MIN_CONFIDENCE
         if picks:
-            record["placement"] = "jev (%s %.2f, %s %.2f)" % (picks["moc"] + picks["folder"])
+            record["placement"] = (("jev (%s %.2f, %s %.2f)" if sure else "minimax (jev unsure: %s %.2f, %s %.2f)")
+                                   % (picks["moc"] + picks["folder"]))
+        try:
+            close = [n for n in dict.fromkeys(near(text)) if n in notes]
+        except Exception:
+            close = []   # no bridge, no index or no mimir: choose by title among the newest
+        if close:
+            # The writer chooses among the notes nearest in meaning plus the newest few.
+            notes = close + [n for n in notes if n not in close][:RECENT]
         note = model(text, mocs, notes)
-        if picks and isinstance(note, dict):
-            # Jev decides where; an unsure folder keeps the writer's own choice.
-            note = {**note, "moc": picks["moc"][0]}
-            if picks["folder"][1] >= JEV_MIN_CONFIDENCE:
-                note["folder"] = picks["folder"][0]
+        if isinstance(note, dict):
+            own = FRONTMATTER.sub("", text).strip()
+            if isinstance(note.get("body"), str) and len(note["body"]) > 2 * len(own) + PADDING:
+                # Far longer than the capture: the writer carried out a request in it
+                # or invented detail. Her own words are filed instead.
+                note = {**note, "body": own}
+            # Jev decides where; a hub or folder it is unsure of is the writer's call,
+            # so nothing waits in a folder nobody reads.
+            if sure:
+                note = {**note, "moc": picks["moc"][0]}
+            if picks and picks["folder"][1] >= JEV_MIN_CONFIDENCE:
+                note = {**note, "folder": picks["folder"][0]}
         note = validate(note, mocs, notes)
         if note["related"]:
             record["related"] = note["related"]
@@ -409,7 +420,7 @@ def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge):
         raise
 
 
-def sweep(path, model=classify, place=locate, bridge=dispatch):
+def sweep(path, model=classify, place=locate, bridge=dispatch, near=nearest):
     vault = Vault(path)
     try:
         inbox = vault.directory("_inbox")
@@ -442,7 +453,7 @@ def sweep(path, model=classify, place=locate, bridge=dispatch):
                 record = {"source": "_inbox/" + name}
                 mark = len(vault.fds)
                 try:
-                    file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge)
+                    file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, near)
                 except Deferred as exc:
                     record["deferred"] = str(exc)
                 except Exception as exc:
@@ -457,7 +468,7 @@ def sweep(path, model=classify, place=locate, bridge=dispatch):
                   "---\n\n# Inbox filing report\n\n[[MOCs/Agents MOC]]\n\n")
         for record in records:
             report += "## " + json.dumps(record["source"], ensure_ascii=False) + "\n\n"
-            for key in ("target", "placement", "related", "held", "route", "job", "deferred", "archive", "error"):
+            for key in ("target", "placement", "related", "route", "job", "deferred", "archive", "error"):
                 if key in record:
                     report += f"- {key}: {json.dumps(record[key], ensure_ascii=False)}\n"
             if "target" in record:
@@ -469,6 +480,10 @@ def sweep(path, model=classify, place=locate, bridge=dispatch):
         report_name = "inbox-" + stamp.replace(":", "-") + "-" + uuid.uuid4().hex[:8] + ".md"
         write_new(reports, report_name, report.encode(), mode=0o644)
         print(f"Inbox sweep: {len(records)} result(s); report Resources/Reports/{report_name}")
+        for record in records:   # one line each for agents/logs, which the dashboard tails
+            outcome = next((f"{key}: {record[key]}" for key in ("error", "deferred", "target", "job")
+                            if key in record), "answered")
+            print(f"  {record['source']} -> {outcome}")
         return int(failed)
     finally:
         vault.close()

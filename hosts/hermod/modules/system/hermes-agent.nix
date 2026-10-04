@@ -30,6 +30,17 @@ in
     };
   };
 
+  # The gateway runs as the hermes user, which cannot enter /home/christina
+  # (0700), so it never saw the vault at ~/muninn. Mount the same export where
+  # the service can reach it; odyn squashes every client to the vault owner, so
+  # hermes reads and writes there. The unit is ProtectSystem=strict: without the
+  # ReadWritePaths entry, a vault already mounted when the gateway starts would
+  # be read-only inside it. The bridge on heimdall tells hermes this path.
+  fileSystems."/mnt/muninn" = {
+    inherit (config.fileSystems."/home/christina/muninn") device fsType options;
+  };
+  systemd.services.hermes-agent.serviceConfig.ReadWritePaths = [ "-/mnt/muninn" ];
+
   networking.firewall.allowedTCPPorts = [ 8642 ];
 
   users.users.christina.extraGroups = [ config.services.hermes-agent.group ];

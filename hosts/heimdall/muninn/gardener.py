@@ -7,7 +7,17 @@ import os, re, json, time, datetime, urllib.request
 VAULT = "/mnt/nas/obsidian/muninn"
 SKIP = {".obsidian", ".git", ".trash", "_templates", "agents", "graphify-out"}
 WIKILINK = re.compile(r"\[\[([^\]|#]+)")
+CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)   # a shell `[[ -d x ]]` test is not a wikilink
 STALE_DAYS = 30
+
+
+def targets(text):
+    # Note names a text links to. A link into a skipped folder (the inbox archive
+    # under agents/) is not part of the graph, so it is not dead either.
+    return {t.split("/")[-1] for t in (m.group(1).strip() for m in WIKILINK.finditer(CODE.sub("", text)))
+            if t.split("/")[0] not in SKIP and any(c.isalnum() for c in t)}
+
+
 
 now = time.time()
 notes = {}  # name -> {rel, folder, links, status, type, mtime, snippet}
@@ -34,7 +44,7 @@ for root, dirs, files in os.walk(VAULT):
         notes[fn[:-3]] = {
             "rel": rel, "folder": folder, "mtime": mtime,
             "status": fm.get("status", ""), "type": fm.get("type", ""),
-            "links": {m.group(1).strip().split("/")[-1] for m in WIKILINK.finditer(text)},
+            "links": targets(text),
             "snippet": " ".join(body.split())[:200],
         }
 

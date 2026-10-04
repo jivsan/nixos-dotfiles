@@ -40,6 +40,11 @@ Confidence is checked separately for the tier and its relevant command, skill
 or worker. `JEV_MIN_CONFIDENCE=0.5` is application policy, not an accuracy guarantee.
 Configured-worker flags do not prove remote reachability.
 
+When a job ends, the bridge commits the vault as `muninn-bridge` with the worker
+and report name as the message, so what an agent changed is not swept into
+huginn's next commit. If Claude fails on a session, usage or rate limit, the
+job goes to Hermes or Codex instead and `route.executor_fallback` says why.
+
 Hermes jobs use separate conversations. Codex retains its `workspace-write`
 sandbox. On bridge restart, unfinished execution becomes failed and receives an
 interruption report. Tool actions are never automatically replayed. If execution
@@ -64,11 +69,13 @@ MiniMax writes the title, tags and body, and links up to four existing notes on
 the same subject as `Related:` (names that do not exist are dropped). The
 generated `TODO MOC` is never offered as a hub. A capture above 2,000 characters is
 already a note: MiniMax only titles and tags it and its text is filed unchanged,
-which is faster and cannot lose content. If Jev is below `JEV_MIN_CONFIDENCE`
-on the MOC, the capture moves to `_inbox/review/`, which the sweep never reads;
-edit it and move it back to retry, or file it by hand. An unsure folder keeps
-MiniMax's folder. If Jev is unreachable, MiniMax's folder and MOC are used and
-the report says so.
+which is faster and cannot lose content. A written body that outgrows twice its
+capture by more than 200 characters has been padded (a request carried out,
+detail invented), so the capture's own words are filed instead. If Jev is below
+`JEV_MIN_CONFIDENCE` on the MOC or the folder, MiniMax's choice is used for
+that one and the report says `minimax (jev unsure: ...)`; nothing is parked. If
+Jev is unreachable, MiniMax's folder and MOC are used and the report says so.
+Each sweep that did something adds its lines to `agents/logs/inbox-sweep.log`.
 
 A capture whose first line (after any frontmatter) starts with `todo:` or `jev:`
 is a request, not a note. The sweep archives it and posts the rest to
@@ -84,6 +91,42 @@ The vault's `CLAUDE.md` defines note conventions. `_inbox/` holds captures;
 `Areas/` and `Resources/` hold organized knowledge; `MOCs/` holds hub notes;
 `journal/` holds daily notes; `agents/` holds logs and archives. Templates and
 Obsidian settings live in `_templates/` and `.obsidian/`.
+
+## Search by meaning
+
+Keyword search (SQLite FTS) finds exact names and error strings; it finds
+nothing when a question shares no word with the note. So notes are also
+searched by meaning.
+
+- **Model:** Qwen3-Embedding-4B (8-bit GGUF, Apache 2.0) served by llama.cpp on
+  mimir at `:8081` (`hosts/mimir/modules/system/embeddings.nix`), on CPU until
+  the GPU is in. Measured there: a question about 0.3 s, a 4,000-character
+  note about 25 s.
+- **Index:** `muninn-embedder` on heimdall keeps one vector per note in
+  `/var/lib/muninn-brain/embeddings.db`, re-embedding a note when it changes.
+  Talk logs, sweep reports, alerts and the inbox are left out. A note is
+  embedded by its title and first 8,000 characters (`MUNINN_EMBED_MAX_CHARS`).
+  The first run takes about an hour. A different model name means every note is
+  embedded again, since vectors of two models cannot be compared.
+- **Answers:** the bridge merges the keyword ranking and the meaning ranking, so
+  a note both agree on comes first. A note below `MUNINN_EMBED_MIN` (0.38)
+  similarity is not counted as related.
+- **Placement:** MiniMax chooses related notes from the 30 closest in meaning
+  plus the 30 newest, instead of the newest 300 by title. The inbox sweep asks
+  the bridge for them at `POST /bridge/similar {"text", "k"}`.
+- **If mimir is down** the embedder waits, lookups return nothing and
+  everything falls back to keyword search and the newest-notes list.
+  `/bridge/health` reports `embedded`, the number of notes in the index.
+
+## The dashboard's graph
+
+`build-graph.py` rewrites `graph.json`, `notes.json` and `activity.json` only
+when their content changed, so an unchanged graph keeps its `generated` stamp.
+The page re-feeds the 3D graph only when neurons or synapses were added or
+removed; an edited note refreshes the neurons in place. Feeding blocks the page
+for about a second and restarts the layout, so it is never done for data the
+graph already holds or while another view is shown. The resting particle on
+every synapse is one instanced mesh rather than a mesh per synapse.
 
 ## API and operations
 
@@ -123,6 +166,15 @@ the inbox every 20 seconds and starts the sweep for captures it has not seen
 (`/var/lib/huginn/inbox-seen`). A capture that failed stays seen and is retried
 by the timer, by a manual run, or once it is edited.
 
+The dead-link fixer reads the vault offline. It checks filed notes only:
+journals, talk logs, reports and the inbox quote whatever a model said, and the
+gardener still lists their dead links. A target that nearly matches an existing
+title is reported as a link to fix; any other missing target gets a stub in
+`Resources/` under the name it was linked by, so the link resolves.
+`python3 dead-link-fixer.py --vault <path> --dry-run` prints the findings and
+writes nothing. Neither it nor the gardener counts wikilink-shaped text in code
+or links into `agents/`.
+
 ## Configuration and deployment
 
 Secrets remain outside git:
@@ -150,7 +202,7 @@ not establish that live credentials or remote tools work.
 
 ```bash
 python3 -m unittest discover -s hosts/heimdall/muninn/brain -p 'test_*.py'
-python3 -m unittest discover -s hosts/heimdall/muninn -p 'test_inbox.py'
+python3 -m unittest discover -s hosts/heimdall/muninn -p 'test_*.py'
 nix-instantiate --parse hosts/heimdall/modules/system/brain.nix >/dev/null
 nix-instantiate --parse hosts/heimdall/modules/system/huginn.nix >/dev/null
 ```
@@ -159,6 +211,9 @@ nix-instantiate --parse hosts/heimdall/modules/system/huginn.nix >/dev/null
 |---|---|
 | Routing, voice, worker adapters | `hosts/heimdall/muninn/brain/bridge.py` |
 | Durable jobs and report filing | `hosts/heimdall/muninn/brain/jobs.py` |
+| Embedding index and search by meaning | `hosts/heimdall/muninn/brain/embed.py` |
+| Embedding model server | `hosts/mimir/modules/system/embeddings.nix` |
+| Dashboard feeds | `hosts/heimdall/muninn/brain/build-graph.py` |
 | Inbox validation and archiving | `hosts/heimdall/muninn/inbox.py` |
 | Services, API, indexer, nginx | `hosts/heimdall/modules/system/brain.nix` |
 | Scheduled automations | `hosts/heimdall/modules/system/huginn.nix` |

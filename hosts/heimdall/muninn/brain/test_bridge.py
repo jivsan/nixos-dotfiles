@@ -284,6 +284,12 @@ class ExecutorTests(unittest.TestCase):
             self.assertIn(identifier, body["conversation"])
             self.assertIn("CLAUDE.md", body["input"])
             self.assertIn("Research backups", body["input"])
+            # the gateway user cannot enter /home/christina: hermes gets the path it can reach
+            self.assertIn("vault (her second brain) is at /mnt/muninn ", body["input"])
+            self.assertNotIn("/home/christina", body["input"])
+        with mock.patch.object(bridge, "post_json", return_value=response) as post:
+            bridge.hermes_chat("hi", "a-fresh-conversation")
+        self.assertIn("vault is at /mnt/muninn ", post.call_args.args[1]["input"])
 
     def test_empty_hermes_output_fails(self):
         job = {"id": "empty", "text": "Research backups", "agent": "hermes"}
@@ -350,6 +356,42 @@ class BridgeJobIntegrationTests(unittest.TestCase):
         codex.assert_not_called()
         self.assertEqual(self.store.get(job["id"])["status"], "done")
         self.assertEqual(log.call_args.args[1]["agent"], "claude")
+
+    def test_claude_out_of_quota_hands_the_job_to_a_lighter_worker(self):
+        job = self.store.create("Research storage", "claude", self.route)
+        limit = "You've hit your session limit · resets 10:50pm (Europe/Oslo)"
+        with mock.patch.object(bridge, "run_claude", side_effect=lambda j: j.update(status="failed", answer=limit)), \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                mock.patch.object(bridge, "run_hermes", side_effect=lambda j: j.update(status="done", answer="Report.")) as hermes, \
+                mock.patch.object(bridge, "log_talk") as log:
+            bridge.run_agent(job)
+        hermes.assert_called_once()
+        saved = self.store.get(job["id"])
+        self.assertEqual((saved["agent"], saved["status"], saved["answer"]), ("hermes", "done", "Report."))
+        self.assertIn("session limit", saved["route"]["executor_fallback"])
+        self.assertEqual(log.call_args.args[1]["agent"], "hermes")
+
+    def test_other_claude_failures_are_not_retried_elsewhere(self):
+        job = self.store.create("Research storage", "claude", self.route)
+        with mock.patch.object(bridge, "run_claude", side_effect=lambda j: j.update(status="failed", answer="Claude ran out of time (25 minutes).")), \
+                mock.patch.object(bridge, "run_hermes") as hermes, mock.patch.object(bridge, "log_talk"):
+            bridge.run_agent(job)
+        hermes.assert_not_called()
+        self.assertEqual(self.store.get(job["id"])["agent"], "claude")
+
+    def test_finished_job_gets_its_own_vault_commit(self):
+        git = ["git", "-C", str(self.store.vault)]
+        try:
+            bridge.subprocess.run(git + ["init", "-q"], check=True, capture_output=True)
+        except (OSError, bridge.subprocess.CalledProcessError):
+            self.skipTest("git is not available")
+        job = self.store.create("Research storage", "hermes", self.route)
+        with mock.patch.object(bridge, "run_hermes", side_effect=lambda j: j.update(status="done", answer="Report.")), \
+                mock.patch.object(bridge, "log_talk"):
+            bridge.run_agent(job)
+        log = bridge.subprocess.run(git + ["log", "--format=%an|%s", "--name-only"], capture_output=True, text=True).stdout
+        self.assertIn("muninn-bridge|hermes: Agent report", log)
+        self.assertIn(self.store.get(job["id"])["report"], log)
 
     def test_thread_start_failure_is_a_durable_failure(self):
         with mock.patch.object(bridge.threading, "Thread", side_effect=RuntimeError("Cannot start")):
@@ -613,6 +655,26 @@ class PlacementTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bridge.report_titler({"text": "x", "answer": "y"})
 
+    def test_with_the_embedding_index_the_closest_notes_lead_a_short_list(self):
+        near = [("Resources/Backups.md", 0.71), ("Areas/gone.md", 0.66), ("Areas/hermod.md", 0.12)]   # last one: not really close
+        with mock.patch.object(bridge.embed, "similar", return_value=near) as similar, \
+                self.reply(json.dumps({"title": "T", "tags": [], "moc": "Knowledge MOC", "related": ["Backups"]})) as post:
+            placed = bridge.place("an agent report", "Request: review backups\n\nResult excerpt: long", about="review backups")
+        self.assertEqual(similar.call_args.args[0], "review backups")
+        offered = post.call_args.args[1]["messages"][1]["content"]
+        self.assertLess(offered.index("- Backups"), offered.index("- hermod"))   # closest first, then the newest others
+        self.assertNotIn("gone", offered)
+        self.assertEqual(placed["related"], ["Backups"])
+
+    def test_similar_endpoint_returns_only_notes_that_are_really_close(self):
+        handler = bridge.H.__new__(bridge.H)
+        raw = json.dumps({"text": "where does hermes run", "k": 5}).encode()
+        handler.path, handler.headers, handler.rfile, handler._j = "/bridge/similar", {"content-length": str(len(raw))}, io.BytesIO(raw), mock.Mock()
+        with mock.patch.object(bridge.embed, "similar", return_value=[("Areas/hermod.md", 0.69), ("Resources/Backups.md", 0.2)]) as similar:
+            handler.do_POST()
+        self.assertEqual(similar.call_args.args[:2], ("where does hermes run", 5))
+        self.assertEqual(handler._j.call_args.args, (200, {"notes": [{"path": "Areas/hermod.md", "name": "hermod", "score": 0.69}]}))
+
     def test_answers_are_placed_while_they_are_made(self):
         with mock.patch.object(bridge, "JEV_KEY", ""), \
                 mock.patch.object(bridge, "place", return_value={"related": ["Backups"]}) as place, \
@@ -622,6 +684,43 @@ class PlacementTests(unittest.TestCase):
         self.assertEqual(place.call_args.args[:2], ("a conversation", "Said to muninn: Where is my report?"))
         self.assertEqual(result["related"], ["Backups"])
         self.assertEqual(log.call_args.args[1]["related"], ["Backups"])
+
+
+class RetrievalTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        database = str(Path(temporary.name) / "index.db")
+        db = bridge.sqlite3.connect(database)
+        db.executescript("CREATE TABLE notes (path TEXT PRIMARY KEY, mtime INTEGER, title TEXT, body TEXT, tags TEXT);"
+                         "CREATE VIRTUAL TABLE notes_fts USING fts5(path UNINDEXED, title, body);")
+        for path, body in (("Areas/hermod.md", "The Hermes agent VM."), ("Resources/Kernel fix.md", "NVIDIA driver and kernel 7.2."),
+                           ("Resources/Driver notes.md", "A driver for the printer."), ("Resources/Immich.md", "Phone photos are uploaded here.")):
+            db.execute("INSERT INTO notes VALUES (?, 1, '', ?, '')", (path, body))
+            db.execute("INSERT INTO notes_fts VALUES (?, '', ?)", (path, body))
+        db.commit()
+        db.close()
+        for name, value in (("DB", database), ("GRAPHIFY", "/nonexistent")):
+            patch = mock.patch.object(bridge, name, value)
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def found(self, question, near):
+        with mock.patch.object(bridge.embed, "similar", return_value=near):
+            return [note["id"] for note in bridge.retrieve(question)[0]]
+
+    def test_meaning_finds_a_note_that_shares_no_word_with_the_question(self):
+        self.assertEqual(self.found("where do my pictures get backed up", [("Resources/Immich.md", 0.52)]), ["Immich"])
+
+    def test_a_note_both_searches_agree_on_comes_first(self):
+        # keywords alone would lead with the printer note, meaning alone with hermod
+        near = [("Areas/hermod.md", 0.6), ("Resources/Kernel fix.md", 0.5)]
+        self.assertEqual(self.found("printer driver", near), ["Kernel fix", "hermod", "Driver notes"])
+
+    def test_without_the_index_or_with_nothing_close_keywords_still_answer(self):
+        for near in ([], [("Areas/hermod.md", 0.2)]):
+            with self.subTest(near=near):
+                self.assertEqual(self.found("kernel", near), ["Kernel fix"])
 
 
 class ReportTitlerTests(unittest.TestCase):

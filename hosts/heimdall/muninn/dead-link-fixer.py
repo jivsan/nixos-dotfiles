@@ -1,322 +1,172 @@
 #!/usr/bin/env python3
-"""huginn dead-link fixer — finds broken wikilinks across the muninn vault via the
-brain API and creates stub notes in _inbox/. Runs weekly, driven by systemd.
+"""huginn dead-link fixer — finds wikilinks in filed notes that point at no note,
+lists them in Resources/Dead Link Report.md and creates a stub note for each
+missing target so the link resolves. Runs weekly, driven by systemd.
 
-API endpoints:
-  GET /api/mocs  → {"mocs": [{"path": "...", ...}], "count": N}
-  GET /api/graph?path=relpath → {"outgoing": [{"path": "...", "title": "..."}], ...}
-  GET /api/read?path=relpath  → 200 (exists) or 404 (missing)
-
-Uses stdlib only (no requests, no pip deps).  TLS verification is disabled because
-the brain API's cert is not trusted on heimdall (same as curl -k).
+Offline and stdlib only. It used to ask the brain API, which lists only the MOCs
+and only ever returns links that resolve, so it never saw a dead one.
 """
-import json
+import argparse
+import difflib
 import os
-import ssl
+import re
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import date, datetime
 
-BRAIN = "https://brain.oryxserver.org"
-VAULT = "/mnt/nas/obsidian/muninn"
-INBOX = os.path.join(VAULT, "_inbox")
-REPORT_PATH = os.path.join(VAULT, "Resources", "Dead Link Report.md")
-STUB_PREFIX = "stub"           # filename prefix for created stub notes
-REQUEST_DELAY = 0.15            # seconds between API calls (gentle rate limit)
-
-# ── TLS: disable cert verification (same as curl -k) ──────────────────────
-_SSL_CTX = ssl.create_default_context()
-_SSL_CTX.check_hostname = False
-_SSL_CTX.verify_mode = ssl.CERT_NONE
-
-
-def api_get(path: str, timeout: int = 30) -> dict | None:
-    """Call the brain API.  Returns parsed JSON, or None on any failure."""
-    url = f"{BRAIN}{path}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:
-            body = resp.read()
-            if not body:
-                return None
-            return json.loads(body)
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return None
-        if e.code == 503:
-            print(f"  [warn] API 503 for {path} — indexer not ready, skipping",
-                  file=sys.stderr)
-            return None
-        print(f"  [warn] HTTP {e.code} for {path}", file=sys.stderr)
-        return None
-    except (urllib.error.URLError, OSError, ValueError) as e:
-        print(f"  [warn] API error for {path}: {e}", file=sys.stderr)
-        return None
+SKIP = {".obsidian", ".git", ".trash", "_templates", "agents", "graphify-out"}
+# Journals, talk logs and reports quote whatever a model said: a dead link there
+# is noise, not a note waiting to be written. The gardener still lists those.
+LOGS = ("journal/", "Resources/Talk logs/", "Resources/Reports/", "_inbox/")
+GENERATED = {"CLAUDE", "README", "Gardener Report", "Dead Link Report"}
+WIKILINK = re.compile(r"\[\[([^\]|#]+)")
+CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)   # a shell `[[ -d x ]]` test is not a wikilink
+UNSAFE = re.compile(r'[\x00-\x1f\x7f/\\\[\]#|:]')   # not allowed in a note title
+CLOSE = 0.8        # how alike two squashed titles must be to count as the same note
+STUB_DIR = "Resources"
 
 
-def discover_all_notes() -> list[str]:
-    """Discover every note path known to the brain via /api/mocs."""
-    data = api_get("/api/mocs")
-    if not data:
-        return []
-    mocs = data.get("mocs", [])
-    if not isinstance(mocs, list):
-        return []
-    return [m["path"] for m in mocs if isinstance(m, dict) and "path" in m]
+def targets(text):
+    """Note names a text links to. A link into a skipped folder (the inbox archive
+    under agents/) is not part of the graph, so it is not dead either."""
+    found = set()
+    for match in WIKILINK.finditer(CODE.sub("", text)):
+        target = match.group(1).strip()
+        if target.split("/")[0] in SKIP or not any(c.isalnum() for c in target):
+            continue
+        name = target.split("/")[-1]
+        found.add(name[:-3] if name.endswith(".md") else name)
+    return found
 
 
-def get_outgoing_links(path: str) -> list[str]:
-    """Return outgoing wikilink paths for a note (via /api/graph)."""
-    q = urllib.parse.quote(path, safe="/")
-    data = api_get(f"/api/graph?path={q}")
-    if not data:
-        return []
-    outgoing = data.get("outgoing", [])
-    if not isinstance(outgoing, list):
-        return []
-    return [l["path"] for l in outgoing if isinstance(l, dict) and "path" in l]
+def scan(vault):
+    """Every note by name, with its vault path and the names it links to."""
+    notes = {}
+    for root, dirs, files in os.walk(vault):
+        dirs[:] = [d for d in dirs if d not in SKIP and not d.startswith(".")]
+        for fn in files:
+            if not fn.endswith(".md"):
+                continue
+            path = os.path.join(root, fn)
+            try:
+                with open(path, encoding="utf-8", errors="ignore") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            notes[fn[:-3]] = {"rel": os.path.relpath(path, vault), "links": targets(text)}
+    return notes
 
 
-def note_exists_in_brain(path: str) -> bool:
-    """Check whether the brain knows about a note (200 via /api/read)."""
-    q = urllib.parse.quote(path, safe="/")
-    url = f"{BRAIN}/api/read?path={q}"
-    try:
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as resp:
-            return resp.status == 200
-    except urllib.error.HTTPError:
+def squash(name):
+    return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
+def find_dead(notes):
+    """Split the dead links of filed notes into (dead, misspelt).
+
+    dead: source -> targets no note answers to. misspelt: source -> {target: the
+    existing note it almost certainly means}, which wants the link fixed, not a stub."""
+    squashed = {squash(name): name for name in notes}
+    dead, misspelt = {}, {}
+    for source, note in notes.items():
+        if source in GENERATED or note["rel"].startswith(LOGS):
+            continue
+        for target in sorted(note["links"]):
+            if target in notes:
+                continue
+            near = difflib.get_close_matches(squash(target), list(squashed), n=1, cutoff=CLOSE)
+            if near:
+                misspelt.setdefault(source, {})[target] = squashed[near[0]]
+            else:
+                dead.setdefault(source, []).append(target)
+    return dead, misspelt
+
+
+def create_stub(vault, target, sources, today):
+    """Create the missing note under its linked name. Never overwrites; True if written."""
+    if UNSAFE.search(target) or target.startswith(".") or len(target.encode()) > 160:
         return False
-    except Exception:
-        return False
-
-
-def note_exists_on_disk(name: str) -> bool:
-    """Check whether a .md file for this note name exists in the vault."""
-    # Try exact match first, then common variations
-    candidates = [
-        os.path.join(VAULT, f"{name}.md"),
-    ]
-    for p in candidates:
-        if os.path.exists(p):
-            return True
-    return False
-
-
-def stub_exists_in_inbox(name: str) -> bool:
-    """Check if a stub note for this name already exists in _inbox."""
-    stub_name = f"{STUB_PREFIX} {name}.md"
-    return os.path.exists(os.path.join(INBOX, stub_name))
-
-
-def normalize_target(raw: str) -> str:
-    """Normalise a wikilink target: strip .md, strip leading/trailing whitespace."""
-    t = raw.strip()
-    if t.endswith(".md"):
-        t = t[:-3]
-    return t
-
-
-def create_stub(target: str, sources: list[str], today: str) -> bool:
-    """Create a stub note in _inbox/ for a dead link target.  Returns True on success."""
-    stub_name = f"{STUB_PREFIX} {target}.md"
-    stub_path = os.path.join(INBOX, stub_name)
-
-    backlinks = "\n".join(f"  - [[{s}]]" for s in sorted(sources)[:5])
-    if len(sources) > 5:
-        backlinks += f"\n  - ... and {len(sources) - 5} more"
-
+    backlinks = "\n".join(f"- [[{s}]]" for s in sorted(sources))
     content = (
         "---\n"
-        f"type: stub\n"
+        "type: stub\n"
         "status: inbox\n"
         "tags: [dead-link, stub, needs-content]\n"
         f"created: {today}\n"
         "agent: huginn/dead-link-fixer\n"
         "---\n\n"
         f"# {target}\n\n"
-        "> [!missing] This note was auto-created because it was linked but missing.\n"
-        ">\n"
-        "> Sources that link here:\n"
-        f"{backlinks}\n\n"
+        "> [!missing] This note was auto-created because it was linked but missing.\n\n"
+        f"Linked from:\n{backlinks}\n\n"
+        "See also: [[Home MOC]]\n"
     )
+    directory = os.path.join(vault, STUB_DIR)
     try:
-        with open(stub_path, "w", encoding="utf-8") as fh:
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, target + ".md"), "x", encoding="utf-8") as fh:
             fh.write(content)
         return True
     except OSError as e:
-        print(f"  [warn] Failed to create stub for {target}: {e}", file=sys.stderr)
+        print(f"  [warn] no stub for {target}: {e}", file=sys.stderr)
         return False
 
 
-def write_report(dead_links: dict[str, list[str]], stubs_created: int,
-                 total_notes: int, today: str) -> None:
+def write_report(vault, dead, misspelt, stubs, total, today):
     """Write (or overwrite) the dead-link report note."""
-    unique_dead = {t for targets in dead_links.values() for t in targets}
-
-    if unique_dead:
-        lines = [
-            "---",
-            "type: note",
-            "status: active",
-            "tags: [gardener, maintenance, dead-links]",
-            f"created: {today}",
-            "agent: huginn",
-            "---",
-            "",
-            "# Dead Link Report",
-            "",
-            f"Weekly dead-link sweep ({today}) — {len(unique_dead)} dead links "
-            f"found across {len(dead_links)} source notes ({total_notes} total).",
-            "",
-        ]
-        for src in sorted(dead_links.keys()):
-            targets = sorted(set(dead_links[src]))
+    lines = [
+        "---", "type: note", "status: active", "tags: [gardener, maintenance, dead-links]",
+        f"created: {today}", "agent: huginn", "---", "", "# Dead Link Report", "",
+    ]
+    count = sum(len(t) for t in dead.values()) + sum(len(t) for t in misspelt.values())
+    if count:
+        sources = sorted(set(dead) | set(misspelt))
+        lines += [f"Weekly dead-link sweep ({today}) — {count} dead links in "
+                  f"{len(sources)} of {total} notes.", ""]
+        for src in sources:
             lines.append(f"## [[{src}]]")
-            for t in targets:
-                lines.append(f"- Links to missing **{t}**")
+            lines += [f"- Links to missing **{t}**" for t in dead.get(src, [])]
+            lines += [f"- Links to **{t}**, which is probably [[{note}]]: fix the link"
+                      for t, note in sorted(misspelt.get(src, {}).items())]
             lines.append("")
-
-        lines += [
-            f"## Stubs created ({stubs_created})",
-            "",
-            f"Stub notes were created in `_inbox/` with prefix `{STUB_PREFIX}`. "
-            "They will be processed by the inbox sweep on the next run.",
-            "",
-            "See also: [[Home MOC]]",
-            "",
-        ]
+        lines += [f"## Stubs created ({len(stubs)})", ""]
+        lines += [f"- [[{s}]]" for s in stubs]
+        lines += ["", f"A stub is written to `{STUB_DIR}/` under the name it was linked by, so the "
+                  "link resolves. Fill it in, or delete it and point the link at the right note.", ""]
     else:
-        lines = [
-            "---",
-            "type: note",
-            "status: active",
-            "tags: [gardener, maintenance, dead-links]",
-            f"created: {today}",
-            "agent: huginn",
-            "---",
-            "",
-            "# Dead Link Report",
-            "",
-            f"Weekly dead-link sweep ({today}) — no dead links found across "
-            f"{total_notes} notes. 🌱",
-            "",
-            "See also: [[Home MOC]]",
-            "",
-        ]
-
-    os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
-    with open(REPORT_PATH, "w", encoding="utf-8") as fh:
+        lines += [f"Weekly dead-link sweep ({today}) — no dead links found across {total} notes. 🌱", ""]
+    lines += ["See also: [[Home MOC]]", ""]
+    path = os.path.join(vault, "Resources", "Dead Link Report.md")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))
 
 
-def main() -> None:
-    # Ensure log and inbox directories exist
-    logdir = os.path.join(VAULT, "agents", "logs")
-    os.makedirs(logdir, exist_ok=True)
-    os.makedirs(INBOX, exist_ok=True)
-
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--vault", default="/mnt/nas/obsidian/muninn")
+    parser.add_argument("--dry-run", action="store_true", help="print the findings, write nothing")
+    args = parser.parse_args()
     today = date.today().isoformat()
     print(f"[{datetime.now().isoformat()}] huginn/dead-link-fixer start")
-
-    # ── Step 1: discover all note paths ──────────────────────────────────
-    note_paths = discover_all_notes()
-    if not note_paths:
-        print("  No notes discovered — API may be unreachable or vault is empty.")
-        print(f"[{datetime.now().isoformat()}] huginn/dead-link-fixer done (empty)")
+    notes = scan(args.vault)
+    dead, misspelt = find_dead(notes)
+    print(f"  Scanned {len(notes)} notes: {sum(len(t) for t in dead.values())} dead links, "
+          f"{sum(len(t) for t in misspelt.values())} misspelt")
+    wanted = {}   # missing target -> the notes that link to it
+    for source, missing in dead.items():
+        for target in missing:
+            wanted.setdefault(target, []).append(source)
+    if args.dry_run:
+        for target, sources in sorted(wanted.items()):
+            print(f"  would stub {target!r} (linked from {', '.join(sorted(sources))})")
+        for source, pairs in sorted(misspelt.items()):
+            for target, note in sorted(pairs.items()):
+                print(f"  {source}: {target!r} is probably {note!r}")
         return
-
-    print(f"  Discovered {len(note_paths)} notes via brain API")
-
-    # ── Step 2: walk every note, collect outgoing links, check liveness ──
-    dead_links: dict[str, list[str]] = {}  # source_path → [dead target ...]
-    confirmed_exist: set[str] = set()       # paths we've confirmed exist
-    checked: set[str] = set()               # paths we've already checked
-
-    for i, path in enumerate(note_paths):
-        if i % 10 == 0:
-            print(f"  Processing {i + 1}/{len(note_paths)}...")
-
-        outgoing = get_outgoing_links(path)
-        if not outgoing:
-            continue
-
-        for raw_target in outgoing:
-            target = normalize_target(raw_target)
-            if not target:
-                continue
-
-            # Already confirmed existing — skip
-            if target in confirmed_exist:
-                continue
-
-            if target in checked:
-                # Already checked and didn't exist — record dead link
-                if path not in dead_links:
-                    dead_links[path] = []
-                if target not in dead_links[path]:
-                    dead_links[path].append(target)
-                continue
-
-            # Check liveness: brain API first, then filesystem as fallback
-            if note_exists_in_brain(target):
-                confirmed_exist.add(target)
-                checked.add(target)
-                continue
-
-            if note_exists_on_disk(target):
-                # Exists on disk but brain missed it — treat as alive
-                confirmed_exist.add(target)
-                checked.add(target)
-                time.sleep(REQUEST_DELAY)
-                continue
-
-            # It's dead — but skip if a stub is already in _inbox
-            if stub_exists_in_inbox(target):
-                confirmed_exist.add(target)   # treat as "being handled"
-                checked.add(target)
-                time.sleep(REQUEST_DELAY)
-                continue
-
-            confirmed_exist.add(target)  # well, mark as checked so we don't re-check
-            if path not in dead_links:
-                dead_links[path] = []
-            dead_links[path].append(target)
-            checked.add(target)
-
-            time.sleep(REQUEST_DELAY)
-
-    # ── Step 3: create stubs and write report ────────────────────────────
-    unique_dead = {t for targets in dead_links.values() for t in targets}
-    print(f"  Found {len(unique_dead)} unique dead links across "
-          f"{len(dead_links)} source notes")
-
-    stubs_created = 0
-    if unique_dead:
-        # Collect all sources per dead target for backlinks
-        target_sources: dict[str, list[str]] = {}
-        for src, targets in dead_links.items():
-            for t in targets:
-                target_sources.setdefault(t, []).append(src)
-
-        for target in sorted(target_sources.keys()):
-            # Double-check: real note might have been created since we checked
-            if note_exists_on_disk(target):
-                continue
-            if stub_exists_in_inbox(target):
-                continue
-            if create_stub(target, target_sources[target], today):
-                stubs_created += 1
-
-        print(f"  Created {stubs_created} stub notes in _inbox/")
-
-    write_report(dead_links, stubs_created, len(note_paths), today)
-    print(f"  Report written to Resources/Dead Link Report.md")
+    stubs = [t for t, sources in sorted(wanted.items()) if create_stub(args.vault, t, sources, today)]
+    write_report(args.vault, dead, misspelt, stubs, len(notes), today)
+    print("  Report written to Resources/Dead Link Report.md")
     print(f"[{datetime.now().isoformat()}] huginn/dead-link-fixer done "
-          f"({len(unique_dead)} dead, {stubs_created} stubs)")
+          f"({len(wanted)} dead, {len(stubs)} stubs)")
 
 
 if __name__ == "__main__":

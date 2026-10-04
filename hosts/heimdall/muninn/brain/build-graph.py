@@ -34,6 +34,25 @@ def community_color(c):
     return "#%02x%02x%02x" % (int(r * 255), int(g * 255), int(b * 255))
 
 
+def publish(name, payload):
+    # A feed is rewritten only when its content changed, the "generated" stamp
+    # aside. The dashboard polls every 15 s and redraws when the stamp moves, so
+    # an unchanged graph must keep its stamp or the 3D layout is rebuilt for nothing.
+    path = os.path.join(WWW, name)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            old = json.load(fh)
+        new = json.loads(json.dumps(payload))
+        if all(old.get(k) == v for k, v in new.items() if k != "generated") and old.keys() == new.keys():
+            return False
+    except (OSError, ValueError, AttributeError):
+        pass
+    with open(path + ".tmp", "w") as fh:
+        json.dump(payload, fh)
+    os.replace(path + ".tmp", path)   # a poll never reads a half-written feed
+    return True
+
+
 now = time.time()
 nodes, links = [], []
 
@@ -117,8 +136,7 @@ if os.path.exists(REPO_GRAPH):
         pass
 
 os.makedirs(WWW, exist_ok=True)
-with open(os.path.join(WWW, "graph.json"), "w") as fh:
-    json.dump({"nodes": nodes, "links": links, "generated": int(now)}, fh)
+publish("graph.json", {"nodes": nodes, "links": links, "generated": int(now)})
 
 # ── activity feed ──
 log = []
@@ -225,29 +243,27 @@ for name, meta in notes.items():
         orphans += 1
 
 # ── notes.json — search index for the Memory view (reader fetches /vault/<rel>) ──
-with open(os.path.join(WWW, "notes.json"), "w") as fh:
-    json.dump({
-        "generated": int(now),
-        "notes": [
-            {"id": n, "rel": m["rel"], "folder": m["folder"], "mtime": int(m["mtime"]),
-             "tags": m.get("tags", []), "excerpt": m.get("excerpt", "")}
-            for n, m in sorted(notes.items(), key=lambda kv: -kv[1]["mtime"])
-        ],
-    }, fh)
+publish("notes.json", {
+    "generated": int(now),
+    "notes": [
+        {"id": n, "rel": m["rel"], "folder": m["folder"], "mtime": int(m["mtime"]),
+         "tags": m.get("tags", []), "excerpt": m.get("excerpt", "")}
+        for n, m in sorted(notes.items(), key=lambda kv: -kv[1]["mtime"])
+    ],
+})
 
-with open(os.path.join(WWW, "activity.json"), "w") as fh:
-    json.dump({
-        "generated": int(now),
-        "counts": {"notes": len(notes), "code": code_nodes, "links": len(links),
-                   "mocs": len(moc_names), "inbox": len(inbox), "orphans": orphans},
-        "agents": agents,
-        "services": services,
-        "inbox": inbox[:12],
-        "digest": {"day": digest_day, "text": digest},
-        "gitlog": gitlog,
-        "log": log[-40:],
-        "recent": [{"id": n, "folder": m["folder"], "mtime": int(m["mtime"])} for n, m in recent],
-    }, fh)
+publish("activity.json", {
+    "generated": int(now),
+    "counts": {"notes": len(notes), "code": code_nodes, "links": len(links),
+               "mocs": len(moc_names), "inbox": len(inbox), "orphans": orphans},
+    "agents": agents,
+    "services": services,
+    "inbox": inbox[:12],
+    "digest": {"day": digest_day, "text": digest},
+    "gitlog": gitlog,
+    "log": log[-40:],
+    "recent": [{"id": n, "folder": m["folder"], "mtime": int(m["mtime"])} for n, m in recent],
+})
 
 print(f"muninn-brain: {len(notes)} notes + {code_nodes} code nodes, {len(links)} links, "
       f"{len(inbox)} inbox, {orphans} orphans")

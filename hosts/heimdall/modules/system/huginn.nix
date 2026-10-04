@@ -12,7 +12,7 @@
 #   • graphify-vault — the NOTES graph: staged copy of the vault's markdown only
 #                      (no .obsidian plugin JS) → /var/lib/huginn/graphs/vault (nightly)
 #   • gardener       — weekly vault hygiene report: orphans, dead links, stale notes
-#   • dead-link-fixer — weekly brain-API sweep: find broken wikilinks, create stub notes
+#   • dead-link-fixer — weekly offline sweep: dead wikilinks in filed notes → report + stub notes
 #   • morning-brief  — MiniMax overnight briefing into today's journal (daily 07:45)
 #   • weeknote       — MiniMax weekly review from the week's journals (Sundays 18:00)
 #   • todo-board     — regathers every open checkbox into MOCs/TODO MOC.md (daily 07:00)
@@ -245,9 +245,14 @@ let
     name = "huginn-inbox-sweep";
     runtimeInputs = [ vaultCommit pkgs.python3 pkgs.findutils pkgs.coreutils ];
     text = ''
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
       ${listCaptures} > ${inboxSeen} || true
       status=0
-      python3 ${../../muninn/inbox.py} --vault "${vault}" || status=$?
+      # an empty sweep prints nothing, so the log (which the dashboard tails) only
+      # gains lines when something was filed or failed
+      python3 ${../../muninn/inbox.py} --vault "${vault}" 2>&1 \
+        | while IFS= read -r line; do echo "[$(date -Iseconds)] $line"; done \
+        | tee -a "$logdir/inbox-sweep.log" || status=$?
       muninn-vault-commit "huginn: inbox filing and report (status $status)"
       exit "$status"
     '';
@@ -330,7 +335,7 @@ let
     '';
   };
 
-  # ── dead-link-fixer (weekly) — brain API: find broken wikilinks, create stubs ──
+  # ── dead-link-fixer (weekly) — offline: find dead wikilinks, report, create stubs ──
   deadLinkFixer = pkgs.writeShellApplication {
     name = "huginn-dead-link-fixer";
     runtimeInputs = [ vaultCommit pkgs.python3 pkgs.coreutils ];
@@ -782,7 +787,7 @@ in
 
   # ── dead-link-fixer: weekly broken-wikilink sweep ──
   systemd.services."huginn-dead-link-fixer" = {
-    description = "huginn: find broken wikilinks via brain API and create stub notes";
+    description = "huginn: find dead wikilinks in filed notes, report them and create stub notes";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
     unitConfig = {

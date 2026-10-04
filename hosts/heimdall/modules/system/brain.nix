@@ -7,11 +7,13 @@ let
   vault = "/mnt/nas/obsidian/muninn";
   www   = "/var/lib/muninn-brain/www";
 
-  # Keep the durable job store beside the bridge for its Python import.
+  # Keep the durable job store and the embedding index beside the bridge for
+  # its Python imports; embed.py is also the embedder service's entry point.
   bridge = pkgs.runCommand "muninn-bridge" {} ''
     mkdir -p "$out"
     cp ${../../muninn/brain/bridge.py} "$out/bridge.py"
     cp ${../../muninn/brain/jobs.py} "$out/jobs.py"
+    cp ${../../muninn/brain/embed.py} "$out/embed.py"
   '';
 
   # Vendored, pinned JS libs served same-origin — no CDN at runtime (the esm.sh
@@ -413,6 +415,28 @@ in
       ExecStart = "${pkgs.python3}/bin/python3 ${indexerPy}";
       Restart = "always";
       RestartSec = "5s";
+      NoNewPrivileges = true;
+    };
+    wantedBy = [ "multi-user.target" ];
+  };
+
+  # ── embedder: one vector per note, for search and placement by meaning ──
+  # Reads the notes from the FTS index above and asks the embedding model on
+  # mimir (hosts/mimir/modules/system/embeddings.nix) for a vector whenever a
+  # note is new or changed; the bridge searches them. If mimir is down it
+  # waits, and the bridge falls back to keyword search. The first run embeds
+  # the whole vault, which takes about an hour on mimir's CPU.
+  systemd.services."muninn-embedder" = {
+    description = "muninn embedder: keep the vault's embedding index in sync";
+    after = [ "muninn-indexer.service" "network-online.target" ];
+    wants = [ "network-online.target" ];
+    serviceConfig = {
+      Type = "simple";
+      User = "christina";
+      Group = "users";
+      ExecStart = "${pkgs.python3}/bin/python3 ${bridge}/embed.py";
+      Restart = "always";
+      RestartSec = "30s";
       NoNewPrivileges = true;
     };
     wantedBy = [ "multi-user.target" ];

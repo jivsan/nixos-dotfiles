@@ -627,7 +627,7 @@
   .nedge.hot { opacity:1; filter:drop-shadow(0 0 5px currentColor); }
   .nlabel { fill:var(--ink3); font-size:8.5px; letter-spacing:1.1px; font-family:var(--mono); }
   .nlabel.hot { fill:var(--cream); }
-  .nflow { opacity:.85; }
+  .nflow { opacity:.85; will-change:transform; }   /* own layers: moving dots must not re-rasterise the whole diagram */
   .nnode { cursor:pointer; }
   .nbox { fill:rgba(19,14,29,.94); stroke:rgba(138,125,255,.35); stroke-width:1; transition:stroke .25s; }
   .nnode:hover .nbox { stroke:var(--cyan); filter:drop-shadow(0 0 8px rgba(45,226,230,.35)); }
@@ -1061,6 +1061,8 @@ function focusSubgraph(id) {
     return keep.has(s)&&keep.has(t);
   });
   Graph.graphData({nodes: subNodes, links: subLinks});
+  rebuildAmbient(subLinks);
+  fedKey = '';   /* the graph now holds a subgraph: the next feed must restore it */
   setTimeout(() => {
     const n = nodeById.get(id);
     if (n && Graph) {
@@ -1095,7 +1097,9 @@ function show(v) {
   if (v === 'usage') refreshUsage();
   if (v === 'systems') refreshJobs();
   if (v === 'pulse') refreshPulse();
-  if (v === 'nexus') nexusInit();
+  /* deferred: on a reload at #nexus, show() runs at boot, before the nexus
+     tables further down exist; building it right then killed the whole script */
+  if (v === 'nexus') setTimeout(nexusInit, 0);
   if (v === 'hermes') hermesInit();
   if (v === 'capture') {
     setTimeout(() => { const ta = $('capture-text'); if (ta) ta.focus(); }, 60);
@@ -1115,13 +1119,15 @@ function renderList() {
   if (q) { const s = q.toLowerCase();
     arr = arr.filter(n => (n.id+' '+n.excerpt+' '+(n.tags||[]).join(' ')).toLowerCase().includes(s)); }
   if (filter === 'all') arr = [...arr].sort((a,b) => a.id.localeCompare(b.id));
-  $('mem-list').innerHTML = arr.slice(0, 400).map(n => `
+  const html = arr.slice(0, 400).map(n => `
     <div class="row${n.id === selId ? ' sel' : ''}" data-id="${esc(n.id)}">
       <div class="tt"><span class="dot" style="background:${FOLDER[n.folder]||'#7f8cff'}"></span>
         <span>${esc(n.id)}</span><span class="when">${rel(n.mtime)}</span>
         <span class="gal" data-gal="${esc(n.id)}" title="show in galaxy" style="margin-left:auto;font-size:10px;opacity:.6;cursor:pointer">✦</span></div>
       <div class="pp">${esc(n.rel)}</div>
     </div>`).join('') || '<div class="ghost">nothing matches</div>';
+  /* the 30 s poll re-renders: rebuild the rows only when they would differ */
+  if (html !== renderList.last) $('mem-list').innerHTML = renderList.last = html;
 }
 $('q').addEventListener('input', e => { q = e.target.value.trim(); renderList(); });
 $('chips').addEventListener('click', e => {
@@ -1313,6 +1319,28 @@ async function refreshNotes() {
 }
 
 /* ── galaxy (enhanced interactive) ────────────────────── */
+/* Three housekeeping fixes for the vendored three.js / 3d-force-graph pair.
+   None changes a pixel; they stop the page from allocating GPU objects it
+   never frees (87,000 geometries and 350 MB after two minutes of hovering). */
+if (window.THREE) {
+  /* while the layout runs, every synapse is re-sampled every tick; three r160
+     allocates a new buffer each time. Write into the existing one instead. */
+  THREE.BufferGeometry.prototype.setFromPoints = function (pts) {
+    let a = this.getAttribute('position');
+    if (!a || a.count !== pts.length) this.setAttribute('position', a = new THREE.Float32BufferAttribute(pts.length * 3, 3));
+    for (let i = 0; i < pts.length; i++) a.setXYZ(i, pts[i].x, pts[i].y, pts[i].z || 0);
+    a.needsUpdate = true;
+    return this;
+  };
+  /* the library drops a synapse's line without freeing its geometry (every
+     re-feed and every hover replaces all of them) */
+  const rm = THREE.Object3D.prototype.remove;
+  THREE.Object3D.prototype.remove = function (...objs) {
+    rm.apply(this, objs);
+    for (const o of objs) if (o && o.__graphObjType === 'link' && o.geometry) o.geometry.dispose();
+    return this;
+  };
+}
 const texCache = new Map();
 function starTex(color, hot) {
   const key = color + (hot ? '+' : '');
@@ -1400,7 +1428,8 @@ function buildGalaxy(el) {
     .linkWidth(l => fired.has(l) ? 1.4 : hl.has(l) ? 0.9 : 0)
     .linkCurvature(0.2)
     .linkCurveRotation(l => ((l.index || 0) * 2.399) % (Math.PI * 2))
-    .linkDirectionalParticles(l => hl.has(l) ? 3 : fired.has(l) ? 2 : (!rmq() && (l.index || 0) % 6 === 0) ? 1 : 0)
+    /* the resting particle on every synapse is drawn by the ambient layer below */
+    .linkDirectionalParticles(l => hl.has(l) ? 3 : fired.has(l) ? 2 : 0)
     .linkDirectionalParticleWidth(l => fired.has(l) ? 2.2 : hl.has(l) ? 1.9 : 1.1)
     .linkDirectionalParticleSpeed(l => fired.has(l) ? 0.02 : hl.has(l) ? 0.012 : 0.005)
     .linkDirectionalParticleColor(l => fired.has(l) ? '#2de2e6' : hl.has(l) ? '#ffffff' : '#9fd8ff')
@@ -1421,6 +1450,7 @@ function buildGalaxy(el) {
     })
     .warmupTicks(140)
     .cooldownTime(10000)
+    .d3AlphaMin(0.001)   /* settled is settled: stop simulating instead of running out the ten seconds */
     .d3AlphaDecay(0.028)
     .d3VelocityDecay(0.42);
   /* density: weak local repulsion only, short synapses inside a lobe, longer
@@ -1488,8 +1518,56 @@ function galaxyWatchdog() {
     Graph.zoomToFit(650, 50);
   }
 }
+/* Resting traffic: one slow, dim particle on every synapse. The library draws
+   each particle as its own mesh, one draw call apiece (3,100 of them, a third
+   of every frame). This layer draws the same spheres, same material and same
+   path, as a single instanced mesh. */
+let ambient = null, ambientLinks = [];
+const ambientM = window.THREE ? new THREE.Matrix4() : null, ambientV = window.THREE ? new THREE.Vector3() : null;
+function rebuildAmbient(links) {
+  if (ambient) { Graph.scene().remove(ambient); ambient.geometry.dispose(); ambient.material.dispose(); ambient = null; }
+  ambientLinks = links;
+  if (!links.length || rmq()) return;
+  ambient = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 4, 4),
+    new THREE.MeshLambertMaterial({ color: '#9fd8ff', transparent: true, opacity: 0.48 }), links.length);
+  ambient.frustumCulled = false;
+  ambient.count = 0;   /* nothing to show until the first frame has placed them */
+  Graph.scene().add(ambient);
+}
+(function ambientLoop(now) {
+  if (ambient && curView === 'galaxy' && !dreamOn && !document.hidden) {
+    const t = (now * 0.0003) % 1;   /* the library's 0.005 per frame, at 60 frames a second */
+    for (let i = 0; i < ambientLinks.length; i++) {
+      const l = ambientLinks[i], s = l.source, e = l.target;
+      /* a hovered or firing synapse shows the library's own brighter particles instead */
+      if (hl.has(l) || fired.has(l) || !s || s.x == null || !e || e.x == null) ambientM.makeScale(0, 0, 0);
+      else {
+        if (l.__curve) l.__curve.getPoint(t, ambientV);
+        else ambientV.set(s.x + (e.x - s.x) * t, s.y + (e.y - s.y) * t, (s.z || 0) + ((e.z || 0) - (s.z || 0)) * t);
+        ambientM.makeTranslation(ambientV.x, ambientV.y, ambientV.z);
+      }
+      ambient.setMatrixAt(i, ambientM);
+    }
+    ambient.count = ambientLinks.length;
+    ambient.instanceMatrix.needsUpdate = true;
+  }
+  requestAnimationFrame(ambientLoop);
+})(0);
+
+let fedKey = '';   /* the data + filter the graph currently holds */
 function feedGalaxy() {
   if (!Graph || !gData) return;
+  /* Feeding rebuilds every neuron and synapse and restarts the layout: about a
+     second of frozen page, then ten of simulation. Never do it for data the
+     graph already holds (re-entering the view, pressing "/" again). */
+  const key = gGen + '|' + gFilter + '|' + gQuery;
+  if (key === fedKey) {
+    setTimeout(() => Graph.zoomToFit(650, 50), 650);
+    clearTimeout(wdT); wdT = setTimeout(galaxyWatchdog, 1600);
+    if (gSel) renderSelInfo();
+    return;
+  }
+  fedKey = key;
   const f = getFilteredData();
   const nodes = f.nodes.map(n => {
     const ex = nodeById.get(n.id);
@@ -1501,6 +1579,7 @@ function feedGalaxy() {
   buildNeighbors(f.links);   // for inspector
   computeLobes(f.nodes);
   Graph.graphData({ nodes: f.nodes, links: f.links });
+  rebuildAmbient(f.links);
   Graph.nodeThreeObject(Graph.nodeThreeObject());
   rebuildLobeGlow();
   if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
@@ -1509,13 +1588,44 @@ function feedGalaxy() {
   clearTimeout(wdT); wdT = setTimeout(galaxyWatchdog, 1600);
   if (gSel) renderSelInfo();
 }
+/* What a poll brings decides how much work it is worth:
+   - nothing but a new build stamp: nothing to do;
+   - the same neurons and synapses with new details (a note was edited, so its
+     age changed): refresh the neurons in place, the layout stays;
+   - neurons or synapses added or removed: a full feed, which freezes the page
+     for about a second and re-runs the layout. */
+let gSig = '', gTopo = '';
+const feedKey = () => gGen + '|' + gFilter + '|' + gQuery;
+const topoSig = d => d.nodes.map(n => n.id + '\u0001' + lobeKey(n)).join('\u0002') + '\u0003' +
+  d.links.map(l => l.source + '\u0001' + l.target).join('\u0002');
 async function refreshGraph() {
   try {
-    const d = await (await fetch('graph.json?_=' + Date.now())).json();
-    if (d.generated === gGen) return;
-    gGen = d.generated; gData = d;
+    const txt = await (await fetch('graph.json?_=' + Date.now())).text();
+    const sig = txt.replace(/"generated":\s*\d+/, '');
+    if (sig === gSig) return;
+    const d = JSON.parse(txt), topo = topoSig(d);
+    gSig = sig;
+    if (gData && topo === gTopo) {
+      const fed = fedKey === feedKey();   /* the graph holds exactly this view */
+      const old = new Map(gData.nodes.map(n => [n.id, n]));
+      for (const n of d.nodes) Object.assign(old.get(n.id), n);
+      gGen = d.generated;
+      if (Graph && fed && gFilter === 'all' && !gQuery) {
+        fedKey = feedKey();
+        Graph.nodeThreeObject(Graph.nodeThreeObject());
+      } else if (curView === 'galaxy') feedGalaxy();   /* a filter may now match other notes */
+      return;
+    }
+    gTopo = topo; gGen = d.generated; gData = d;
     nodeById.clear();
-    feedGalaxy();
+    if (curView === 'galaxy' || !Graph) feedGalaxy();
+    else {
+      /* not being looked at: keep the lookups fresh and let show('galaxy')
+         feed it, instead of freezing another view for a second */
+      const f = getFilteredData();
+      for (const n of f.nodes) nodeById.set(n.id, n);
+      buildNeighbors(f.links);
+    }
   } catch {}
 }
 
@@ -1608,10 +1718,19 @@ async function refreshActivity() {
 /* ── neural activity: ambient firing, and recall lighting up ─ */
 const active = new Map();   // node id → {t0, s} firing strength (1 = recall, .5 = ambient)
 let thinkingOn = false;
+function emit(l) {
+  /* the library builds a geometry and a material for every emitted particle
+     and frees neither when the particle arrives */
+  Graph.emitParticle(l);
+  const g = l.__singleHopPhotonsObj, p = g && g.children[g.children.length - 1];
+  if (p && !p.__d) { p.__d = 1; p.addEventListener('removed', () => { p.geometry.dispose(); p.material.dispose(); }); }
+}
 function fire(n) {
-  if (!Graph || curView !== 'galaxy') return;
+  /* a paused graph (dream mode, hidden tab) keeps every emitted particle until
+     it renders again: emitting into it only piles up meshes */
+  if (!Graph || curView !== 'galaxy' || dreamOn || document.hidden) return;
   const links = Graph.graphData().links;
-  for (let i = 0; i < n && links.length; i++) Graph.emitParticle(links[(Math.random() * links.length) | 0]);
+  for (let i = 0; i < n && links.length; i++) emit(links[(Math.random() * links.length) | 0]);
 }
 setInterval(() => fire(thinkingOn ? 16 : 2), 420);
 /* spontaneous background activity — a neuron glows softly now and then,
@@ -1636,7 +1755,7 @@ function activate(ids) {
   Graph.linkWidth(Graph.linkWidth()); Graph.linkColor(Graph.linkColor());   // synapses light up
   let k = 0;
   const burst = setInterval(() => {
-    links.forEach(l => Graph.emitParticle(l));
+    links.forEach(l => emit(l));
     if (++k > 5) { clearInterval(burst); setTimeout(() => {
       links.forEach(l => fired.delete(l));
       if (Graph) { Graph.linkWidth(Graph.linkWidth()); Graph.linkColor(Graph.linkColor()); }
@@ -1821,7 +1940,7 @@ $('t-target').onclick = e => {
   target = { auto: 'hermes', hermes: 'codex', codex: 'auto' }[target];
   e.target.textContent = 'to: ' + target; e.target.classList.toggle('on', target !== 'auto');
 };
-$('t-speak').onclick = e => { speakOn = !speakOn; e.target.classList.toggle('on', speakOn); if (!speakOn && audio) audio.pause(); };
+$('t-speak').onclick = e => { speakOn = !speakOn; e.target.classList.toggle('on', speakOn); if (!speakOn && audio) { audio.pause(); orbLevelStop(); } };
 $('t-log').onclick = e => e.target.classList.toggle('on', $('drawer').classList.toggle('on'));
 $('d-close').onclick = () => { $('drawer').classList.remove('on'); $('t-log').classList.remove('on'); };
 addEventListener('keydown', e => {
@@ -2566,15 +2685,18 @@ async function refreshJobs() {
   $('nav-systems').classList.toggle('jobs-live', running.length > 0);
   if (curView === 'systems') {
     $('jobs-n').textContent = running.length ? `${running.length} running` : '';
-    $('jobs').innerHTML = jobs.length ? jobs.slice(0, 10).map(j => {
+    const html = jobs.length ? jobs.slice(0, 10).map(j => {
       const rid = (j.report || '').split('/').pop().replace(/\.md$/, '');
       return `<div class="jrow" data-rid="${esc(rid)}" title="${esc(j.text)}">
         <i class="js ${j.status}"></i><span class="who2">${esc(j.agent)}</span>
         <span class="txt">${esc(j.text)}</span><span class="ago">${rel(j.started)}</span></div>`;
     }).join('') : '<div class="empty">no agent jobs yet — ask muninn to do something</div>';
-    document.querySelectorAll('#jobs .jrow[data-rid]').forEach(x => {
-      x.onclick = x.dataset.rid ? () => openNote(x.dataset.rid) : null;
-    });
+    if (html !== refreshJobs.last) {   /* polled every 5 s: rebuild the rows only when they would differ */
+      $('jobs').innerHTML = refreshJobs.last = html;
+      document.querySelectorAll('#jobs .jrow[data-rid]').forEach(x => {
+        x.onclick = x.dataset.rid ? () => openNote(x.dataset.rid) : null;
+      });
+    }
   }
   clearTimeout(jobsTimer);
   if (running.length) jobsTimer = setTimeout(refreshJobs, 8000);   /* live while anything runs */
