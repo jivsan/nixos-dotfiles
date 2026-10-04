@@ -34,8 +34,8 @@ let
       --exclude='VSCodium' \
       "$HOME/.config/" "$DEST/config/"
 
-    # Backup octane-src
-    echo "[3/3] Backing up ~/octane-src..."
+    # Backup the Octane installer zips (server, addon, node, cuDNN)
+    echo "[3/3] Backing up ~/octane-src (installer zips)..."
     ${pkgs.rsync}/bin/rsync -av --delete --no-group --no-owner --no-perms --omit-dir-times \
       "$HOME/octane-src/" "$DEST/octane-src/"
 
@@ -74,7 +74,7 @@ let
     echo ""
     echo "==> Restore complete!"
     echo "    Run: sudo nixos-rebuild switch --flake ~/nixos-dotfiles#mjolnir"
-    echo "    Run: sudo octane-install ~/octane-src"
+    echo "    Run: sudo octane-install ~/octane-src/OctaneStudio_for_BlenderOctaneAddon_Linux_*.zip ~/octane-src/octane_blender_addon-*.zip"
   '';
 in
 {

@@ -41,19 +41,6 @@ let
     '';
   };
 
-  # Legacy wrapper for the old "Blender Octane Edition" build still in
-  # /opt/octane/blender (2025.5 / 30.11). Safe to delete once the addon flow
-  # is confirmed working: `sudo rm -r /opt/octane/blender`.
-  octane-blender = pkgs.buildFHSEnv {
-    name = "octane-blender";
-    targetPkgs = pkgs: (octaneLibs pkgs) ++ (with pkgs; [
-      pulseaudio libsndfile jack2 openal
-      libpng libjpeg libtiff openexr openjpeg
-      python3 wayland libdecor ocl-icd
-    ]);
-    runScript = "${octaneBase}/blender/blender";
-  };
-
   # Stop OctaneServer gracefully and wait for its license logout to finish.
   octane-stop = pkgs.writeShellScriptBin "octane-stop" ''
     pg=${pkgs.procps}/bin/pgrep
@@ -184,7 +171,6 @@ in
 
   environment.systemPackages = [
     octane-server
-    octane-blender
     octane-install
     octane-stop
   ];

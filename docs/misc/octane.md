@@ -12,9 +12,8 @@ shared libs in `modules/apps/octane-libs.nix`, Blender in `modules/apps/blender.
 | OctaneServer 31.10 (Octane 2026.4, Studio+) | mjolnir, `octane-server` (FHS env over `/opt/octane/server`) | holds the OTOY sign-in, renders, drives network rendering |
 | Render node 2026.4 | mimir, `octane-node.service` (FHS env over `/opt/octane/node`) | daemon + `octane_node`; mjolnir's server uses mimir's GPU |
 
-There is no "Blender Octane Edition" binary any more. The old 2025.5 build is
-still under `/opt/octane/blender` (wrapper `octane-blender`) until the new flow
-is confirmed, then `sudo rm -r /opt/octane/blender` and drop the wrapper.
+There is no "Blender Octane Edition" binary any more. The installer zips are kept
+in `~/octane-src` (backed up to the NAS by `backup-nixos`).
 
 **Versions must match**: node version == OctaneServer version, or the primary
 ignores the node. Addon 31.10 ⇒ Octane **2026.4** ⇒ node zip `..._2026_4_node_linux.zip`.
@@ -55,8 +54,8 @@ blender-migrate-config              # copies ~/.config/blender/4.5 -> 5.2 (25 GB
 #   --from 5.1 instead if the vanilla-Blender config is the one you want
 
 # 3. install server + addon
-sudo octane-install ~/Downloads/OctaneStudio_for_BlenderOctaneAddon_Linux_31.10-stable.zip \
-                    ~/Downloads/octane_blender_addon-31.10-stable.zip
+sudo octane-install ~/octane-src/OctaneStudio_for_BlenderOctaneAddon_Linux_31.10-stable.zip \
+                    ~/octane-src/octane_blender_addon-31.10-stable.zip
 
 # 4. first run
 octane-server &      # sign in with the OTOY account
@@ -73,7 +72,7 @@ mimir's driver is already the open 595 module (Blackwell needs ≥ R572). Deploy
 `#mimir`, then:
 
 ```sh
-scp ~/Downloads/OctaneRender_Studio+_2026_4_node_linux.zip christina@10.0.20.18:
+scp ~/octane-src/OctaneRender_Studio+_2026_4_node_linux.zip christina@10.0.20.18:
 ssh christina@10.0.20.18
 sudo octane-node-install ~/OctaneRender_Studio+_2026_4_node_linux.zip
 # optional, the OTOY way to pick port/GPUs (writes run_octane_daemon.sh):
