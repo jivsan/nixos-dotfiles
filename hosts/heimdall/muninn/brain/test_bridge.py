@@ -330,9 +330,11 @@ class BridgeJobIntegrationTests(unittest.TestCase):
         root = Path(temporary.name)
         self.store = JobStore(root / "jobs.db", root, max_active=1)
         self.route = {"via": "jev", "tier": "agent", "executor": "hermes"}
-        patch = mock.patch.object(bridge, "job_store", return_value=self.store)
-        patch.start()
-        self.addCleanup(patch.stop)
+        # no key, no outcome check: only the tests about it ask Jev
+        for patch in (mock.patch.object(bridge, "job_store", return_value=self.store),
+                      mock.patch.object(bridge, "JEV_KEY", "")):
+            patch.start()
+            self.addCleanup(patch.stop)
 
     def test_unexpected_executor_failure_is_filed_and_logged_with_original_route(self):
         job = self.store.create("Research storage", "hermes", self.route)
@@ -378,6 +380,61 @@ class BridgeJobIntegrationTests(unittest.TestCase):
             bridge.run_agent(job)
         hermes.assert_not_called()
         self.assertEqual(self.store.get(job["id"])["agent"], "claude")
+
+    def test_worker_that_only_explains_why_it_could_not_is_replaced(self):
+        job = self.store.create("What are my todos?", "hermes", self.route)
+        excuse = "I can't access the vault from this session, so I can't verify your tasks."
+        verdicts = [{"answers": {"gave_up": {"type": "noul", "noul": 0.97}}},
+                    {"answers": {"gave_up": {"type": "noul", "noul": 0.02}}}]
+        with mock.patch.object(bridge, "JEV_KEY", "jev-key"), \
+                mock.patch.object(bridge, "post_json", side_effect=verdicts) as post, \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                mock.patch.object(bridge, "run_hermes", side_effect=lambda j: j.update(status="done", answer=excuse)) as hermes, \
+                mock.patch.object(bridge, "run_codex", side_effect=lambda j: j.update(status="done", answer="Three open todos.")), \
+                mock.patch.object(bridge, "run_claude") as claude, \
+                mock.patch.object(bridge, "log_talk"):
+            bridge.run_agent(job)
+        hermes.assert_called_once()
+        claude.assert_not_called()
+        saved = self.store.get(job["id"])
+        self.assertEqual((saved["agent"], saved["status"], saved["answer"]), ("codex", "done", "Three open todos."))
+        self.assertIn("can't access the vault", saved["route"]["executor_fallback"])
+        self.assertEqual(saved["route"]["outcome"], {"worker": "codex", "gave_up": 0.02})
+        asked = post.call_args_list[0]
+        self.assertEqual(asked.args[1]["state"], {"request": "What are my todos?", "result": excuse})
+        self.assertEqual(asked.args[1]["questions"]["gave_up"]["type"], "noul")
+        self.assertEqual(asked.kwargs["key"], "jev-key")
+
+    def test_job_nobody_could_do_is_filed_as_failed_with_the_reason(self):
+        job = self.store.create("What are my todos?", "hermes", self.route)
+        with mock.patch.object(bridge, "JEV_KEY", "jev-key"), \
+                mock.patch.object(bridge, "post_json", return_value={"answers": {"gave_up": {"type": "noul", "noul": 0.97}}}), \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": False, "claude": True}), \
+                mock.patch.object(bridge, "run_hermes", side_effect=lambda j: j.update(status="done", answer="No vault access.")) as hermes, \
+                mock.patch.object(bridge, "log_talk"):
+            bridge.run_agent(job)
+        hermes.assert_called_once()
+        saved = self.store.get(job["id"])
+        self.assertEqual((saved["agent"], saved["status"], saved["answer"]), ("hermes", "failed", "No vault access."))
+        self.assertEqual(saved["route"]["outcome"], {"worker": "hermes", "gave_up": 0.97})
+        self.assertIn("status: failed", (self.store.vault / saved["report"]).read_text())
+
+    def test_done_job_stands_when_jev_is_unsure_or_silent(self):
+        answers = ({"answers": {"gave_up": {"type": "noul", "noul": 0.6}}}, TimeoutError("timed out"),
+                   {"answers": {"gave_up": {"type": "noul", "noul": True}}}, {"answers": {}})
+        for answer in answers:
+            job = self.store.create("Research storage", "hermes", self.route)
+            with self.subTest(answer=answer), mock.patch.object(bridge, "JEV_KEY", "jev-key"), \
+                    mock.patch.object(bridge, "post_json", side_effect=[answer]), \
+                    mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                    mock.patch.object(bridge, "run_hermes", side_effect=lambda j: j.update(status="done", answer="Report.")), \
+                    mock.patch.object(bridge, "run_codex") as codex, mock.patch.object(bridge, "log_talk"):
+                bridge.run_agent(job)
+            codex.assert_not_called()
+            saved = self.store.get(job["id"])
+            self.assertEqual((saved["agent"], saved["status"]), ("hermes", "done"))
+            self.assertEqual(saved["route"].get("outcome"),
+                             {"worker": "hermes", "gave_up": 0.6} if answer is answers[0] else None)
 
     def test_finished_job_gets_its_own_vault_commit(self):
         git = ["git", "-C", str(self.store.vault)]

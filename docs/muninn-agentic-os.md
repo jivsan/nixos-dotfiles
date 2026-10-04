@@ -45,6 +45,17 @@ and report name as the message, so what an agent changed is not swept into
 huginn's next commit. If Claude fails on a session, usage or rate limit, the
 job goes to Hermes or Codex instead and `route.executor_fallback` says why.
 
+A worker that returns "I can't reach the vault" has answered, but not done the
+job. So Jev reads the request and the opening of every finished result and
+gives the probability that the result only explains why the work could not be
+done; `route.outcome` records it with the worker it was asked about. At
+`JEV_OUTCOME_MIN` (0.85) or above, the job goes to the next connected worker
+(Hermes, then Codex; never Claude) that has not tried it, and
+`route.executor_fallback` quotes what the first one said. If no worker is left
+the job is filed as failed with that explanation as its result. If Jev does not
+answer, the result stands. A handover runs the request again from the start, so
+a wrong verdict on a job that did change files repeats that work.
+
 Hermes jobs use separate conversations. Codex retains its `workspace-write`
 sandbox. On bridge restart, unfinished execution becomes failed and receives an
 interruption report. Tool actions are never automatically replayed. If execution
@@ -189,7 +200,8 @@ Secrets remain outside git:
   `MUNINN_BRIDGE_URL` (default `http://127.0.0.1:8093`) go here too.
 - `/var/lib/secrets/muninn-bridge.env`: `HERMES_API_KEY`, matching hermod's
   `API_SERVER_KEY`. Optional bridge overrides: `JEV_API_KEY`, `JEV_URL`,
-  `JEV_MODEL`, `JEV_MIN_CONFIDENCE`, `MUNINN_MAX_JOBS`, `MUNINN_JOBS_DB`,
+  `JEV_MODEL`, `JEV_MIN_CONFIDENCE`, `JEV_OUTCOME_MIN` (above 1 turns the
+  outcome check off), `MUNINN_MAX_JOBS`, `MUNINN_JOBS_DB`,
   `MUNINN_HERMES_URL`. Native TypeSafe uses its key,
   `JEV_URL=https://api.typesafe.ai/v1/systemone` and `JEV_MODEL=jev-latest`.
 - Codex needs its existing login on heimdall. Hermes uses its configured provider
