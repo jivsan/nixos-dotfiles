@@ -13,12 +13,19 @@ import bridge
 from jobs import JobStore
 
 
+LIVE_STATE = bridge.live_state   # the real one, for the tests about it
+
+
 def setUpModule():
     # This suite also runs on heimdall: keep it out of the live talk log, spool and Pulse counters.
     scratch = tempfile.TemporaryDirectory()
     unittest.addModuleCleanup(scratch.cleanup)
-    for name, leaf in (("LOG_DIR", "talk"), ("TALK_SPOOL", "talk-spool.jsonl"), ("STATS_FILE", "stats.json")):
-        patch = mock.patch.object(bridge, name, str(Path(scratch.name) / leaf))
+    values = [(name, str(Path(scratch.name) / leaf))
+              for name, leaf in (("LOG_DIR", "talk"), ("TALK_SPOOL", "talk-spool.jsonl"), ("STATS_FILE", "stats.json"))]
+    # Answers never probe the real systems here, and worker commands are the same on every host.
+    values += [("live_state", lambda: ""), ("NO_NEW_PRIVS", [])]
+    for name, value in values:
+        patch = mock.patch.object(bridge, name, value)
         patch.start()
         unittest.addModuleCleanup(patch.stop)
 
@@ -321,6 +328,19 @@ class ExecutorTests(unittest.TestCase):
         with mock.patch.object(bridge.subprocess, "run", side_effect=bridge.subprocess.TimeoutExpired("claude", 1500)):
             bridge.run_claude(job)
         self.assertIn("out of time", job["answer"])
+
+    def test_no_worker_on_this_host_can_reach_sudo(self):
+        guard = ["/bin/setpriv", "--no-new-privs"]
+        done = mock.Mock(returncode=0, stdout="Done.", stderr="")
+        runs = {"run_claude": (bridge.CLAUDE, lambda: bridge.run_claude({"id": "j", "text": "Research", "agent": "claude"})),
+                "run_codex": (bridge.CODEX, lambda: bridge.run_codex({"id": "j", "text": "Tidy", "agent": "codex"})),
+                "run_claude_answer": (bridge.CLAUDE, lambda: bridge.run_claude_answer("A question")),
+                "run_codex_answer": (bridge.CODEX, lambda: bridge.run_codex_answer("A question"))}
+        for name, (program, start) in runs.items():
+            with self.subTest(worker=name), mock.patch.object(bridge, "NO_NEW_PRIVS", guard), \
+                    mock.patch.object(bridge.subprocess, "run", return_value=done) as run:
+                start()
+                self.assertEqual(run.call_args.args[0][:3], guard + [program])
 
 
 class BridgeJobIntegrationTests(unittest.TestCase):
@@ -639,6 +659,74 @@ class AnswerTierTests(unittest.TestCase):
         self.assertIn("Backups", result["answer"])
         self.assertIsNone(result["model"])
 
+    def test_live_state_is_part_of_what_the_model_is_given(self):
+        with mock.patch.object(bridge, "live_state", return_value="Failed systemd units on heimdall: none"):
+            _, m = self.answer("light", codex=True, codex_text="All quiet.")
+        prompt = m["run_codex_answer"].call_args.args[0]
+        self.assertIn("--- live state ---\nFailed systemd units on heimdall: none", prompt)
+        self.assertIn("General knowledge, not from your notes:", prompt)
+
+    def test_general_knowledge_answer_does_not_cite_her_notes(self):
+        note = {"id": "Backups", "path": "Resources/Backups.md", "title": "Backups", "body": "Backup notes."}
+        for text, cited in (("General knowledge, not from your notes: an embedding is a vector.", []),
+                            ("Your Backups note says nightly.", [{"id": "Backups", "path": "Resources/Backups.md", "title": "Backups"}])):
+            with self.subTest(text=text), mock.patch.object(bridge, "retrieve", return_value=([note], "", ["heimdall"])):
+                result, _ = self.answer("light", codex=True, codex_text=text)
+                self.assertEqual(result["sources"], cited)
+                self.assertEqual(result["code_nodes"], ["heimdall"] if cited else [])
+
+
+class LiveStateTests(unittest.TestCase):
+    def state(self, activity, **patches):
+        with tempfile.TemporaryDirectory() as d:
+            feed = Path(d) / "activity.json"
+            if activity is not None:
+                feed.write_text(json.dumps(activity))
+            units = mock.Mock(stdout=patches.get("failed", ""), returncode=0)
+            with mock.patch.object(bridge, "ACTIVITY_FILE", str(feed)), \
+                    mock.patch.object(bridge.subprocess, "run", return_value=units), \
+                    mock.patch.multiple(bridge, voice_up=mock.Mock(return_value=patches.get("voice", True)),
+                                        embed_up=mock.Mock(return_value=True),
+                                        monitored=mock.Mock(**patches.get("targets", {"return_value": (3, [])})),
+                                        available_agents=mock.Mock(return_value={"hermes": True, "codex": False}),
+                                        job_store=mock.Mock(return_value=mock.Mock(recent=lambda: [{"status": "running"}, {"status": "done"}])),
+                                        usage=mock.Mock(return_value={"openai": {"five_hour": {"used_percent": 12.4}}, "anthropic": None})):
+                return LIVE_STATE()
+
+    def test_it_says_what_is_up_and_what_is_not(self):
+        now = int(bridge.time.time())
+        activity = {"counts": {"notes": 255, "inbox": 2},
+                    "agents": [{"name": "inbox-sweep", "last": now - 60, "result": "success", "active": False},
+                               {"name": "gardener", "last": 0, "result": "exit-code", "active": False}],
+                    "services": [{"name": "nginx", "ok": True}, {"name": "obsidian", "ok": False}],
+                    "gitlog": [{"t": now - 120, "msg": "huginn: inbox filing"}]}
+        text = self.state(activity, failed="huginn-gardener.service loaded failed failed huginn\n", voice=False,
+                          targets={"return_value": (15, ["pfsense"])})
+        for line in ("Failed systemd units on heimdall: huginn-gardener.service",
+                     "Vault: 255 notes, 2 waiting in the inbox.",
+                     "gardener never exit-code", "nginx ok, obsidian DOWN", "huginn: inbox filing",
+                     "hermes connected, codex NOT connected. Agent jobs running: 1 of",
+                     "Codex 12% of the 5-hour window",
+                     "On mimir: voice NOT answering, embedding model up.",
+                     "Prometheus: 14 of 15 monitored targets up; DOWN: pfsense."):
+            self.assertIn(line, text)
+
+    def test_what_cannot_be_read_is_left_out(self):
+        text = self.state(None, targets={"side_effect": OSError("refused")})
+        self.assertIn("Failed systemd units on heimdall: none", text)
+        self.assertIn("Workers: hermes connected", text)
+        for absent in ("Vault:", "Scheduled agents", "Prometheus"):
+            self.assertNotIn(absent, text)
+
+    def test_prometheus_names_the_targets_that_are_down(self):
+        rows = [{"metric": {"host": "hella", "instance": "10.0.20.10:9100"}, "value": [1, "1"]},
+                {"metric": {"host": "pfsense", "instance": "10.0.20.1:9273"}, "value": [1, "0"]},
+                {"metric": {"instance": "https://immich.oryxserver.org"}, "value": [1, "0"]}]
+        reply = mock.MagicMock()
+        reply.__enter__.return_value.read.return_value = json.dumps({"data": {"result": rows}}).encode()
+        with mock.patch.object(bridge.urllib.request, "urlopen", return_value=reply):
+            self.assertEqual(bridge.monitored(), (3, ["https://immich.oryxserver.org", "pfsense"]))
+
 
 class HermesChatTests(unittest.TestCase):
     def post(self, payload):
@@ -791,6 +879,17 @@ class RetrievalTests(unittest.TestCase):
         for near in ([], [("Areas/hermod.md", 0.2)]):
             with self.subTest(near=near):
                 self.assertEqual(self.found("kernel", near), ["Kernel fix"])
+
+    def test_logs_of_what_was_said_or_filed_are_not_answer_sources(self):
+        db = bridge.sqlite3.connect(bridge.DB)
+        for path in ("Resources/Talk logs/Talk 2026-10-03.md", "Resources/Reports/inbox-2026-10-03T18-09-14.md",
+                     "Resources/Reports/alert-huginn-inbox-sweep.service.md", "Resources/Reports/Kernel report (1a2b3c4d).md"):
+            db.execute("INSERT INTO notes VALUES (?, 1, '', 'kernel kernel kernel', '')", (path,))
+            db.execute("INSERT INTO notes_fts VALUES (?, '', 'kernel kernel kernel')", (path,))
+        db.commit()
+        db.close()
+        # an agent's report is a source; the logs are not, however well they match
+        self.assertEqual(self.found("kernel", []), ["Kernel report (1a2b3c4d)", "Kernel fix"])
 
 
 class ReportTitlerTests(unittest.TestCase):

@@ -19,11 +19,12 @@
 #   • resurface      — three >90-day-old notes back into today's journal (daily 09:00)
 #   • unlinked-mentions — offline weave check: plain-text mentions that could be links
 #   • health-report  — heimdall health note: failed units, timers, disk, memory
+#   • vault-mirror   — hourly: commit the vault, push its history to a bare repo on heimdall
 #
 # Cross-cutting: every vault-writing agent auto-commits the vault git repo
 # (audit trail, author huginn), and every huginn unit has OnFailure= wired to
-# drop an alert note into _inbox/ so failures surface on the Home dashboard.
-# Inbox-sweep alerts go directly to Resources/Reports to avoid retrigger loops.
+# its one alert note, Resources/Reports/alert-<unit>.md, and OnSuccess= to
+# close it: a unit that keeps failing has one open alert, not one per failure.
 #
 # Runs as `christina` (uid 1000, matches the vault's NFS ownership), hardened with
 # NoNewPrivileges + ProtectHome. LLM creds live in the out-of-git secret
@@ -72,22 +73,51 @@ let
     '';
   };
 
-  # ── OnFailure alert — drop a note into _inbox so it surfaces on Home + digest ──
+  # ── alerts — one note per unit, open while it fails, closed when it runs clean ──
+  # `huginn-notify <unit>` (OnFailure) writes Resources/Reports/alert-<unit>.md; a
+  # unit that fails again before a clean run rewrites that note with a count
+  # instead of adding another. `huginn-notify <unit> resolved` (OnSuccess) closes
+  # it. The note has a fixed name and never passes through the inbox, where the
+  # sweep would retitle and move it.
   notify = pkgs.writeShellApplication {
     name = "huginn-notify";
-    runtimeInputs = [ pkgs.coreutils pkgs.systemd ];
+    runtimeInputs = [ pkgs.coreutils pkgs.systemd pkgs.gnused pkgs.gnugrep ];
     text = ''
       umask 0022  # nginx serves these reports through /vault
       unit="''${1:-unknown-unit}"
-      dest="${vault}/_inbox"
-      case "$unit" in
-        huginn-inbox-sweep|huginn-inbox-sweep.service) dest="${vault}/Resources/Reports" ;;
-      esac
-      mkdir -p "$dest"
-      f="$dest/alert-$unit-$(date +%Y%m%d-%H%M%S-%N).md"
+      event="''${2:-failed}"
+      dir="${vault}/Resources/Reports"
+      f="$dir/alert-$unit.md"
+      now="$(date -Iseconds)"
+      open=no
+      if [ -f "$f" ] && grep -q '^status: failed$' "$f"; then open=yes; fi
+
+      if [ "$event" = resolved ]; then
+        if [ "$open" = yes ]; then
+          sed -i 's/^status: failed$/status: resolved/' "$f"
+          printf '\nResolved: %s ran clean again at %s.\n' "$unit" "$now" >> "$f"
+        fi
+        exit 0
+      fi
+
+      first="$now"
+      count=1
+      if [ "$open" = yes ]; then
+        first="$(sed -n 's/^created: //p' "$f" | head -n 1)"
+        seen="$(sed -n 's/^failures: //p' "$f" | head -n 1)"
+        case "$seen" in ""|*[!0-9]*) seen=1 ;; esac
+        count=$((seen + 1))
+      fi
+      mkdir -p "$dir"
+      tmp="$(mktemp "$dir/.alert-XXXXXX")"
       {
-        printf -- '---\ntype: report\nagent: huginn\nstatus: failed\ncreated: %s\n---\n\n' "$(date -Iseconds)"
-        echo "huginn alert: $unit FAILED on heimdall at $(date -Iseconds)."
+        printf -- '---\ntype: report\nagent: huginn\nstatus: failed\ncreated: %s\nupdated: %s\nfailures: %s\n---\n\n' "''${first:-$now}" "$now" "$count"
+        echo "# alert — $unit"
+        echo
+        echo "huginn alert: $unit FAILED on heimdall at $now."
+        if [ "$count" -gt 1 ]; then
+          echo "It has failed $count times since ''${first:-$now} without a clean run in between."
+        fi
         echo
         echo "Recent log lines:"
         echo '```'
@@ -96,8 +126,32 @@ let
         echo
         echo "Inspect: ssh christina@10.0.20.17 'systemctl status $unit'"
         echo
+        echo "This note closes itself (status: resolved) when the unit next runs clean."
+        echo
         echo '[[MOCs/Agents MOC]]'
-      } > "$f"
+      } > "$tmp"
+      chmod 0644 "$tmp"   # mktemp makes it 0600; vault notes must stay group-readable
+      mv -f "$tmp" "$f"
+    '';
+  };
+
+  # ── vault-mirror (hourly) — a second copy of the vault and its history, off odyn ──
+  # The vault and its .git sit on one dataset on odyn. Each hour this commits
+  # whatever is uncommitted (her own edits included) and pushes every ref to a
+  # bare repository on heimdall's own disk. Snapshots on odyn undo an accident;
+  # this copy is the one that survives losing the dataset.
+  vaultMirror = pkgs.writeShellApplication {
+    name = "huginn-vault-mirror";
+    runtimeInputs = [ vaultCommit pkgs.git pkgs.coreutils ];
+    text = ''
+      mirror="${agentHome}/vault-mirror.git"
+      logdir="${vault}/agents/logs"; mkdir -p "$logdir"
+      if [ ! -d "$mirror" ]; then git init -q --bare "$mirror"; fi
+      muninn-vault-commit "huginn: hourly vault snapshot" || true   # a busy index: mirror what is committed
+      head="$(git -C "${vault}" rev-parse HEAD)"
+      git -C "${vault}" push -q --mirror "$mirror"
+      git -C "$mirror" cat-file -e "$head^{commit}"   # the push must really have landed
+      echo "[$(date -Iseconds)] vault-mirror done ($(git -C "$mirror" rev-list --count --all) commits, head ''${head:0:7})" | tee -a "$logdir/vault-mirror.log"
     '';
   };
 
@@ -598,15 +652,29 @@ in
   # let huginn-notify quote the failing unit's log lines in its alert note
   users.users.christina.extraGroups = [ "systemd-journal" ];
 
-  # every huginn job that dies drops an alert note into _inbox (→ Home dashboard)
+  # every huginn job that dies opens (or updates) its one alert note in Resources/Reports
   systemd.services."huginn-notify@" = {
-    description = "huginn: file a failure alert for %i into the vault inbox";
+    description = "huginn: open or update the failure alert for %i";
     unitConfig.RequiresMountsFor = vault;
     serviceConfig = {
       Type = "oneshot";
       User = "christina";
       Group = "users";
       ExecStart = "${notify}/bin/huginn-notify %i";
+    };
+  };
+  # ... and its next clean run closes it; a unit with no alert note skips this
+  systemd.services."huginn-resolve@" = {
+    description = "huginn: close the failure alert for %i";
+    unitConfig = {
+      RequiresMountsFor = vault;
+      ConditionPathExists = "${vault}/Resources/Reports/alert-%i.md";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "christina";
+      Group = "users";
+      ExecStart = "${notify}/bin/huginn-notify %i resolved";
     };
   };
 
@@ -629,6 +697,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${inboxSweep}/bin/huginn-inbox-sweep";
@@ -649,7 +718,7 @@ in
   };
   # instant filing: fire the sweep when something lands in _inbox. Only sees
   # writes made through heimdall's NFS client (the hosted Obsidian app, huginn
-  # itself, alert notes) — mjolnir's `capture` writes bypass this inotify, but
+  # itself) — mjolnir's `capture` writes bypass this inotify, but
   # capture already ssh-nudges the service directly. The timer below is the
   # slow safety net for anything both mechanisms miss.
   systemd.paths."huginn-inbox-sweep" = {
@@ -679,6 +748,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${dailyDigest}/bin/huginn-daily-digest";
@@ -719,6 +789,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       # OpenRouter/MiniMax creds ONLY (no ANTHROPIC_API_KEY, so Graphify's
@@ -747,6 +818,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${graphifyVault}/bin/huginn-graphify-vault";
@@ -770,6 +842,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${gardener}/bin/huginn-gardener";
@@ -793,6 +866,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${deadLinkFixer}/bin/huginn-dead-link-fixer";
@@ -808,6 +882,28 @@ in
     };
   };
 
+  # ── vault-mirror: hourly commit + push to the bare mirror on heimdall's disk ──
+  # :20 so the 22:20 run lands before PBS backs heimdall up at 22:30.
+  systemd.services."huginn-vault-mirror" = {
+    description = "huginn: commit the vault and mirror its git history off odyn";
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
+    };
+    serviceConfig = agentServiceConfig // {
+      ExecStart = "${vaultMirror}/bin/huginn-vault-mirror";
+    };
+  };
+  systemd.timers."huginn-vault-mirror" = {
+    description = "huginn vault mirror schedule";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* *:20:00";
+      Persistent = true;
+    };
+  };
+
   # ── morning brief: overnight facts → today's journal, before the day starts ──
   systemd.services."huginn-morning-brief" = {
     description = "huginn: morning briefing into today's journal note";
@@ -816,6 +912,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${morningBrief}/bin/huginn-morning-brief";
@@ -839,6 +936,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${weeknote}/bin/huginn-weeknote";
@@ -860,6 +958,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${todoBoard}/bin/huginn-todo-board";
@@ -881,6 +980,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${resurface}/bin/huginn-resurface";
@@ -902,6 +1002,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${unlinkedMentions}/bin/huginn-unlinked-mentions";
@@ -923,6 +1024,7 @@ in
     unitConfig = {
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-notify@%n.service" ];
+      OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
       ExecStart = "${healthReport}/bin/huginn-health-report";

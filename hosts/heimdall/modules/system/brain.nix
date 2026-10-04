@@ -471,8 +471,9 @@ in
     after = [ "muninn-indexer.service" "network-online.target" ];
     wants = [ "network-online.target" ];
     unitConfig.RequiresMountsFor = vault;
-    # git + shell tools are for the Codex agent tier, which works inside the vault
-    path = [ pkgs.systemd pkgs.git pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.ripgrep ];
+    # git + shell tools are for the Codex agent tier, which works inside the vault;
+    # util-linux is for setpriv, which starts every worker unable to sudo
+    path = [ pkgs.systemd pkgs.git pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.ripgrep pkgs.util-linux ];
     environment.MUNINN_CODEX =
       "${inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex}/bin/codex";
     # Deep answer tier: headless Claude on the Claude Code subscription

@@ -13,7 +13,8 @@ tool work. The desktop consumes these services.
    which workers are configured. An explicit `target: hermes` or `target: codex`
    overrides dispatch while preserving Jev's classification in the job record.
 3. **Commands** open views, search, capture notes, or start an allowlisted systemd
-   skill. **Answers** use MiniMax with vault search and the config graph.
+   skill. **Answers** are made from three things: the notes retrieved from the
+   vault, the config graph, and the live state of the system (below).
    **Agent work** goes to Hermes on hermod or Codex on heimdall.
 4. Before dispatch, the bridge saves the job and routing decision in
    `/var/lib/muninn-brain/jobs.db`. At most two agent jobs run concurrently;
@@ -56,8 +57,27 @@ the job is filed as failed with that explanation as its result. If Jev does not
 answer, the result stands. A handover runs the request again from the start, so
 a wrong verdict on a job that did change files repeats that work.
 
+**Live state.** Every answer is given a few lines on how the system is doing
+right now, so "how are the systems looking" has something to be answered from:
+failed systemd units on heimdall, each scheduled agent's last run and result,
+the inbox count, the latest vault commits, which workers are connected and how
+many jobs run, subscription usage, whether voice and the embedding model answer
+on mimir, and how many of Prometheus's targets are up (the ones that are down
+are named). It is read from `activity.json`, systemd, the job store and
+Prometheus on heimdall; a part that cannot be read is left out.
+
+**General knowledge.** What is hers (her setup, notes, decisions, the state of
+her systems) is answered only from that context, and "the notes don't say" is
+still the answer when it is missing. A general question (what an embedding
+model is) is answered from the model's own knowledge and must begin "General
+knowledge, not from your notes:"; such an answer lists no notes as sources.
+
 Hermes jobs use separate conversations. Codex retains its `workspace-write`
-sandbox. On bridge restart, unfinished execution becomes failed and receives an
+sandbox. Codex and Claude on heimdall run as `christina`, who may sudo without a
+password, so the bridge starts them through `setpriv --no-new-privs`: sudo and
+every other setuid program refuse to raise privileges anywhere in a worker's
+process tree. `/bridge/health` reports this as `workers_no_sudo`. The bridge
+itself keeps sudo, which is how it starts skills. On bridge restart, unfinished execution becomes failed and receives an
 interruption report. Tool actions are never automatically replayed. If execution
 finished but filing was pending, startup files the saved result. Report-write
 errors fail the job and retain its response plus `report_error` in SQLite.
@@ -123,7 +143,10 @@ searched by meaning.
   embedded again, since vectors of two models cannot be compared.
 - **Answers:** the bridge merges the keyword ranking and the meaning ranking, so
   a note both agree on comes first. A note below `MUNINN_EMBED_MIN` (0.38)
-  similarity is not counted as related.
+  similarity is not counted as related. Talk logs, sweep reports (`inbox-*`)
+  and alerts are left out of both rankings: they repeat what was said or filed,
+  and used as sources they answer a question with an earlier answer. They stay
+  in the keyword index, so searching the vault still finds them.
 - **Placement:** MiniMax chooses related notes from the 30 closest in meaning
   plus the 30 newest, instead of the newest 300 by title. The inbox sweep asks
   the bridge for them at `POST /bridge/similar {"text", "k"}`.
@@ -132,6 +155,35 @@ searched by meaning.
   `/bridge/health` reports `embedded`, the number of notes in the index, and
   `embed`, whether the model itself answers — with `embed_model` and
   `embed_dim` alongside, so the dashboard can show it as a node.
+
+## Backups
+
+The vault and its git history live on one dataset on odyn (`vault/obsidian`).
+Two things protect it:
+
+- **Snapshots on odyn**, set up in TrueNAS (not in this repo): hourly kept 2
+  days, daily at 00:10 kept 30 days, weekly on Sunday at 00:20 kept 12 weeks.
+  They undo an accident (a bad `rm`, an agent gone wrong). List them with
+  `midclt call pool.snapshot.query '[["dataset","=","vault/obsidian"]]'`; the
+  files of each are under `/mnt/vault/obsidian/.zfs/snapshot/<name>/`.
+- **A git mirror on heimdall**: `huginn-vault-mirror` runs hourly at :20,
+  commits whatever is uncommitted (including edits made in Obsidian) and pushes
+  every ref to the bare repository `/var/lib/huginn/vault-mirror.git` on
+  heimdall's own disk. This is the copy that survives losing the dataset.
+  Restore with `git clone /var/lib/huginn/vault-mirror.git`.
+
+Neither is a copy outside the house, and PBS keeps its datastore on odyn too.
+`/var/lib/muninn-brain` (jobs, embeddings, counters) is only in heimdall's
+nightly PBS backup.
+
+## Alerts
+
+A huginn unit that fails opens one note, `Resources/Reports/alert-<unit>.md`
+(`status: failed`). If it fails again before a clean run, the same note is
+rewritten with the new log lines and a `failures:` count. Its next clean run
+sets `status: resolved` and adds the time. Alerts no longer pass through the
+inbox, where the sweep would retitle and move them, so they are not in Home's
+inbox list; the dashboard and the morning brief show failed units.
 
 ## The dashboard's graph
 
@@ -173,7 +225,7 @@ journalctl -u muninn-bridge -u huginn-inbox-sweep -n 60
 an operator removes records; back up SQLite alongside vault snapshots.
 
 Schedules: inbox on local changes, within about 20 seconds of a capture written
-from another host, plus 08:15/14:15/20:15; digest 23:00; vault graph
+from another host, plus 08:15/14:15/20:15; vault mirror hourly at :20; digest 23:00; vault graph
 23:30; repo graph Sunday 04:00; gardener Saturday 08:30; dead-link fixer Sunday
 06:00; brain builder every 30 seconds. Some timers add a short randomized delay.
 NFS writes from other clients never reach inotify, so `huginn-inbox-poll` lists

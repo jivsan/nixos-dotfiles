@@ -56,6 +56,13 @@ CLAUDE_MODEL = os.environ.get("MUNINN_CLAUDE_MODEL", "claude-opus-5-5")
 # vault: related notes score 0.45-0.72, unrelated ones 0.28-0.34).
 EMBED_TIMEOUT = float(os.environ.get("MUNINN_EMBED_TIMEOUT", "5"))
 EMBED_MIN = float(os.environ.get("MUNINN_EMBED_MIN", "0.38"))
+# Live state for answers: the dashboard builder's feed (agents, inbox, commits; rewritten
+# every 30 s) and Prometheus on this host, which watches the rest of the fleet.
+ACTIVITY_FILE = os.environ.get("MUNINN_ACTIVITY_FILE", "/var/lib/muninn-brain/www/activity.json")
+PROMETHEUS = os.environ.get("MUNINN_PROMETHEUS_URL", "http://127.0.0.1:9090").rstrip("/")
+# Codex and Claude run as christina, who may sudo without a password. Started through
+# this, a worker's whole process tree is refused by sudo and every other setuid program.
+NO_NEW_PRIVS = [shutil.which("setpriv"), "--no-new-privs"] if shutil.which("setpriv") else []
 LOCK = threading.Lock()
 TALK_LOCK = threading.Lock()
 JOBS = None
@@ -142,6 +149,8 @@ SKILLS = [
      "does": "overnight activity, inbox and failures → journal", "unit": "huginn-morning-brief", "auto": "daily 07:45", "kind": "schedule"},
     {"id": "health-report", "domain": "System", "task": "know heimdall is well", "skill": "/health-report",
      "does": "failed units, timers, disk, memory → report", "unit": "huginn-health-report", "auto": "Mondays 07:30", "kind": "schedule"},
+    {"id": "vault-mirror", "domain": "System", "task": "keep a second copy", "skill": "/vault-mirror",
+     "does": "commits the vault and mirrors its history to heimdall", "unit": "huginn-vault-mirror", "auto": "hourly at :20", "kind": "schedule"},
 ]
 RUNNABLE = {s["id"]: s["unit"] for s in SKILLS if s["unit"]}
 
@@ -208,6 +217,7 @@ JEV_QUESTIONS = {
             "resurface": "Resurface or rediscover old forgotten notes",
             "unlinked-mentions": "Find unlinked mentions between notes, weave the graph tighter",
             "health-report": "Write a system health report for heimdall",
+            "vault-mirror": "Back up the vault: commit it and mirror its git history",
             "none": "No skill is being asked for",
         },
     },
@@ -408,9 +418,12 @@ def retrieve(q):
                 fts = " OR ".join(f'"{w}"' for w in words)
                 for path, title, body in c.execute(
                         "SELECT n.path, n.title, n.body FROM notes_fts JOIN notes n ON n.path = notes_fts.path "
-                        "WHERE notes_fts MATCH ? ORDER BY bm25(notes_fts, 0, 4.0, 1.0) LIMIT 8", (fts,)):
-                    found[path] = (title, body)
-                    keyword.append(path)
+                        "WHERE notes_fts MATCH ? ORDER BY bm25(notes_fts, 0, 4.0, 1.0) LIMIT 40", (fts,)):
+                    # Talk logs, sweep reports and alerts repeat what was said or filed. They
+                    # stay searchable, but like the embedder the answer does not use them.
+                    if embed.wanted(path) and len(keyword) < 8:
+                        found[path] = (title, body)
+                        keyword.append(path)
             missing = [path for path in semantic if path not in found]
             if missing:
                 for path, title, body in c.execute(
@@ -437,18 +450,110 @@ def retrieve(q):
     return notes, code, code_nodes
 
 
-SYSTEM = ("You are muninn, the voice of Christina's personal homelab and note system. Answer using ONLY the "
-          "provided context: notes from her Obsidian vault and a knowledge graph of her NixOS config (hosts: "
-          "mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box, hermod agent VM). Your answer is "
-          "read aloud, so keep it to two to four plain sentences with no markdown, lists or file paths unless "
-          "she asks for detail. Name the note you used. If the context lacks the answer, say so plainly.")
+# What is hers is answered from the context or not at all; what is general
+# knowledge is answered, but marked, so the two are never mistaken for each other.
+GROUNDING = ("The context holds notes from her Obsidian vault, a knowledge graph of her NixOS config (hosts: "
+             "mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box, hermod agent VM) and the live "
+             "state of her systems as it is right now. Anything about her own setup, notes, decisions or how her "
+             "systems are doing is answered ONLY from that context: if the context lacks it, say so plainly "
+             "instead of guessing. A general question that is not about her setup (what something is, how a "
+             "technology works) is answered from your own knowledge, and that answer must begin with the words "
+             "\"General knowledge, not from your notes:\". ")
+GENERAL = re.compile(r"\W*general knowledge\b", re.I)
 
-SYSTEM_DEEP = ("You are muninn, the deep-thinking voice of Christina's personal homelab and note system. Answer "
-               "using ONLY the provided context: notes from her Obsidian vault and a knowledge graph of her "
-               "NixOS config (hosts: mjolnir desktop, heimdall services VM, odyn TrueNAS, mimir AI box, hermod "
-               "agent VM). Think hard and answer in full detail: structure the reasoning, compare options when "
-               "asked, and name every note you relied on. Distinguish what the notes say from your own inference. "
-               "If the context lacks the answer, say so plainly instead of guessing.")
+SYSTEM = ("You are muninn, the voice of Christina's personal homelab and note system. " + GROUNDING +
+          "Your answer is read aloud, so keep it to two to four plain sentences with no markdown, lists or file "
+          "paths unless she asks for detail. Name the note you used.")
+
+SYSTEM_DEEP = ("You are muninn, the deep-thinking voice of Christina's personal homelab and note system. " + GROUNDING +
+               "Think hard and answer in full detail: structure the reasoning, compare options when asked, and "
+               "name every note you relied on. Distinguish what the notes say from your own inference.")
+
+
+# ── live state: how the system is doing right now ──────────────────────────
+def monitored():
+    # Prometheus on heimdall watches the fleet: how many targets answer, and which do not.
+    with urllib.request.urlopen(PROMETHEUS + "/api/v1/query?query=up", timeout=1.5) as r:
+        rows = json.loads(r.read().decode("utf-8", "replace"))["data"]["result"]
+    down = sorted({m["metric"].get("host") or m["metric"].get("instance", "?") for m in rows if m["value"][1] != "1"})
+    return len(rows), down
+
+
+def live_state():
+    # A few plain lines for the answer context, so "how are the systems looking"
+    # has something to be answered from. Everything is local to heimdall except
+    # the two probes of mimir, which run beside the rest; a part that cannot be
+    # read is left out rather than guessed.
+    now = time.time()
+    lines = [f"Time on heimdall: {time.strftime('%A %Y-%m-%d %H:%M')}"]
+    probes = {}
+
+    def probe(name, check):
+        try:
+            probes[name] = check()
+        except Exception:
+            pass
+    threads = [threading.Thread(target=probe, args=pair, daemon=True)
+               for pair in (("voice", voice_up), ("embed", embed_up), ("targets", monitored))]
+    for thread in threads:
+        thread.start()
+
+    def when(t):
+        return time.strftime("%H:%M" if now - t < 86400 else "%Y-%m-%d %H:%M", time.localtime(t)) if t else "never"
+
+    def part(make):
+        try:
+            lines.append(make())
+        except Exception:
+            pass
+
+    def failed_units():
+        out = subprocess.run(["systemctl", "list-units", "--failed", "--no-legend", "--plain"],
+                             capture_output=True, text=True, timeout=5, check=True).stdout
+        names = [line.split()[0] for line in out.splitlines() if line.strip()]
+        return "Failed systemd units on heimdall: " + (", ".join(names) if names else "none")
+    part(failed_units)
+    try:
+        with open(ACTIVITY_FILE, encoding="utf-8") as fh:
+            act = json.load(fh)
+    except (OSError, ValueError):
+        act = {}
+    part(lambda: f"Vault: {act['counts']['notes']} notes, {act['counts']['inbox']} waiting in the inbox.")
+    part(lambda: "Scheduled agents, last run and result: " + "; ".join(
+        f"{a['name']} {when(a.get('last'))} {'RUNNING' if a.get('active') else a.get('result', 'unknown')}"
+        for a in act["agents"]))
+    part(lambda: "Services on heimdall: " + ", ".join(
+        f"{s['name']} {'ok' if s.get('ok') else 'DOWN'}" for s in act["services"]))
+    part(lambda: "Latest vault commits: " + "; ".join(
+        f"{when(c['t'])} {str(c['msg'])[:70]}" for c in act["gitlog"][:5]))
+
+    def workers():
+        have = available_agents()
+        running = sum(1 for job in job_store().recent() if job.get("status") == "running")
+        return ("Workers: " + ", ".join(f"{name} {'connected' if ok else 'NOT connected'}" for name, ok in have.items())
+                + f". Agent jobs running: {running} of {MAX_JOBS}.")
+    part(workers)
+
+    def limits():
+        said, seen = [], usage()
+        for label, key in (("Codex", "openai"), ("Claude", "anthropic")):
+            snap = seen.get(key) or {}
+            windows = [f"{snap[w]['used_percent']:.0f}% of the {name}" for w, name in
+                       (("five_hour", "5-hour window"), ("seven_day", "week")) if snap.get(w)]
+            if windows:
+                said.append(f"{label} {' and '.join(windows)}")
+        return "Subscription usage: " + "; ".join(said) if said else None
+    part(limits)
+    for thread in threads:
+        thread.join(2)
+    if "voice" in probes and "embed" in probes:
+        lines.append(f"On mimir: voice {'up' if probes['voice'] else 'NOT answering'}, embedding model "
+                     f"{'up' if probes['embed'] else 'NOT answering'}.")
+    if "targets" in probes:
+        total, down = probes["targets"]
+        lines.append(f"Prometheus: {total - len(down)} of {total} monitored targets up"
+                     + (f"; DOWN: {', '.join(down)}." if down else "."))
+    return "\n".join(line for line in lines if line)
 
 
 def claude_ready():
@@ -461,7 +566,7 @@ def run_claude_answer(prompt):
     # answers from the prompt instead of roaming the filesystem.
     try:
         with tempfile.TemporaryDirectory() as d:
-            p = subprocess.run([CLAUDE, "-p", prompt, "--model", CLAUDE_MODEL, "--output-format", "text"],
+            p = subprocess.run(NO_NEW_PRIVS + [CLAUDE, "-p", prompt, "--model", CLAUDE_MODEL, "--output-format", "text"],
                                capture_output=True, text=True, timeout=600, cwd=d, stdin=subprocess.DEVNULL)
         return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
     except Exception:
@@ -475,7 +580,7 @@ def run_codex_answer(prompt):
     os.close(fd)
     try:
         with tempfile.TemporaryDirectory() as d:
-            p = subprocess.run([CODEX, "exec", "--skip-git-repo-check", "-s", "read-only", "-C", d, "-o", out, prompt],
+            p = subprocess.run(NO_NEW_PRIVS + [CODEX, "exec", "--skip-git-repo-check", "-s", "read-only", "-C", d, "-o", out, prompt],
                                capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
         with open(out, encoding="utf-8", errors="ignore") as fh:
             msg = fh.read().strip()
@@ -493,7 +598,8 @@ def answer(q, depth="light"):
     notes, code, code_nodes = retrieve(q)
     sources = [{"id": n["id"], "path": n["path"], "title": n["title"]} for n in notes]
     ctx = "\n\n".join(f"### [[{n['title']}]] ({n['path']})\n{n['body']}" for n in notes) or "(no matching notes)"
-    user = f"Question: {q}\n\n--- notes ---\n{ctx}\n\n--- config graph ---\n{code or '(none)'}"
+    user = (f"Question: {q}\n\n--- notes ---\n{ctx}\n\n--- config graph ---\n{code or '(none)'}"
+            f"\n\n--- live state ---\n{live_state() or '(not available)'}")
     text, model = None, None
     if depth == "deep":
         if claude_ready():
@@ -519,6 +625,8 @@ def answer(q, depth="light"):
             model = MODEL
         except Exception as e:
             text = f"The language model did not answer ({str(e)[:120]})."
+    if GENERAL.match(text):
+        sources, code_nodes = [], []   # answered from the model's own knowledge: no note of hers is its source
     return {"answer": text.strip(), "sources": sources, "code_nodes": code_nodes, "model": model, "depth": depth}
 
 
@@ -531,8 +639,9 @@ def run_codex(job):
     fd, out = tempfile.mkstemp(prefix="muninn-agent-", suffix=".txt")
     os.close(fd)
     try:
-        p = subprocess.run([CODEX, "exec", "--skip-git-repo-check", "-s", "workspace-write", "-C", VAULT, "-o", out,
-                            brief_for("codex") + job["text"]], capture_output=True, text=True, timeout=1500, stdin=subprocess.DEVNULL)
+        p = subprocess.run(NO_NEW_PRIVS + [CODEX, "exec", "--skip-git-repo-check", "-s", "workspace-write", "-C", VAULT, "-o", out,
+                                           brief_for("codex") + job["text"]],
+                           capture_output=True, text=True, timeout=1500, stdin=subprocess.DEVNULL)
         with open(out, encoding="utf-8", errors="ignore") as fh:
             msg = fh.read().strip()
         ok = p.returncode == 0 and bool(msg)
@@ -566,9 +675,9 @@ def run_claude(job):
     # search, fetch and read tools: nothing here can write or run a command,
     # and file reads are confined to the vault. The bridge files the report.
     try:
-        p = subprocess.run([CLAUDE, "-p", RESEARCH_BRIEF + job["text"], "--model", CLAUDE_MODEL, "--output-format", "text",
-                            "--restricted", "--tools", RESEARCH_TOOLS, "--allowedTools", RESEARCH_TOOLS,
-                            "--no-session-persistence"],
+        p = subprocess.run(NO_NEW_PRIVS + [CLAUDE, "-p", RESEARCH_BRIEF + job["text"], "--model", CLAUDE_MODEL,
+                                           "--output-format", "text", "--restricted", "--tools", RESEARCH_TOOLS,
+                                           "--allowedTools", RESEARCH_TOOLS, "--no-session-persistence"],
                            capture_output=True, text=True, timeout=1500, cwd=VAULT, stdin=subprocess.DEVNULL)
         msg = p.stdout.strip()
         ok = p.returncode == 0 and bool(msg)
@@ -1145,6 +1254,7 @@ class H(BaseHTTPRequestHandler):
                                  "voice": voice_up(), "index": os.path.exists(DB), "codex": codex_ready(),
                                  "claude": claude_ready(), "claude_model": CLAUDE_MODEL if claude_ready() else None,
                                  "hermes": bool(HERMES_KEY), "max_jobs": MAX_JOBS,
+                                 "workers_no_sudo": bool(NO_NEW_PRIVS),
                                  "embed": embed_up(), "embed_model": embed.MODEL, "embed_dim": embed.DIM,
                                  "embedded": len(embed.vectors())})   # notes in the embedding index
         if p == "/bridge/skills":
