@@ -23,7 +23,7 @@ def setUpModule():
     values = [(name, str(Path(scratch.name) / leaf))
               for name, leaf in (("LOG_DIR", "talk"), ("TALK_SPOOL", "talk-spool.jsonl"), ("STATS_FILE", "stats.json"))]
     # Answers never probe the real systems here, and worker commands are the same on every host.
-    values += [("live_state", lambda: ""), ("NO_NEW_PRIVS", [])]
+    values += [("live_state", lambda: ""), ("NO_NEW_PRIVS", []), ("hermes_up", lambda: True)]
     for name, value in values:
         patch = mock.patch.object(bridge, name, value)
         patch.start()
@@ -77,16 +77,109 @@ class RoutingTests(unittest.TestCase):
                 mock.patch.object(bridge, "post_json", side_effect=TimeoutError("timed out")):
             self.assertIn("timed out", bridge.route_jev("Research backups")["error"])
 
-    def test_jev_uses_separate_key_and_receives_worker_availability(self):
-        response = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("codex", 0.8)}}
-        available = {"hermes": False, "codex": True}
+    def test_jev_uses_separate_key_and_is_asked_what_the_task_needs(self):
+        response = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("codex", 0.8),
+                                "needs_web": {"type": "noul", "noul": 0.04}, "changes_vault": {"type": "noul", "noul": 0.91},
+                                "deep_research": {"type": "noul", "noul": "high"}}}
         with mock.patch.object(bridge, "JEV_KEY", "router-key"), \
-                mock.patch.object(bridge, "available_agents", return_value=available), \
                 mock.patch.object(bridge, "post_json", return_value=response) as post:
-            result = bridge.route_jev("Research backups")
+            result = bridge.route_jev("Cross the backup item off my list")
         self.assertEqual(result["executor"], "codex")
+        self.assertEqual(result["needs"], {"web": 0.04, "writes": 0.91})   # an unusable answer is no answer
+        self.assertNotIn("settled", result)
         self.assertEqual(post.call_args.kwargs["key"], "router-key")
-        self.assertEqual(post.call_args.args[1]["state"]["available_agents"], available)
+        # who is connected is the bridge's business: Jev only reads the request
+        self.assertEqual(post.call_args.args[1]["state"], {"request": "Cross the backup item off my list"})
+        asked = post.call_args.args[1]["questions"]
+        self.assertEqual({asked[name]["type"] for name in ("needs_web", "changes_vault", "deep_research")}, {"noul"})
+
+    def test_unsure_tier_is_settled_by_what_the_task_needs(self):
+        def route(web, writes, tier=("answer", 0.45)):
+            nouls = {name: {"type": "noul", "noul": value} for name, value in
+                     (("needs_web", web), ("changes_vault", writes)) if value is not None}
+            response = {"answers": {"tier": jev_choice(*tier), "depth": jev_choice("light"),
+                                    "executor": jev_choice("hermes", 0.3), **nouls}}
+            with mock.patch.object(bridge, "JEV_KEY", "test"), mock.patch.object(bridge, "post_json", return_value=response):
+                return bridge.route_jev("What are my todos? Make a priority list.")
+        # nothing to look up online, nothing to change: it is a question about her notes
+        asked = route(0.1, 0.2)
+        self.assertEqual((asked["via"], asked["tier"], asked["depth"]), ("jev", "answer", "light"))
+        self.assertIn("unsure (answer 0.45)", asked["settled"]["tier"])
+        for web, writes in ((0.9, 0.1), (0.1, 0.8)):
+            with self.subTest(web=web, writes=writes):
+                self.assertEqual(route(web, writes)["tier"], "agent")
+        # without those answers, or when it is a command Jev is unsure of, the rules decide
+        self.assertEqual(route(None, 0.2)["error"], "uncertain Jev tier choice")
+        self.assertEqual(route(0.1, 0.2, ("command", 0.4))["error"], "uncertain Jev tier choice")
+
+    def test_deep_research_reaches_claude_on_either_signal(self):
+        def executor(choice, deep):
+            response = {"answers": {"tier": jev_choice("agent"), "executor": choice,
+                                    "deep_research": {"type": "noul", "noul": deep}}}
+            with mock.patch.object(bridge, "JEV_KEY", "test"), mock.patch.object(bridge, "post_json", return_value=response):
+                return bridge.route_jev("Research local models and think hard about it")["executor"]
+        self.assertEqual(executor(jev_choice("hermes", 0.4), 0.85), "claude")   # torn on the worker, sure it is deep
+        self.assertEqual(executor(jev_choice("claude", 0.8), 0.2), "claude")
+        self.assertIsNone(executor(jev_choice("claude", 0.6), 0.6))             # half-sure both ways: a lighter worker
+        self.assertEqual(executor(jev_choice("hermes", 0.9), 0.3), "hermes")
+
+    def test_a_worker_is_matched_to_what_the_task_needs(self):
+        everyone = {"hermes": True, "codex": True, "claude": True}
+
+        def worker(executor=None, have=everyone, tried=(), **needs):
+            return bridge.delegate({"executor": executor, "needs": needs}, have, tried)
+        self.assertEqual(worker("codex", web=0.9), "hermes")                 # codex has no internet, whatever Jev preferred
+        self.assertEqual(worker("hermes", writes=0.9, web=0.1), "codex")     # a pure vault change is done in the vault
+        self.assertEqual(worker("codex", web=0.8, writes=0.8), "hermes")     # only hermes does both
+        self.assertEqual(worker("codex"), "codex")                           # nothing rules it out: Jev's pick
+        self.assertEqual(worker(), "hermes")
+        self.assertEqual(worker("claude", web=0.9), "claude")
+        self.assertEqual(worker("claude", web=0.9, writes=0.9), "hermes")    # Claude changes nothing in the vault
+        self.assertEqual(worker("claude", have={**everyone, "claude": False}, web=0.9), "hermes")
+        self.assertEqual(worker(have={**everyone, "hermes": False}, web=0.9), "codex")   # nobody fits: the best there is
+        self.assertEqual(worker(tried={"hermes"}, web=0.9), "codex")
+        self.assertIsNone(worker(have={"hermes": False, "codex": False, "claude": True}))
+        self.assertIsNone(worker(tried={"hermes", "codex"}))
+
+    def test_rules_say_what_a_task_needs_when_jev_cannot(self):
+        for text, web, writes, executor in (
+                ("Research the latest NixOS release", 1.0, 0.0, None),
+                ("Please add the backup disk to my todo list", 0.0, 1.0, None),
+                ("Fix the broken notes", 0.0, 0.0, None),
+                ("Research local models for me and think hard about it", 1.0, 0.0, "claude")):
+            with self.subTest(text=text):
+                route = bridge.route_rules(text)
+                self.assertEqual((route["needs"]["web"], route["needs"]["writes"], route["executor"]), (web, writes, executor))
+
+    def test_the_reason_for_a_worker_is_recorded(self):
+        response = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("codex"),
+                                "needs_web": {"type": "noul", "noul": 0.93}, "changes_vault": {"type": "noul", "noul": 0.1}}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), mock.patch.object(bridge, "post_json", return_value=response), \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                mock.patch.object(bridge, "start_agent", return_value={"id": "job"}) as start:
+            result = bridge.talk("Find out what changed in the newest llama.cpp")
+        self.assertEqual(start.call_args.args[1], "hermes")
+        route = result["route"]
+        self.assertEqual((route["selected_executor"], route["selected_because"]), ("hermes", "needs the web"))
+        self.assertEqual(route["executor_fallback"], "Jev picked codex; hermes took it instead.")
+
+    def test_preview_decides_without_doing_anything(self):
+        response = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("codex"),
+                                "changes_vault": {"type": "noul", "noul": 0.9}, "needs_web": {"type": "noul", "noul": 0.1}}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), mock.patch.object(bridge, "post_json", return_value=response), \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                mock.patch.object(bridge, "start_agent") as start, mock.patch.object(bridge, "answer") as answer, \
+                mock.patch.object(bridge, "log_talk") as log, mock.patch.object(bridge, "record_stats") as stats:
+            seen = bridge.preview("Cross the backup item off my list")
+            by_hand = bridge.preview("Cross the backup item off my list", "hermes")
+        for untouched in (start, answer, log, stats):
+            untouched.assert_not_called()
+        self.assertEqual((seen["worker"], seen["route"]["selected_because"]), ("codex", "changes the vault"))
+        self.assertEqual((by_hand["worker"], by_hand["route"]["selected_because"]), ("hermes", "picked by hand"))
+        answered = {"answers": {"tier": jev_choice("answer"), "depth": jev_choice("deep")}}
+        with mock.patch.object(bridge, "JEV_KEY", "test"), mock.patch.object(bridge, "post_json", return_value=answered), \
+                mock.patch.multiple(bridge, claude_ready=mock.Mock(return_value=True), codex_ready=mock.Mock(return_value=True)):
+            self.assertEqual(bridge.preview("Compare my backup options")["answered_by"], bridge.CLAUDE_MODEL)
 
     def test_uncertain_skill_does_not_inherit_tier_confidence(self):
         response = {"answers": {"tier": jev_choice("command", 0.99),
@@ -198,11 +291,14 @@ class RoutingTests(unittest.TestCase):
         answer.assert_called_once_with("Compare my backup strategies in depth", "deep")
         self.assertEqual(result["route"]["depth"], "deep")
 
-    def test_answer_tier_without_a_depth_choice_is_malformed(self):
-        response = {"answers": {"tier": jev_choice("answer")}}
-        with mock.patch.object(bridge, "JEV_KEY", "test"), \
-                mock.patch.object(bridge, "post_json", return_value=response):
-            self.assertIn("error", bridge.route_jev("What is in my vault?"))
+    def test_answer_without_a_usable_depth_is_answered_light(self):
+        for depth in (None, {"choice": "profound", "confidence": 0.9}, jev_choice("deep", 0.3)):
+            response = {"answers": {"tier": jev_choice("answer"), **({"depth": depth} if depth else {})}}
+            with self.subTest(depth=depth), mock.patch.object(bridge, "JEV_KEY", "test"), \
+                    mock.patch.object(bridge, "post_json", return_value=response):
+                route = bridge.route_jev("What is in my vault?")
+                # the tier Jev was sure of is kept; only the depth falls back
+                self.assertEqual((route["via"], route["tier"], route["depth"]), ("jev", "answer", "light"))
 
     def test_rules_depth_heuristic(self):
         self.assertEqual(bridge.route_rules("How do I write a note?")["depth"], "light")
@@ -264,16 +360,21 @@ class RoutingTests(unittest.TestCase):
             self.assertEqual(result["route"]["fallback_reason"], f"uncertain Jev {uncertain} choice")
             self.assertEqual(result["jev_error"], result["route"]["fallback_reason"])
 
-    def test_uncertain_executor_uses_available_worker_and_preserves_fallback_in_job(self):
-        response = {"answers": {"tier": jev_choice("agent"), "executor": jev_choice("codex", 0.1)}}
-        with mock.patch.object(bridge, "JEV_KEY", "test"), \
-                mock.patch.object(bridge, "post_json", return_value=response), \
-                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True}), \
-                mock.patch.object(bridge, "start_agent", return_value={"id": "new-job"}) as start:
-            result = bridge.talk("Research storage")
-        self.assertEqual(start.call_args.args[1], "hermes")
-        self.assertEqual(start.call_args.args[2]["fallback_reason"], "uncertain Jev executor choice")
-        self.assertEqual(result["route"]["via"], "rules")
+    def test_uncertain_executor_costs_only_the_worker_choice(self):
+        for executor in (jev_choice("codex", 0.1), {"choice": "nobody", "confidence": 0.9}, None):
+            response = {"answers": {"tier": jev_choice("agent"), **({"executor": executor} if executor else {})}}
+            with self.subTest(executor=executor), mock.patch.object(bridge, "JEV_KEY", "test"), \
+                    mock.patch.object(bridge, "post_json", return_value=response), \
+                    mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True}), \
+                    mock.patch.object(bridge, "route_rules", wraps=bridge.route_rules) as rules, \
+                    mock.patch.object(bridge, "start_agent", return_value={"id": "new-job"}) as start:
+                result = bridge.talk("Research storage")
+            rules.assert_not_called()   # Jev was sure it is agent work: that stands
+            self.assertEqual(start.call_args.args[1], "hermes")
+            route = start.call_args.args[2]
+            self.assertEqual((route["via"], route["executor"], route["selected_because"]), ("jev", None, "default worker"))
+            self.assertIn("chosen by what the task needs", route["settled"]["executor"])
+            self.assertNotIn("jev_error", result)
 
 
 class ExecutorTests(unittest.TestCase):
@@ -424,6 +525,35 @@ class BridgeJobIntegrationTests(unittest.TestCase):
         self.assertEqual(asked.args[1]["state"], {"request": "What are my todos?", "result": excuse})
         self.assertEqual(asked.args[1]["questions"]["gave_up"]["type"], "noul")
         self.assertEqual(asked.kwargs["key"], "jev-key")
+
+    def test_job_goes_to_another_worker_when_hermes_is_unreachable(self):
+        job = self.store.create("Tidy the backup notes", "hermes", self.route)
+        with mock.patch.object(bridge, "hermes_up", return_value=False), \
+                mock.patch.object(bridge, "post_json") as post, \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                mock.patch.object(bridge, "run_codex", side_effect=lambda j: j.update(status="done", answer="Tidied.")) as codex, \
+                mock.patch.object(bridge, "run_claude") as claude, mock.patch.object(bridge, "log_talk"):
+            bridge.run_agent(job)
+        post.assert_not_called()     # the job was never sent: nothing can have run twice
+        claude.assert_not_called()
+        codex.assert_called_once()
+        saved = self.store.get(job["id"])
+        self.assertEqual((saved["agent"], saved["status"], saved["answer"]), ("codex", "done", "Tidied."))
+        self.assertIn("hermes could not start (Hermes is not reachable", saved["route"]["executor_fallback"])
+        self.assertNotIn("unstarted", saved)
+
+    def test_handover_respects_what_the_task_needs(self):
+        # the job needs the web and hermes is gone: codex is still the best there is, and is tried once
+        route = {**self.route, "needs": {"web": 0.9, "writes": 0.1}}
+        job = self.store.create("What changed in the newest llama.cpp?", "hermes", route)
+        with mock.patch.object(bridge, "hermes_up", return_value=False), \
+                mock.patch.object(bridge, "available_agents", return_value={"hermes": True, "codex": True, "claude": True}), \
+                mock.patch.object(bridge, "run_codex", side_effect=lambda j: j.update(status="failed", answer="Codex ran out of time (25 minutes).")) as codex, \
+                mock.patch.object(bridge, "run_claude") as claude, mock.patch.object(bridge, "log_talk"):
+            bridge.run_agent(job)
+        codex.assert_called_once()
+        claude.assert_not_called()   # never a fallback, even though it has the web
+        self.assertEqual(self.store.get(job["id"])["status"], "failed")
 
     def test_job_nobody_could_do_is_filed_as_failed_with_the_reason(self):
         job = self.store.create("What are my todos?", "hermes", self.route)

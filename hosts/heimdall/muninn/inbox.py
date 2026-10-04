@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """File captures: Jev decides where a note goes and who handles a request, MiniMax
-writes the note; preserve originals and report every nonempty sweep."""
+writes the note; preserve originals and report every nonempty sweep.
+
+Everything that lands in the inbox is filed. What the writer leaves out or gets
+wrong is repaired from the capture itself and from Jev's placement, so a capture
+only waits when the writer or the bridge cannot be reached at all, and then the
+poll starts the sweep again a little later."""
 import argparse
 import datetime as dt
 import fcntl
@@ -10,14 +15,18 @@ from pathlib import Path
 import re
 import stat
 import sys
+import time
 import urllib.request
 import uuid
 
 
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-MAX_INPUT = 128_000  # Reject oversized captures; never silently truncate them.
-MAX_REQUEST = 4000   # The bridge cuts longer requests; refuse them here instead.
+MAX_INPUT = 5_000_000  # Beyond this it is not a note: archived whole and reported, never truncated.
+MAX_REQUEST = 4000   # The bridge cuts longer requests; a longer one is filed as a note instead.
 VERBATIM = 2000      # A longer capture is already a note: keep its text, never rewrite it.
+WRITER_INPUT = 128_000  # What the writer is sent of a longer capture, which is filed whole all the same.
+WRITER_TRIES = 3     # The writer now and then answers with something that is not a note: ask again.
+SETTLE = 1.0         # Seconds before a capture that changed under the sweep is read again.
 PADDING = 200        # A written body may outgrow twice its capture by this much, no more.
 JEV_URL = os.environ.get("JEV_URL", "https://openrouter.ai/api/v1/systemone")
 JEV_MODEL = os.environ.get("JEV_MODEL", "typesafe/jev-1.13")
@@ -41,6 +50,10 @@ UNLINKABLE = re.compile(r'[\x00-\x1f\x7f\[\]#|]')
 
 class Deferred(Exception):
     """The bridge cannot take a request right now; keep the capture for the next sweep."""
+
+
+class Changed(ValueError):
+    """The capture was edited while it was being filed; it is read again."""
 
 
 class Vault:
@@ -92,7 +105,7 @@ def read_note(directory, name):
         raw = stream.read()
         after = os.fstat(stream.fileno())
     if signature(before) != signature(after):
-        raise ValueError("capture changed while being read; retry next sweep")
+        raise Changed("capture changed while being read; retry next sweep")
     return raw, after
 
 
@@ -286,50 +299,84 @@ def tidy_title(title):
     return title.encode()[:160].decode("utf-8", "ignore").strip()
 
 
-def validate(note, mocs, notes=()):
-    if not isinstance(note, dict):
-        raise ValueError("model response must be an object")
+def ask_writer(model, text, mocs, notes):
+    """The writer's note, asked up to WRITER_TRIES times: (note, None), or ({}, what it
+    said) when every reply was unusable. Raises only if it could not be reached at all."""
+    said, unreachable = "", None
+    for _ in range(WRITER_TRIES):
+        try:
+            note = model(text, mocs, notes)
+            if isinstance(note, dict):
+                return note, None
+            said = "its reply was not an object"
+        except ValueError as exc:   # it answered, but not with a note
+            said = str(exc) or "its reply was unusable"
+        except OSError as exc:      # no answer: network, timeout, HTTP error
+            unreachable = exc
+    if unreachable is not None and not said:
+        raise unreachable
+    return {}, said
+
+
+def first_words(text):
+    """A title in the capture's own words: its first heading or line."""
+    for line in FRONTMATTER.sub("", text).splitlines():
+        title = tidy_title(line.lstrip("#>*- \t"))
+        if title and not title.startswith("."):
+            return title.encode()[:80].decode("utf-8", "ignore").strip()
+    return ""
+
+
+def validate(note, mocs, notes=(), text="", picks=None, repaired=None):
+    """The note as it will be filed. Whatever the writer left out or got wrong is
+    taken from the capture itself or from Jev's placement and named in `repaired`:
+    a capture is never kept in the inbox over the writer's mistakes."""
+    note = dict(note) if isinstance(note, dict) else {}
+    repaired = repaired if repaired is not None else []
     title = tidy_title(note.get("title"))
     # A leading dot is a hidden file, and what is left of a "../" path.
     if not title or title.startswith("."):
-        raise ValueError("invalid model title: " + repr(note.get("title"))[:80])
+        repaired.append("title " + repr(note.get("title"))[:80])
+        title = first_words(text) or "Capture " + dt.datetime.now().strftime("%Y-%m-%d %H%M%S")
     # A related note is a suggestion: one that does not exist is dropped, never fatal.
-    picks = note.get("related") if isinstance(note.get("related"), list) else []
-    related = [n for n in dict.fromkeys(p for p in picks if isinstance(p, str))
-               if n in notes and n != title][:4]
-    note = {**note, "title": title, "related": related}
+    related = note.get("related") if isinstance(note.get("related"), list) else []
+    note["related"] = [n for n in dict.fromkeys(p for p in related if isinstance(p, str))
+                       if n in notes and n != title][:4]
+    note["title"] = title
     if note.get("folder") not in ("Areas", "Resources"):
-        raise ValueError("invalid model folder")
+        repaired.append("folder")
+        note["folder"] = picks["folder"][0] if picks else "Resources"
     if not isinstance(note.get("moc"), str) or note["moc"] not in mocs:
-        raise ValueError("model selected an unknown MOC")
-    tags = note.get("tags")
-    if (not isinstance(tags, list) or not 1 <= len(tags) <= 4
-            or any(not isinstance(t, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,39}", t)
-                   for t in tags)):
-        raise ValueError("invalid model tags")
+        repaired.append("moc")
+        # Jev's hub even when it was unsure of it; else the hub for what fits nowhere.
+        note["moc"] = (picks["moc"][0] if picks and picks["moc"][0] in mocs
+                       else "Knowledge MOC" if "Knowledge MOC" in mocs else mocs[0])
+    tags = note.get("tags") if isinstance(note.get("tags"), list) else []
+    clean = [t for t in dict.fromkeys(re.sub(r"[^a-z0-9_-]+", "-", t.lower()).strip("-_")[:40]
+                                      for t in tags if isinstance(t, str)) if t][:4]
+    if not clean or clean != tags:
+        repaired.append("tags")
+    note["tags"] = clean or ["unsorted"]
     if not isinstance(note.get("body"), str) or not note["body"].strip():
-        raise ValueError("model body is empty or not text")
+        repaired.append("body")
+        note["body"] = FRONTMATTER.sub("", text).strip() or text.strip() or title
     return note
 
 
 def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, near):
     raw, info = read_note(inbox, name)
-    if not raw.strip():
-        raise ValueError("empty capture; retained for review")
     archive_path = "agents/inbox/archive/" + uuid.uuid4().hex
     archive = vault.directory(archive_path, create=True)
     record["archive"] = archive_path
     write_new(archive, "snapshot.md", raw)
-    if len(raw) > MAX_INPUT:
-        raise ValueError(f"capture exceeds {MAX_INPUT} bytes; full original retained")
-    text = raw.decode("utf-8")
+    text = raw.decode("utf-8", "replace")   # a stray byte is no reason to keep a capture back
     mocs = sorted(hubs)
     claimed = False
 
     def unchanged():
         current, current_info = read_note(inbox, name)
         if current != raw or signature(current_info) != signature(info):
-            raise ValueError("capture changed during model request; retained for retry")
+            raise Changed("capture changed during model request; retained for retry")
 
     def claim():
         nonlocal claimed
@@ -345,10 +392,18 @@ def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, 
             raise ValueError("capture changed during archival; original retained for retry")
 
     try:
+        if not raw.strip() or len(raw) > MAX_INPUT:
+            # Nothing a note can be made of. The original goes to the archive whole,
+            # so it neither waits here for ever nor fails every sweep from now on.
+            claim()
+            record["set_aside"] = ("empty capture" if not raw.strip()
+                                   else f"larger than {MAX_INPUT} bytes: archived whole, not filed as a note")
+            return
         request = request_in(text)
+        if request is not None and len(request) > MAX_REQUEST:
+            record["request"] = f"{len(request)} characters is too long to run; filed as a note"
+            request = None
         if request is not None:
-            if len(request) > MAX_REQUEST:
-                raise ValueError(f"request exceeds {MAX_REQUEST} characters; retained for review")
             # Claim before the bridge acts: a retry must never run the same task twice.
             claim()
             if settle(bridge(request), record):
@@ -369,20 +424,26 @@ def file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, 
         if close:
             # The writer chooses among the notes nearest in meaning plus the newest few.
             notes = close + [n for n in notes if n not in close][:RECENT]
-        note = model(text, mocs, notes)
-        if isinstance(note, dict):
-            own = FRONTMATTER.sub("", text).strip()
-            if isinstance(note.get("body"), str) and len(note["body"]) > 2 * len(own) + PADDING:
-                # Far longer than the capture: the writer carried out a request in it
-                # or invented detail. Her own words are filed instead.
-                note = {**note, "body": own}
-            # Jev decides where; a hub or folder it is unsure of is the writer's call,
-            # so nothing waits in a folder nobody reads.
-            if sure:
-                note = {**note, "moc": picks["moc"][0]}
-            if picks and picks["folder"][1] >= JEV_MIN_CONFIDENCE:
-                note = {**note, "folder": picks["folder"][0]}
-        note = validate(note, mocs, notes)
+        note, said = ask_writer(model, text[:WRITER_INPUT], mocs, notes)
+        if said:
+            record["writer"] = f"unusable after {WRITER_TRIES} tries ({said[:160]}); filed from the capture itself"
+        own = FRONTMATTER.sub("", text).strip()
+        if len(text) > VERBATIM:
+            note = {**note, "body": own}   # already a note: filed whole, in its own words
+        elif isinstance(note.get("body"), str) and len(note["body"]) > 2 * len(own) + PADDING:
+            # Far longer than the capture: the writer carried out a request in it
+            # or invented detail. Her own words are filed instead.
+            note = {**note, "body": own}
+        # Jev decides where; a hub or folder it is unsure of is the writer's call,
+        # so nothing waits in a folder nobody reads.
+        if sure:
+            note = {**note, "moc": picks["moc"][0]}
+        if picks and picks["folder"][1] >= JEV_MIN_CONFIDENCE:
+            note = {**note, "folder": picks["folder"][0]}
+        repaired = []
+        note = validate(note, mocs, notes, text, picks, repaired)
+        if repaired:
+            record["repaired"] = repaired
         if note["related"]:
             record["related"] = note["related"]
         destination = vault.directory(note["folder"], create=True, mode=0o755)
@@ -450,16 +511,25 @@ def sweep(path, model=classify, place=locate, bridge=dispatch, near=nearest):
         else:
             notes = catalogue(vault)
             for name in names:
-                record = {"source": "_inbox/" + name}
-                mark = len(vault.fds)
-                try:
-                    file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, near)
-                except Deferred as exc:
-                    record["deferred"] = str(exc)
-                except Exception as exc:
-                    record["error"] = str(exc)
-                finally:
-                    vault.close_since(mark)
+                # A capture still being written (saved, then chmod'ed) is read again
+                # once: that race is over in a moment and is not worth a failed sweep.
+                for attempt in (1, 2):
+                    record = {"source": "_inbox/" + name}
+                    mark = len(vault.fds)
+                    try:
+                        file_capture(vault, inbox, name, hubs, notes, record, model, place, bridge, near)
+                    except Deferred as exc:
+                        record["deferred"] = str(exc)
+                    except Changed as exc:
+                        if attempt == 1:
+                            time.sleep(SETTLE)
+                            continue
+                        record["error"] = str(exc)
+                    except Exception as exc:
+                        record["error"] = str(exc)
+                    finally:
+                        vault.close_since(mark)
+                    break
                 records.append(record)
         failed = any("error" in record for record in records)
         stamp = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -468,7 +538,8 @@ def sweep(path, model=classify, place=locate, bridge=dispatch, near=nearest):
                   "---\n\n# Inbox filing report\n\n[[MOCs/Agents MOC]]\n\n")
         for record in records:
             report += "## " + json.dumps(record["source"], ensure_ascii=False) + "\n\n"
-            for key in ("target", "placement", "related", "route", "job", "deferred", "archive", "error"):
+            for key in ("target", "placement", "related", "writer", "repaired", "request", "set_aside",
+                        "route", "job", "deferred", "archive", "error"):
                 if key in record:
                     report += f"- {key}: {json.dumps(record[key], ensure_ascii=False)}\n"
             if "target" in record:
@@ -481,7 +552,7 @@ def sweep(path, model=classify, place=locate, bridge=dispatch, near=nearest):
         write_new(reports, report_name, report.encode(), mode=0o644)
         print(f"Inbox sweep: {len(records)} result(s); report Resources/Reports/{report_name}")
         for record in records:   # one line each for agents/logs, which the dashboard tails
-            outcome = next((f"{key}: {record[key]}" for key in ("error", "deferred", "target", "job")
+            outcome = next((f"{key}: {record[key]}" for key in ("error", "deferred", "target", "job", "set_aside")
                             if key in record), "answered")
             print(f"  {record['source']} -> {outcome}")
         return int(failed)

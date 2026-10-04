@@ -53,6 +53,9 @@ class VaultCase(unittest.TestCase):
         (self.vault / "MOCs/Home MOC.md").write_text("# Home MOC")
         self.source = self.vault / "_inbox/capture.md"
         self.source.write_text("A complete original capture.")
+        settle = patch.object(inbox, "SETTLE", 0)   # no waiting between the two reads of a changed capture
+        settle.start()
+        self.addCleanup(settle.stop)
 
     def run_sweep(self, model=lambda *_: result(), place=no_jev, bridge=no_bridge, near=lambda *_: []):
         return inbox.sweep(self.vault, model, place, bridge, near)
@@ -85,15 +88,71 @@ class FilingTests(VaultCase):
         self.assertIn("---\n\n# Mine\n\nFacts.", filed)
         self.assertNotIn("# A filed note", filed)
 
-    def test_invalid_model_data_keeps_capture_and_reports_failure(self):
-        invalid = [[], {}, {**result(), "moc": "../../escape"},
-                   {**result(), "title": "../escape"}, {**result(), "tags": [12]},
-                   {**result(), "body": None}, {**result(), "folder": "_inbox"}]
-        for response in invalid:
-            with self.subTest(response=response):
-                self.assertEqual(self.run_sweep(lambda *_: response), 1)
-                self.assertTrue(self.source.exists())
-        self.assertTrue(all("status: failed" in p.read_text() for p in self.reports()))
+    def test_whatever_the_writer_gets_wrong_is_repaired_and_the_capture_filed(self):
+        (self.vault / "MOCs/Knowledge MOC.md").write_text("# Knowledge MOC")
+        invalid = {"moc": ({**result(), "moc": "../../escape"}, "[[MOCs/Knowledge MOC]]"),
+                   "tags": ({**result(), "tags": [12, "Home Lab!", "x" * 60]}, 'tags: ["home-lab", "' + "x" * 40 + '"]'),
+                   "body": ({**result(), "body": None}, "\n\nA complete original capture.\n\n"),
+                   "folder": ({**result(), "folder": "_inbox"}, "# A filed note")}
+        for field, (response, expected) in invalid.items():
+            with self.subTest(field=field):
+                self.source.write_text("A complete original capture.")
+                self.assertEqual(self.run_sweep(lambda *_: response), 0)
+                self.assertFalse(self.source.exists())
+                filed = max(self.vault.glob("Resources/A filed note*.md"), key=lambda p: p.stat().st_mtime_ns)
+                self.assertIn(expected, filed.read_text())
+                report = max(self.reports(), key=lambda p: p.stat().st_mtime_ns).read_text()
+                self.assertIn("status: completed", report)
+                self.assertIn(f'- repaired: ["{field}"]', report)
+        # nothing of the writer's was ever written outside the two note folders
+        self.assertEqual(list(self.vault.glob("escape*")) + list(self.vault.parent.glob("escape*")), [])
+
+    def test_writer_is_asked_again_before_the_capture_is_filed_without_it(self):
+        replies = iter([ValueError("model reply has no JSON object: 'Sure! Here'"), [], result()])
+
+        def flaky(*_):
+            reply = next(replies)
+            if isinstance(reply, Exception):
+                raise reply
+            return reply
+        self.assertEqual(self.run_sweep(flaky), 0)
+        self.assertTrue((self.vault / "Resources/A filed note.md").is_file())
+        self.assertNotIn("- writer:", self.reports()[0].read_text())
+
+    def test_writer_that_never_gives_a_note_does_not_keep_the_capture_back(self):
+        (self.vault / "MOCs/Knowledge MOC.md").write_text("# Knowledge MOC")
+        self.source.write_text("---\ntype: note\n---\n\n## Swap the backup disk: Friday\n\nThe old one clicks.")
+        calls = []
+
+        def useless(*_):
+            calls.append(1)
+            raise ValueError("model reply has no JSON object: 'Sure! Here'")
+        self.assertEqual(self.run_sweep(useless, place=jev(moc=0.3, folder=0.3)), 0)
+        self.assertEqual(len(calls), inbox.WRITER_TRIES)
+        self.assertFalse(self.source.exists())
+        # named by its own first line, placed by Jev even though Jev was unsure
+        filed = (self.vault / "Areas/Swap the backup disk — Friday.md").read_text()
+        self.assertIn("The old one clicks.", filed)
+        self.assertIn('tags: ["unsorted"]', filed)
+        self.assertIn("[[MOCs/Knowledge MOC]]", filed)
+        report = self.reports()[0].read_text()
+        self.assertIn("status: completed", report)
+        self.assertIn("- writer: \"unusable after 3 tries (model reply has no JSON object", report)
+
+    def test_empty_capture_is_set_aside_instead_of_failing_every_sweep(self):
+        self.source.write_text(" \n\n")
+        self.assertEqual(self.run_sweep(lambda *_: self.fail("an empty capture was sent to the writer")), 0)
+        self.assertFalse(self.source.exists())
+        self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/original.md")).read_text(), " \n\n")
+        self.assertIn('- set_aside: "empty capture"', self.reports()[0].read_text())
+        self.assertEqual(self.run_sweep(), 0)   # nothing left: no second report
+        self.assertEqual(len(self.reports()), 1)
+
+    def test_capture_with_a_stray_byte_is_still_filed(self):
+        self.source.write_bytes(b"Backup disk \xff swapped.")
+        self.assertEqual(self.run_sweep(), 0)
+        self.assertFalse(self.source.exists())
+        self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/original.md")).read_bytes(), b"Backup disk \xff swapped.")
 
     def test_title_punctuation_is_repaired_instead_of_failing_the_capture(self):
         titles = {"Inbox: todo/jev requests [draft]": "Inbox — todo jev requests draft",
@@ -105,13 +164,22 @@ class FilingTests(VaultCase):
                 self.assertEqual(self.run_sweep(lambda *_: {**result(), "title": given}), 0)
                 self.assertTrue((self.vault / "Resources" / (filed + ".md")).is_file())
 
-    def test_unusable_title_is_named_in_the_report(self):
+    def test_unusable_title_is_replaced_by_the_captures_own_words_and_named_in_the_report(self):
         for given in (None, "", "#[]", ".hidden", "../escape"):
             with self.subTest(title=given):
-                self.assertEqual(self.run_sweep(lambda *_: {**result(), "title": given}), 1)
-                self.assertTrue(self.source.exists())
-        self.assertTrue(any("invalid model title: '../escape'" in p.read_text() for p in self.reports()))
-        self.assertEqual(list(self.vault.glob("Resources/*.md")), [])
+                self.source.write_text("# Swap the backup disk\n\nThe old one clicks.")
+                self.assertEqual(self.run_sweep(lambda *_: {**result(), "title": given}), 0)
+                self.assertFalse(self.source.exists())
+        self.assertTrue(any("""- repaired: ["title '../escape'"]""" in p.read_text() for p in self.reports()))
+        # every one landed in Resources under the capture's first line, none anywhere else
+        self.assertEqual({p.name for p in self.vault.glob("Resources/*.md")},
+                         {"Swap the backup disk.md"} | {f"Swap the backup disk ({n}).md" for n in range(2, 6)})
+        self.assertEqual(list(self.vault.glob("escape*")) + list(self.vault.glob(".hidden*")), [])
+
+    def test_capture_with_no_usable_first_line_still_gets_a_name(self):
+        self.source.write_text("#[]|\n\n...")
+        self.assertEqual(self.run_sweep(lambda *_: {**result(), "title": None}), 0)
+        self.assertEqual(len(list(self.vault.glob("Resources/Capture 20*.md"))), 1)
 
     def test_public_notes_reports_and_private_archives_with_restrictive_umask(self):
         previous_umask = os.umask(0o077)
@@ -129,10 +197,15 @@ class FilingTests(VaultCase):
             self.assertEqual(stat.S_IMODE((self.vault / directory).stat().st_mode), 0o750)
         self.assertEqual(stat.S_IMODE(snapshot.parent.stat().st_mode), 0o750)
 
-    def test_model_failure_keeps_source_and_is_reported(self):
+    def test_unreachable_writer_keeps_source_and_is_reported(self):
+        calls = []
+
         def fail(*_):
+            calls.append(1)
             raise TimeoutError("model timeout")
         self.assertEqual(self.run_sweep(fail), 1)
+        self.assertEqual(len(calls), inbox.WRITER_TRIES)
+        # no answer at all is an outage, not a mistake: the capture waits for the retry
         self.assertTrue(self.source.exists())
         self.assertIn("model timeout", self.reports()[0].read_text())
 
@@ -156,12 +229,31 @@ class FilingTests(VaultCase):
         self.assertIn("no regular MOC notes", self.reports()[0].read_text())
 
     def test_concurrent_edit_during_model_is_retained(self):
+        edits = []
+
         def editing_model(*_):
-            self.source.write_text("New user edit")
+            edits.append(f"User edit {len(edits) + 1}")
+            self.source.write_text(edits[-1])
             return result()
         self.assertEqual(self.run_sweep(editing_model), 1)
-        self.assertEqual(self.source.read_text(), "New user edit")
+        self.assertEqual(self.source.read_text(), "User edit 2")   # still being edited on the second read
         self.assertFalse((self.vault / "Resources/A filed note.md").exists())
+
+    def test_capture_that_changed_once_is_read_again_and_filed(self):
+        # written, then chmod'ed a moment later: the race that failed a whole sweep on 2026-10-04
+        seen = []
+
+        def model(text, *_):
+            seen.append(text)
+            if len(seen) == 1:
+                self.source.chmod(0o644 if stat.S_IMODE(self.source.stat().st_mode) != 0o644 else 0o664)
+            return result()
+        self.assertEqual(self.run_sweep(model), 0)
+        self.assertEqual(len(seen), 2)
+        self.assertFalse(self.source.exists())
+        self.assertTrue((self.vault / "Resources/A filed note.md").is_file())
+        self.assertEqual(len(self.reports()), 1)
+        self.assertIn("status: completed", self.reports()[0].read_text())
 
     def test_last_instant_replacement_is_archived_and_restored(self):
         rename = os.rename
@@ -202,14 +294,30 @@ class FilingTests(VaultCase):
         self.assertEqual(self.source.read_text(), "A complete original capture.")
         self.assertIn("disk full", self.reports()[0].read_text())
 
-    def test_oversized_capture_is_not_truncated_or_sent(self):
-        raw = "x" * (inbox.MAX_INPUT + 1)
+    def test_long_capture_is_filed_whole_and_only_its_start_goes_to_the_writer(self):
+        raw = "# Runbook\n\n" + "A line of the runbook.\n" * 6000   # about 138,000 characters
         self.source.write_text(raw)
-        def unexpected(*_):
-            self.fail("oversized note sent to model")
-        self.assertEqual(self.run_sweep(unexpected), 1)
-        self.assertEqual(self.source.read_text(), raw)
-        self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/snapshot.md")).read_text(), raw)
+        sent = []
+
+        def model(text, *_):
+            sent.append(text)
+            return {**result(), "body": "A summary the writer made up."}
+        self.assertEqual(self.run_sweep(model), 0)
+        self.assertEqual(sent, [raw[:inbox.WRITER_INPUT]])
+        filed = (self.vault / "Resources/A filed note.md").read_text()
+        self.assertIn(raw.strip(), filed)                       # nothing cut, nothing rewritten
+        self.assertNotIn("made up", filed)
+        self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/original.md")).read_text(), raw)
+
+    def test_capture_too_large_to_be_a_note_is_archived_whole_and_never_sent(self):
+        with patch.object(inbox, "MAX_INPUT", 1000):
+            raw = "x" * 1001
+            self.source.write_text(raw)
+            self.assertEqual(self.run_sweep(lambda *_: self.fail("oversized capture sent to the writer")), 0)
+        self.assertFalse(self.source.exists())
+        self.assertEqual(next(self.vault.glob("agents/inbox/archive/*/original.md")).read_text(), raw)
+        self.assertIn("- set_aside: \"larger than 1000 bytes", self.reports()[0].read_text())
+        self.assertEqual(list(self.vault.glob("Resources/*.md")), [])
 
     def test_source_symlink_is_not_read(self):
         outside = self.vault / "outside.md"
@@ -230,8 +338,11 @@ class FilingTests(VaultCase):
 
     def test_moc_symlink_is_not_accepted(self):
         (self.vault / "MOCs/Fake.md").symlink_to(self.source)
-        self.assertEqual(self.run_sweep(lambda *_: {**result(), "moc": "Fake"}), 1)
-        self.assertTrue(self.source.exists())
+        self.assertEqual(self.run_sweep(lambda *_: {**result(), "moc": "Fake"}), 0)
+        # a symlink is no hub: the note is filed under a real one instead
+        filed = (self.vault / "Resources/A filed note.md").read_text()
+        self.assertIn("[[MOCs/Home MOC]]", filed)
+        self.assertNotIn("Fake", filed)
 
     def test_destination_collision_preserves_existing_note(self):
         (self.vault / "Resources").mkdir()
@@ -534,10 +645,12 @@ class RequestTests(VaultCase):
         self.assertEqual(self.run_sweep(fail, bridge=lambda _: note), 1)
         self.assertEqual(self.source.read_text(), "todo: research my backup options")
 
-    def test_overlong_request_is_never_sent(self):
+    def test_overlong_request_is_never_sent_but_filed_as_a_note(self):
         self.source.write_text("todo: " + "x" * (inbox.MAX_REQUEST + 1))
-        self.assertEqual(self.run_sweep(), 1)
-        self.assertTrue(self.source.exists())
+        self.assertEqual(self.run_sweep(), 0)   # no_bridge fails the test if the request is sent
+        self.assertFalse(self.source.exists())
+        self.assertTrue((self.vault / "Resources/A filed note.md").is_file())
+        self.assertIn("4001 characters is too long to run; filed as a note", self.reports()[0].read_text())
 
     def test_dispatch_posts_the_request_to_the_bridge(self):
         sent = []

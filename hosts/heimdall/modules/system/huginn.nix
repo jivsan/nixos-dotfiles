@@ -5,8 +5,10 @@
 #   • inbox-sweep    — MiniMax turns each _inbox note into a titled, frontmattered,
 #                      MOC-linked note with archived originals and a sweep report;
 #                      also path-triggered (inotify on _inbox) for instant filing.
-#                      Jev picks the folder + MOC (unsure → _inbox/review/); a
-#                      capture starting `todo:` or `jev:` goes to the bridge instead
+#                      Jev picks the folder + MOC; whatever MiniMax leaves out or
+#                      gets wrong is repaired, so every capture is filed. A capture
+#                      starting `todo:` or `jev:` goes to the bridge instead. What
+#                      is left behind by an outage is swept again every 15 minutes
 #   • daily-digest   — MiniMax summarises the day into today's journal note
 #   • graphify-repo  — offline code extraction + MiniMax community labeling (weekly)
 #   • graphify-vault — the NOTES graph: staged copy of the vault's markdown only
@@ -321,6 +323,7 @@ let
     name = "huginn-inbox-poll";
     runtimeInputs = [ pkgs.findutils pkgs.coreutils pkgs.gnugrep pkgs.systemd ];
     text = ''
+      sweep() { /run/wrappers/bin/sudo -n systemctl start --no-block huginn-inbox-sweep.service || true; }
       while sleep 20; do
         state="$(systemctl is-active huginn-inbox-sweep.service || true)"
         [ "$state" = activating ] && continue   # look again once it is done
@@ -328,7 +331,15 @@ let
         [ -n "$now" ] || continue
         touch ${inboxSeen}
         if grep -qFxvf ${inboxSeen} <<< "$now"; then
-          /run/wrappers/bin/sudo -n systemctl start --no-block huginn-inbox-sweep.service || true
+          sweep
+        else
+          # What the last sweep left behind (the writer or the bridge could not be
+          # reached, or both agent slots were busy) gets another sweep every 15
+          # minutes, so nothing waits in the inbox for the next timer.
+          last="$(systemctl show huginn-inbox-sweep.service --timestamp=unix -p ExecMainStartTimestamp --value || true)"
+          last="''${last#@}"
+          case "$last" in ""|*[!0-9]*) last=0 ;; esac
+          if [ $(( $(date +%s) - last )) -ge 900 ]; then sweep; fi
         fi
       done
     '';

@@ -9,9 +9,10 @@ tool work. The desktop consumes these services.
 
 1. Typed or spoken requests enter `POST /bridge/talk`. Local Whisper and Kokoro
    on mimir provide transcription and speech.
-2. **Jev** chooses a tier, command/skill, and worker from bounded choices. It sees
-   which workers are configured. An explicit `target: hermes` or `target: codex`
-   overrides dispatch while preserving Jev's classification in the job record.
+2. **Jev** chooses a tier, command/skill, and worker from bounded choices, and
+   says what the task needs (see "How work is delegated"). An explicit
+   `target: hermes` or `target: codex` overrides dispatch while preserving Jev's
+   classification in the job record.
 3. **Commands** open views, search, capture notes, or start an allowlisted systemd
    skill. **Answers** are made from three things: the notes retrieved from the
    vault, the config graph, and the live state of the system (below).
@@ -35,11 +36,56 @@ tool work. The desktop consumes these services.
    retrieved for the answer are linked as `sources:` instead.
 
 Jev uses `https://openrouter.ai/api/v1/systemone`, `typesafe/jev-1.13` and the
-existing OpenRouter key. Invalid, unavailable or low-confidence decisions fall
-back to local rules, with `jev_error` and `route.fallback_reason` exposed.
-Confidence is checked separately for the tier and its relevant command, skill
-or worker. `JEV_MIN_CONFIDENCE=0.5` is application policy, not an accuracy guarantee.
-Configured-worker flags do not prove remote reachability.
+existing OpenRouter key. `JEV_MIN_CONFIDENCE=0.5` is application policy, not an
+accuracy guarantee.
+
+### How work is delegated
+
+One call asks Jev eight things about a request. Five are choices: the tier
+(command, answer, agent), the command, the skill, the depth of an answer (light
+or deep) and the worker it would pick. Three are yes/no questions, each
+answered as a probability: does the task need the internet (`needs_web`), does
+it tell us to change notes or files in the vault (`changes_vault`), and is it
+deep research (`deep_research`). Jev is not told which workers are connected;
+that is the bridge's business.
+
+The bridge then matches the task to a worker by what each can do:
+
+| Worker | Internet | Changes the vault | Used for |
+|---|---|---|---|
+| hermes (hermod) | yes | yes, over NFS | the default: research, news, lookups, everyday tasks |
+| codex (heimdall) | no (sandbox) | yes, in the vault itself | changes to notes and files |
+| claude (heimdall) | yes | no | deep research only |
+
+- A task that needs the internet goes to a worker that has it, whichever
+  worker Jev preferred. A task that only changes the vault goes to codex.
+  Otherwise Jev's own pick is taken when it is sure of it, and hermes when it
+  is not.
+- Claude takes a job only when Jev is at least `JEV_DEEP_MIN_CONFIDENCE` (0.7)
+  sure it is deep research, by either the yes/no question or its worker pick,
+  and the job does not have to change the vault. It is never a fallback.
+- `route.selected_because` records the reason: `needs the web`, `changes the
+  vault`, `deep research`, `Jev's choice`, `default worker` or `picked by hand`.
+
+An answer Jev is unsure of costs only that decision, not the whole route
+(`route.settled` names each one):
+
+- Unsure of the **tier** between answering and working: the task is agent work
+  if it needs the internet or changes the vault, otherwise it is answered. If
+  those two answers are missing too, or the unsure tier is a command, the local
+  rules decide everything (`route.fallback_reason`, `jev_error`).
+- Unsure of the **worker**: chosen by what the task needs.
+- Unsure of the **depth**: answered light (Codex), since deep is the costly path.
+- Unsure of a **command or skill**: the local rules, which know the commands.
+
+When Jev cannot be reached at all the rules route the request, and say what it
+needs from its wording, so the same matching applies.
+
+A worker flagged as connected may still be down. hermes is checked for three
+seconds before a job is sent to it; if it does not answer, or Claude is out of
+quota, the job goes untouched to the next worker that can do it. `POST
+/bridge/route {"text", "target"}` returns the route and the worker for a
+request without starting, answering or logging anything.
 
 When a job ends, the bridge commits the vault as `muninn-bridge` with the worker
 and report name as the message, so what an agent changed is not swept into
@@ -86,13 +132,30 @@ Inspect that record before retrying work.
 ## Capture and filing
 
 `capture "rough thought"`, the dashboard, or `POST /api/inbox` creates an inbox
-note. Huginn validates the model's JSON and files a titled, frontmattered note
-into `Areas/` or `Resources/`, linked to an existing MOC. Full originals are
-archived under `agents/inbox/archive/`; source notes are not deleted after a
-truncated model request. Invalid output and concurrent edits cause a recorded
-failure. Each nonempty sweep files a report in `Resources/Reports/`; failures
-return nonzero to systemd. Inputs above 128,000 bytes remain in the
-inbox for manual handling.
+note. Huginn files a titled, frontmattered note into `Areas/` or `Resources/`,
+linked to an existing MOC. Full originals are archived under
+`agents/inbox/archive/`. Each nonempty sweep files a report in
+`Resources/Reports/`; failures return nonzero to systemd.
+
+**Everything in the inbox is filed.** A capture is never kept back over what
+the writer did:
+
+- MiniMax is asked up to three times. If every reply is unusable, the capture
+  is filed from its own words: titled by its first heading or line, tagged
+  `unsorted`, placed where Jev said (even if Jev was unsure) or under
+  Knowledge MOC. The report line `writer:` says so.
+- A reply that is usable except for one field is repaired field by field (a
+  title that cannot be a file name, an unknown MOC or folder, tags that are not
+  tags, an empty body) and the report lists them under `repaired:`.
+- A capture above 128,000 characters is filed whole; only its start is sent to
+  the writer for a title. An empty capture, or one above 5 MB, is not a note:
+  it is moved whole to the archive and reported as `set_aside`.
+- A capture that changes while it is being filed (saved, then chmod'ed a moment
+  later) is read again once before that counts as a failure.
+
+What still waits is a capture the sweep could not get an answer for at all:
+MiniMax or the bridge unreachable, or both agent slots busy. The poll starts
+the sweep again for whatever is left every 15 minutes.
 
 Jev decides where a note goes: it chooses the folder and the MOC from the
 existing ones, reading each MOC's first line of prose as its description.
@@ -115,8 +178,8 @@ job, an answer (written into the sweep report and the talk log) or a skill run.
 If Jev reads it as something to capture or show, it is filed as an ordinary
 note. A busy bridge leaves the capture in the inbox for the next sweep without
 failing the unit; an unreachable bridge or a missing worker is a recorded
-failure. Requests above 4,000 characters are refused. Anything that can write
-to `_inbox/` can start agent work with these markers.
+failure. A request above 4,000 characters is not run; it is filed as a note.
+Anything that can write to `_inbox/` can start agent work with these markers.
 
 The vault's `CLAUDE.md` defines note conventions. `_inbox/` holds captures;
 `Areas/` and `Resources/` hold organized knowledge; `MOCs/` holds hub notes;
@@ -230,8 +293,8 @@ from another host, plus 08:15/14:15/20:15; vault mirror hourly at :20; digest 23
 06:00; brain builder every 30 seconds. Some timers add a short randomized delay.
 NFS writes from other clients never reach inotify, so `huginn-inbox-poll` lists
 the inbox every 20 seconds and starts the sweep for captures it has not seen
-(`/var/lib/huginn/inbox-seen`). A capture that failed stays seen and is retried
-by the timer, by a manual run, or once it is edited.
+(`/var/lib/huginn/inbox-seen`). A capture the sweep left behind is swept again
+15 minutes after the last sweep started, and on every timer or manual run.
 
 The dead-link fixer reads the vault offline. It checks filed notes only:
 journals, talk logs, reports and the inbox quote whatever a model said, and the
