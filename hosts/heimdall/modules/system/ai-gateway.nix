@@ -70,10 +70,7 @@ in
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
-    environment = {
-      AIGW_CONFIG = "${config}";
-      PYTHONUNBUFFERED = "1";
-    };
+    environment.AIGW_CONFIG = "${config}";
     serviceConfig = {
       ExecStart = "${python}/bin/python3 ${../../ai-gateway/gateway.py}";
       # Both optional ("-"): without the first, the openrouter target is off;

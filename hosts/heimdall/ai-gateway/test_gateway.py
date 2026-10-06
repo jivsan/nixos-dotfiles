@@ -186,8 +186,9 @@ class PlainRequests(GatewayCase):
         bad = await self.client.post("/v1/chat/completions", data=b"not json")
         self.assertEqual(bad.status, 400)
         self.assertEqual((await bad.json())["error"]["type"], "invalid_request_error")
-        # callers' model names never become label values
+        # callers' model names never become label values, and a turned-away request is not a latency sample
         self.assertEqual(self.value("aigw_requests_total", endpoint="chat/completions", model="unknown", target="none", code="404"), 1)
+        self.assertEqual(self.value("aigw_request_duration_seconds_count", model="unknown", target="none"), 0)
         self.assertEqual(self.upstream.seen, [])
 
     async def test_upstream_error_is_passed_on(self):

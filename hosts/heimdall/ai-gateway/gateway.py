@@ -506,10 +506,10 @@ class Gateway:
         if finish and finish not in FINISH_REASONS:
             finish = "other"
         m.requests.labels(call.endpoint, *labels, call.code).inc()
-        m.duration.labels(*labels).observe(elapsed)
         if call.route:
             m.decisions.labels(call.route, call.tier, call.reason).inc()
-        if call.sent is not None:
+        if call.sent is not None:   # a model was asked: requests turned away before that are not latency samples
+            m.duration.labels(*labels).observe(elapsed)
             m.queue.labels(*labels).observe(call.queued)
         if finish:
             m.finish.labels(*labels, finish).inc()
