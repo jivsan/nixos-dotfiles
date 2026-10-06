@@ -4,14 +4,17 @@
 A request names a model (or a route, which is an ordered list of models). The
 gateway picks the target that serves it, forwards the call, and measures what
 the model servers do not report themselves: time to first token, time per
-output token, tokens in and out, finish reasons, queueing. Prometheus reads
-the numbers at /metrics; one JSON line per request goes to the journal, and
+output token, tokens in and out, what the call cost, finish reasons, queueing.
+Prometheus reads the numbers at /metrics; one JSON line per request goes to the journal, and
 to Loki when `loki_url` is set, so a request can be looked up by its id.
 
 It also keeps llama.cpp's model swapping safe. With one model in VRAM at a
 time, llama-server force-kills the loaded model when another one is asked for,
 and the request that was running on it fails. A target marked `exclusive`
 makes requests for another model wait here until the running ones are done.
+
+A caller can name itself in the URL, /client/<name>/v1/... instead of /v1/...,
+and its requests, tokens and cost are then counted under that name.
 
 Config: the JSON file named by AIGW_CONFIG (written by ai-gateway.nix).
 Run the tests with: python3 -m unittest discover -s hosts/heimdall/ai-gateway -p 'test_*.py'
@@ -49,19 +52,22 @@ class Metrics:
     def __init__(self):
         self.registry = r = CollectorRegistry()
         per_call = ("model", "target")
+        by_client = (*per_call, "client")   # the counters that say who is using what
         self.requests = Counter("aigw_requests", "Requests answered, by what the caller got: an HTTP status, "
                                 "client_closed (the caller left) or stream_error (the upstream broke mid-stream).",
-                                ("endpoint", *per_call, "code"), registry=r)
+                                ("endpoint", *by_client, "code"), registry=r)
         self.duration = Histogram("aigw_request_duration_seconds", "Arrival to last byte.",
                                   per_call, buckets=LATENCY_BUCKETS, registry=r)
         self.ttft = Histogram("aigw_time_to_first_token_seconds", "Arrival to first streamed token, queueing included.",
                               per_call, buckets=LATENCY_BUCKETS, registry=r)
         self.per_token = Histogram("aigw_time_per_output_token_seconds", "Mean gap between output tokens of a request.",
                                    per_call, buckets=PER_TOKEN_BUCKETS, registry=r)
-        self.prompt_tokens = Counter("aigw_prompt_tokens", "Prompt tokens, cached ones included.", per_call, registry=r)
+        self.prompt_tokens = Counter("aigw_prompt_tokens", "Prompt tokens, cached ones included.", by_client, registry=r)
         self.cached_tokens = Counter("aigw_cached_prompt_tokens", "Prompt tokens served from the prompt cache.",
-                                     per_call, registry=r)
-        self.completion_tokens = Counter("aigw_completion_tokens", "Generated tokens.", per_call, registry=r)
+                                     by_client, registry=r)
+        self.completion_tokens = Counter("aigw_completion_tokens", "Generated tokens.", by_client, registry=r)
+        self.cost = Counter("aigw_cost_usd", "US dollars the upstream charged, where it reports that per call (OpenRouter).",
+                            by_client, registry=r)
         self.request_prompt = Histogram("aigw_request_prompt_tokens", "Prompt tokens per request.",
                                         per_call, buckets=TOKEN_BUCKETS, registry=r)
         self.request_completion = Histogram("aigw_request_completion_tokens", "Generated tokens per request.",
@@ -132,6 +138,7 @@ class Call:
         self.id, self.endpoint = request_id, endpoint
         self.start = time.monotonic()
         self.model, self.target = "unknown", "none"
+        self.client = "other"        # callers that do not name themselves
         self.route = self.tier = self.reason = None
         self.code = "500"
         self.stream = False
@@ -180,6 +187,11 @@ class Call:
             completion = self.pieces   # servers stream about one token per chunk
         return prompt, cached, completion
 
+    def cost(self):
+        """US dollars charged for this call, if the upstream says: OpenRouter puts it in usage."""
+        cost = (self.usage or {}).get("cost")
+        return cost if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost > 0 else None
+
 
 def log(**fields):
     print(json.dumps(fields), flush=True)
@@ -211,6 +223,7 @@ class Gateway:
     def __init__(self, config, environ=os.environ):
         self.targets, self.models, self.routes = config["targets"], config["models"], config["routes"]
         self.health_interval = config.get("health_interval", 15)
+        self.clients = list(config.get("clients", []))   # the names a caller may give itself in the URL
         self.metrics = Metrics()
         self.client_keys = [k.strip() for k in environ.get("AIGW_CLIENT_KEYS", "").split(",") if k.strip()]
         self.keys = {}      # target -> upstream API key
@@ -239,13 +252,16 @@ class Gateway:
         m = self.metrics
         for name, model in self.models.items():
             labels = (name, model["target"])
-            for metric in (m.duration, m.ttft, m.per_token, m.prompt_tokens, m.cached_tokens, m.completion_tokens,
-                           m.request_prompt, m.request_completion, m.queue, m.prefill, m.decode):
+            for metric in (m.duration, m.ttft, m.per_token, m.request_prompt, m.request_completion,
+                           m.queue, m.prefill, m.decode):
                 metric.labels(*labels)
             for reason in USUAL_REASONS:
                 m.finish.labels(*labels, reason)
-            for code in USUAL_CODES:
-                m.requests.labels(ENDPOINTS[0], *labels, code)
+            for client in (*self.clients, "other"):
+                for metric in (m.prompt_tokens, m.cached_tokens, m.completion_tokens, m.cost):
+                    metric.labels(*labels, client)
+                for code in USUAL_CODES:
+                    m.requests.labels(ENDPOINTS[0], *labels, client, code)
             m.decisions.labels("direct", model.get("tier", "efficient"), "requested")
             m.running.labels(model["target"])
             m.waiting.labels(model["target"])
@@ -259,9 +275,9 @@ class Gateway:
         app = web.Application(client_max_size=MAX_BODY)
         app.router.add_get("/health", self.health)
         app.router.add_get("/metrics", self.metrics_page)
-        app.router.add_get("/v1/models", self.list_models)
-        for endpoint in ENDPOINTS:
-            app.router.add_post(f"/v1/{endpoint}", self.handle)
+        for prefix in ("/v1", "/client/{client}/v1"):
+            app.router.add_get(f"{prefix}/models", self.list_models)
+            app.router.add_post(f"{prefix}/{{endpoint:{'|'.join(ENDPOINTS)}}}", self.handle)
         app.on_startup.append(self.start)
         app.on_cleanup.append(self.stop)
         return app
@@ -349,7 +365,7 @@ class Gateway:
 
     # ── one request ──────────────────────────────────────────────────────────
     async def handle(self, request):
-        call = Call(request.headers.get("X-Request-Id") or uuid.uuid4().hex, request.path.removeprefix("/v1/"))
+        call = Call(request.headers.get("X-Request-Id") or uuid.uuid4().hex, request.match_info["endpoint"])
         self.metrics.inflight.inc()
         try:
             return await self.serve(request, call)
@@ -365,6 +381,12 @@ class Gateway:
             self.record(call)
 
     async def serve(self, request, call):
+        client = request.match_info.get("client")
+        if client is not None:
+            if client not in self.clients:   # a typo would otherwise be counted under a name nobody looks at
+                call.code = "404"
+                return openai_error(404, f"unknown client {client!r} in the URL; known: {', '.join(self.clients) or 'none'}")
+            call.client = client
         raw = await request.read()
         try:
             body = json.loads(raw)
@@ -505,7 +527,8 @@ class Gateway:
             finish = "error"   # an upstream was asked and the caller got no answer
         if finish and finish not in FINISH_REASONS:
             finish = "other"
-        m.requests.labels(call.endpoint, *labels, call.code).inc()
+        who = (*labels, call.client)
+        m.requests.labels(call.endpoint, *who, call.code).inc()
         if call.route:
             m.decisions.labels(call.route, call.tier, call.reason).inc()
         if call.sent is not None:   # a model was asked: requests turned away before that are not latency samples
@@ -515,13 +538,16 @@ class Gateway:
             m.finish.labels(*labels, finish).inc()
         prompt, cached, completion = call.tokens()
         if prompt is not None:
-            m.prompt_tokens.labels(*labels).inc(prompt)
+            m.prompt_tokens.labels(*who).inc(prompt)
             m.request_prompt.labels(*labels).observe(prompt)
         if cached:
-            m.cached_tokens.labels(*labels).inc(cached)
+            m.cached_tokens.labels(*who).inc(cached)
         if completion is not None and call.endpoint != "embeddings":
-            m.completion_tokens.labels(*labels).inc(completion)
+            m.completion_tokens.labels(*who).inc(completion)
             m.request_completion.labels(*labels).observe(completion)
+        cost = call.cost()
+        if cost:
+            m.cost.labels(*who).inc(cost)
         ttft = per_token = None
         timings = call.timings or {}
         if call.first is not None:
@@ -540,8 +566,8 @@ class Gateway:
         elif call.first is not None:
             m.prefill.labels(*labels).observe(call.first - call.sent)
             m.decode.labels(*labels).observe(call.last - call.first)
-        fields = dict(event="request", id=call.id, endpoint=call.endpoint, model=call.model, target=call.target,
-                      route=call.route, tier=call.tier, reason=call.reason, code=call.code, stream=call.stream,
+        fields = dict(event="request", id=call.id, client=call.client, endpoint=call.endpoint, model=call.model,
+                      target=call.target, cost_usd=cost, route=call.route, tier=call.tier, reason=call.reason, code=call.code, stream=call.stream,
                       finish=finish, prompt_tokens=prompt, cached_tokens=cached, completion_tokens=completion,
                       queued_s=round(call.queued, 3), ttft_s=None if ttft is None else round(ttft, 3),
                       duration_s=round(elapsed, 3))

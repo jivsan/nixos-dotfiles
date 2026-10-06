@@ -20,11 +20,12 @@ mimir ── :9835 nvidia-smi exporter, :9100 node exporter ◀── Prometheus
 | gateway service, targets, models, routes | `hosts/heimdall/modules/system/ai-gateway.nix` |
 | dashboard | `hosts/heimdall/modules/system/ai-gateway-dashboard.json` |
 | scrape jobs (`ai-gateway`, `nvidia-gpu`, mimir in `node`) | `hosts/heimdall/modules/system/prometheus.nix` |
-| GPU and host exporters | `hosts/mimir/modules/system/exporters.nix` |
+| host exporter | `hosts/mimir/modules/system/exporters.nix` |
+| GPU exporter (import commented out until the card is in) | `hosts/mimir/modules/system/gpu-exporter.nix` |
 | chat model server (import commented out until the card is in) | `hosts/mimir/modules/system/llm.nix` |
 
-Nothing is pointed at the gateway by these modules. huginn, the bridge and hermes keep
-calling what they called before.
+muninn's MiniMax calls go through the gateway: huginn's skills (graphify's labeling
+included) and the bridge's MiniMax floor. Jev, Codex, Claude and hermes do not.
 
 ## Using it
 
@@ -36,6 +37,12 @@ curl http://10.0.20.17:4000/v1/chat/completions -H 'Content-Type: application/js
 
 `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and `/v1/models` are served.
 Every answer carries `X-Request-Id`, `X-AIGW-Model` and `X-AIGW-Target`.
+
+A caller can name itself by using `http://10.0.20.17:4000/client/<name>/v1` as its base
+URL. Its requests, tokens and cost are then counted under that name; without a name
+they are counted as `other`. The names are the `clients` list in `ai-gateway.nix`
+(`huginn`, `bridge`, `hermes`, `mjolnir`); any other name is a 404, so a typo shows.
+The name is a label for the dashboard, not a login.
 
 | model | served by | tier |
 |---|---|---|
@@ -89,13 +96,19 @@ swapped out.
 
 ## Deploy
 
-heimdall and mimir, in either order. Before the card is in, mimir only gets the
-exporters; the dashboard's GPU row and the `mimir:8080` health row stay empty or red.
+heimdall and mimir, in either order. Before the card is in, mimir only gets the host
+exporter; the dashboard's GPU row is empty and the `mimir:8080` and `mimir:9835` health
+rows are red.
+
+**Do not enable the GPU exporter before the card is in.** It runs `nvidia-smi` on every
+scrape. With the GTX 1070 and the open kernel module, each run made the kernel load the
+driver, fail and unload it, five times every 15 s, and the card's fans ramped up and
+down until the service was stopped (2026-10-06).
 
 When the RTX 5070 Ti is installed:
 
-1. In `hosts/mimir/default.nix`, uncomment `./modules/system/llm.nix`. The first rebuild
-   compiles llama.cpp with CUDA.
+1. In `hosts/mimir/default.nix`, uncomment `./modules/system/gpu-exporter.nix` and
+   `./modules/system/llm.nix`. The first rebuild compiles llama.cpp with CUDA.
 2. Download the two models on mimir (20 GiB; the files are world-readable, which the
    service needs):
 
@@ -117,18 +130,33 @@ A local model is a section in the preset in `llm.nix` and an entry in `models` i
 `ai-gateway.nix`; the two names must be the same. `max_concurrent` on the target should
 equal the largest `parallel` in the preset. `ctx-size` is shared by a model's slots.
 
-### Sending muninn's MiniMax calls through it
+### muninn's MiniMax calls
 
-Not done. huginn and the bridge read `OPENAI_BASE_URL` and `OPENAI_MODEL` from
-`/var/lib/secrets/graphify-openrouter.env`. Setting `OPENAI_BASE_URL=http://127.0.0.1:4000/v1`
-there moves them; `OPENAI_MODEL=minimax/minimax-m3` stays as it is, or becomes `auto`
-for local first. The gateway does not read `OPENAI_BASE_URL`, so it keeps calling
-OpenRouter.
+huginn and the bridge read `OPENAI_BASE_URL` from `/var/lib/secrets/graphify-openrouter.env`.
+That file is not changed. Each unit reads a second, non-secret file after it, which
+sets the gateway as the base URL:
+
+| who | where | base URL |
+|---|---|---|
+| huginn's skills | `viaGateway` in `huginn.nix` | `http://127.0.0.1:4000/client/huginn/v1` |
+| the bridge | `EnvironmentFile` of `muninn-bridge` in `brain.nix` | `http://127.0.0.1:4000/client/bridge/v1` |
+
+To go back to calling OpenRouter directly, delete that entry from the unit's
+`EnvironmentFile` list and rebuild heimdall. Jev has its own `JEV_URL`, and `ask`'s SSH
+fallback loads only the secrets file; both still call OpenRouter directly.
+
+If the gateway is down, these calls fail until it is back (it restarts itself after
+5 s). `OPENAI_MODEL` is still `minimax/minimax-m3`; making it `auto` would try the local
+model first once it runs.
 
 ## The dashboard
 
 The first two rows copy the reference dashboard panel for panel. Below them: token
-totals, mimir's GPU, and **Request Lookup**.
+totals, **Cost and Callers**, mimir's GPU, and **Request Lookup**.
+
+- **Spend** is what OpenRouter charged, which it reports with every answer. Local
+  models add nothing to it.
+- **Tokens / Requests / Spend by Caller** split by the name in the caller's URL.
 
 - **Efficient / Capable Routed Decisions** count requests by the tier of the model that
   answered, whether a route picked it or the caller named it.
@@ -143,10 +171,12 @@ totals, mimir's GPU, and **Request Lookup**.
 ## Metrics
 
 All at `http://10.0.20.17:4000/metrics`, labelled `model` and `target` unless noted.
+The request, token and cost counters also carry `client`.
 
 | metric | what |
 |---|---|
 | `aigw_requests_total{endpoint,code}` | requests; `code` is the HTTP status, `client_closed` or `stream_error` |
+| `aigw_cost_usd_total` | US dollars the upstream charged (OpenRouter's `usage.cost`) |
 | `aigw_request_duration_seconds` | arrival to last byte (histogram) |
 | `aigw_time_to_first_token_seconds` | streamed requests, queueing included (histogram) |
 | `aigw_time_per_output_token_seconds` | mean gap between output tokens (histogram) |
@@ -172,6 +202,10 @@ The model servers are a local stand-in; nothing leaves the machine.
 
 ## History
 
-- 2026-10-06: built and staged. Verified on mjolnir against a real llama-server (CPU
-  build, small test models), a local Prometheus, Grafana and Loki. Not yet run on
-  heimdall, against the RTX 5070 Ti, or against OpenRouter.
+- 2026-10-06: built. Verified on mjolnir against a real llama-server (CPU build, small
+  test models), a local Prometheus, Grafana and Loki. Deployed to heimdall and mimir
+  the same day; two real MiniMax calls through it worked. Not yet run against the
+  RTX 5070 Ti.
+- 2026-10-06: cost and per-caller counting added, and muninn's MiniMax calls pointed at
+  the gateway. The GPU exporter was taken out of mimir's imports after it made the
+  GTX 1070's fans cycle.

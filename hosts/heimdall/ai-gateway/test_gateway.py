@@ -17,6 +17,13 @@ from aiohttp.test_utils import TestClient, TestServer
 import gateway
 from gateway import Gate, Gateway
 
+# OpenRouter's usage for one small MiniMax call (2026-10-06): the price of the call rides along.
+PAID_USAGE = {"prompt_tokens": 183, "completion_tokens": 16, "total_tokens": 199, "cost": 0.00004338, "is_byok": False,
+              "prompt_tokens_details": {"cached_tokens": 128, "cache_write_tokens": 0},
+              "cost_details": {"upstream_inference_cost": 0.00004338}}
+BY_CLIENT = {"aigw_requests_total", "aigw_prompt_tokens_total", "aigw_cached_prompt_tokens_total",
+             "aigw_completion_tokens_total", "aigw_cost_usd_total"}
+
 TIMINGS = {"cache_n": 45, "prompt_n": 1, "prompt_ms": 250.0, "predicted_n": 3, "predicted_ms": 500.0}
 USAGE = {"completion_tokens": 3, "prompt_tokens": 46, "total_tokens": 49, "prompt_tokens_details": {"cached_tokens": 45}}
 CHAT = {"choices": [{"finish_reason": "stop", "index": 0, "message": {"role": "assistant", "content": "Hi there"}}],
@@ -99,6 +106,7 @@ class GatewayCase(unittest.IsolatedAsyncioTestCase):
                 "cloud/large": {"target": "cloud", "tier": "capable"},
             },
             "routes": {"auto": {"models": ["small", "cloud/large"]}},
+            "clients": ["huginn", "bridge"],
         }
 
     async def asyncSetUp(self):
@@ -117,6 +125,8 @@ class GatewayCase(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(self.client.close)
 
     def value(self, name, **labels):
+        if name in BY_CLIENT:
+            labels.setdefault("client", "other")   # a caller that did not name itself
         return self.gw.metrics.registry.get_sample_value(name, labels) or 0
 
     async def chat(self, model="small", headers=None, **body):
@@ -213,14 +223,70 @@ class FreshStart(GatewayCase):
         sample = self.gw.metrics.registry.get_sample_value
         labels = {"model": "big", "target": "gpu"}
         self.assertEqual(sample("aigw_finish_reason_total", {**labels, "reason": "abort"}), 0)
-        self.assertEqual(sample("aigw_completion_tokens_total", labels), 0)
-        self.assertEqual(sample("aigw_requests_total", {**labels, "endpoint": "chat/completions", "code": "502"}), 0)
+        self.assertEqual(sample("aigw_completion_tokens_total", {**labels, "client": "huginn"}), 0)
+        self.assertEqual(sample("aigw_cost_usd_total", {**labels, "client": "other"}), 0)
+        self.assertEqual(sample("aigw_requests_total", {**labels, "client": "bridge", "endpoint": "chat/completions", "code": "502"}), 0)
         self.assertEqual(sample("aigw_time_to_first_token_seconds_count", labels), 0)
         self.assertEqual(sample("aigw_route_decisions_total", {"route": "auto", "tier": "capable", "reason": "failover"}), 0)
         self.assertEqual(sample("aigw_route_decisions_total", {"route": "direct", "tier": "efficient", "reason": "requested"}), 0)
         self.assertEqual(sample("aigw_target_waiting", {"target": "gpu"}), 0)
         text = await (await self.client.get("/metrics")).text()
         self.assertIn('aigw_target_up{target="gpu"} 1.0', text)
+
+
+class Callers(GatewayCase):
+    async def test_caller_named_in_the_url_is_counted_under_its_name(self):
+        response = await self.client.post("/client/huginn/v1/chat/completions", json={
+            "model": "small", "messages": [{"role": "user", "content": "hi"}]})
+        self.assertEqual(response.status, 200)
+        self.assertEqual(self.upstream.seen[0][0], "/v1/chat/completions")   # the name stays in the gateway
+        labels = {"model": "small", "target": "gpu", "client": "huginn"}
+        self.assertEqual(self.value("aigw_requests_total", endpoint="chat/completions", code="200", **labels), 1)
+        self.assertEqual(self.value("aigw_prompt_tokens_total", **labels), 46)
+        self.assertEqual(self.value("aigw_completion_tokens_total", **labels), 3)
+        self.assertEqual(self.value("aigw_prompt_tokens_total", model="small", target="gpu"), 0)   # not under "other"
+        self.assertEqual(self.logged()[-1]["client"], "huginn")
+
+    async def test_unnamed_caller_is_other(self):
+        await self.chat()
+        self.assertEqual(self.logged()[-1]["client"], "other")
+
+    async def test_unknown_name_is_refused(self):
+        response = await self.client.post("/client/hugin/v1/chat/completions", json={"model": "small", "messages": []})
+        self.assertEqual(response.status, 404)
+        self.assertIn("known: huginn, bridge", (await response.json())["error"]["message"])
+        self.assertEqual(self.upstream.seen, [])
+
+    async def test_models_list_under_a_name(self):
+        listed = (await (await self.client.get("/client/bridge/v1/models")).json())["data"]
+        self.assertIn("auto", [m["id"] for m in listed])
+
+
+class Cost(GatewayCase):
+    def spent(self, client="other"):
+        return self.value("aigw_cost_usd_total", model="cloud/large", target="cloud", client=client)
+
+    async def test_upstream_price_is_added_up(self):
+        self.upstream.replies["*"] = json_reply({**CHAT, "usage": PAID_USAGE})
+        for _ in range(2):
+            await self.client.post("/client/bridge/v1/chat/completions", json={"model": "cloud/large", "messages": []})
+        self.assertAlmostEqual(self.spent("bridge"), 2 * 0.00004338)
+        self.assertEqual(self.spent(), 0)
+        self.assertEqual(self.logged()[-1]["cost_usd"], 0.00004338)
+
+    async def test_price_on_the_last_chunk_of_a_stream(self):
+        # OpenRouter repeats the finish chunk with usage on it, choices and all: the caller gets that chunk too
+        last = chunk({"content": "", "role": "assistant"}, finish="length", usage=PAID_USAGE)
+        self.upstream.replies["*"] = sse_reply([chunk({"reasoning": "hm"}), chunk({"content": ""}, finish="length"), last])
+        response = await self.chat("cloud/large", stream=True)
+        self.assertIn('"cost": 4.338e-05', (await response.read()).decode())
+        self.assertAlmostEqual(self.spent(), 0.00004338)
+        self.assertEqual(self.value("aigw_prompt_tokens_total", model="cloud/large", target="cloud"), 183)
+
+    async def test_local_model_costs_nothing(self):
+        await self.chat()
+        self.assertEqual(self.value("aigw_cost_usd_total", model="small", target="gpu"), 0)
+        self.assertIsNone(self.logged()[-1]["cost_usd"])
 
 
 class RequestLog(GatewayCase):

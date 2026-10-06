@@ -22,7 +22,8 @@
     ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
     ./modules/system/voice.nix            # Whisper + Kokoro for the muninn brain (heimdall's bridge)
     ./modules/system/embeddings.nix       # Qwen3-Embedding-4B for vault search and placement (heimdall)
-    ./modules/system/exporters.nix        # node + GPU numbers for heimdall's Prometheus
+    ./modules/system/exporters.nix        # host numbers for heimdall's Prometheus
+#   ./modules/system/gpu-exporter.nix     # GPU numbers — needs the RTX 5070 Ti (polls nvidia-smi; see the file)
 #   ./modules/system/llm.nix              # chat models behind heimdall's ai-gateway — needs the RTX 5070 Ti
     ../../modules/apps/octane-node.nix    # OctaneRender render node for mjolnir (needs the RTX 5070 Ti)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing

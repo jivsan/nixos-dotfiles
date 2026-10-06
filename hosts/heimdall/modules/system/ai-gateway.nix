@@ -20,6 +20,11 @@ let
     # dashboard's Request ID box searches. No prompt or answer text is logged.
     loki_url = "http://127.0.0.1:3100/loki/api/v1/push";
 
+    # Callers may name themselves in the URL, http://…:4000/client/<name>/v1,
+    # and the dashboard then splits requests, tokens and cost by that name.
+    # huginn.nix and brain.nix point their MiniMax calls at the first two.
+    clients = [ "huginn" "bridge" "hermes" "mjolnir" ];
+
     targets = {
       # llama-server on mimir (hosts/mimir/modules/system/llm.nix). The 16 GB
       # card holds one chat model at a time, and llama-server kills the loaded

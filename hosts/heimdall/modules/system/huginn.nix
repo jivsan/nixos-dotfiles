@@ -645,13 +645,24 @@ Failed systemd units on heimdall: $failed"
     '';
   };
 
+  # The skills' MiniMax calls go through the ai-gateway (ai-gateway.nix), which
+  # counts their tokens and cost under the name "huginn". Read after the secrets
+  # file, so this OPENAI_BASE_URL wins over the one in it; take it out of the
+  # list below to call OpenRouter directly again.
+  viaGateway = pkgs.writeText "huginn-via-gateway.env" ''
+    OPENAI_BASE_URL=http://127.0.0.1:4000/client/huginn/v1
+  '';
+
   # Common hardening + auth for the LLM-calling jobs.
   agentServiceConfig = {
     Type = "oneshot";
     User = "christina";
     Group = "users";
     Environment = [ "HOME=${agentHome}" ];
-    EnvironmentFile = "-/var/lib/secrets/graphify-openrouter.env";   # OpenRouter/MiniMax creds
+    EnvironmentFile = [
+      "-/var/lib/secrets/graphify-openrouter.env"   # OpenRouter/MiniMax creds
+      viaGateway
+    ];
     NoNewPrivileges = true;   # block sudo/setuid escalation despite passwordless-sudo christina
     ProtectHome = true;       # hide /home/christina; HOME is ${agentHome}
     PrivateTmp = true;
@@ -803,10 +814,10 @@ in
       OnSuccess = [ "huginn-resolve@%n.service" ];
     };
     serviceConfig = agentServiceConfig // {
-      # OpenRouter/MiniMax creds ONLY (no ANTHROPIC_API_KEY, so Graphify's
-      # auto-detect picks the openai backend); optional (leading '-') so the job
-      # still builds an offline graph if the file is absent.
-      EnvironmentFile = "-/var/lib/secrets/graphify-openrouter.env";
+      # agentServiceConfig's secrets file has OpenRouter/MiniMax creds ONLY (no
+      # ANTHROPIC_API_KEY, so Graphify's auto-detect picks the openai backend);
+      # it is optional (leading '-') so the job still builds an offline graph
+      # if the file is absent.
       ExecStart = "${graphifyRepo}/bin/huginn-graphify-repo";
     };
   };

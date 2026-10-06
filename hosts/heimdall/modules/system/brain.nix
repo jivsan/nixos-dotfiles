@@ -486,6 +486,11 @@ in
       EnvironmentFile = [
         "-/var/lib/secrets/graphify-openrouter.env"   # OPENAI_API_KEY (OpenRouter): Jev + MiniMax
         "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY: same value as API_SERVER_KEY on hermod
+        # MiniMax goes through the ai-gateway (ai-gateway.nix), counted as
+        # "bridge". Read last, so it wins over the URL in the secrets file;
+        # delete this entry to call OpenRouter directly again. Jev has its own
+        # URL and is not affected.
+        (pkgs.writeText "bridge-via-gateway.env" "OPENAI_BASE_URL=http://127.0.0.1:4000/client/bridge/v1\n")
       ];
       ExecStart = "${pkgs.python3}/bin/python3 ${bridge}/bridge.py";
       Restart = "always";

@@ -1982,7 +1982,7 @@
     {
       "id": 29,
       "type": "row",
-      "title": "GPU · mimir",
+      "title": "Cost and Callers",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1995,6 +1995,385 @@
     {
       "id": 30,
       "type": "stat",
+      "title": "Spend · Last 24 Hours",
+      "description": "What OpenRouter charged for calls through the gateway in the last 24 hours. It reports the price with every answer; local models cost nothing here.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(aigw_cost_usd_total[24h])) or vector(0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Spend · Last 30 Days",
+      "description": "The same over 30 days, which is as far back as Prometheus keeps data.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 48,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(aigw_cost_usd_total[30d])) or vector(0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "stat",
+      "title": "Spend · Selected Range",
+      "description": "The same for the dashboard's time range and Model filter.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 48,
+        "w": 8,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(increase(aigw_cost_usd_total{model=~\"$model\"}[$__range])) or vector(0)",
+          "legendFormat": "",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "Tokens by Caller",
+      "description": "Prompt plus generated tokens per caller. A caller names itself in the URL (/client/<name>/v1); everything else is \"other\".",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (client) (increase(aigw_prompt_tokens_total{model=~\"$model\"}[$__rate_interval])) + sum by (client) (increase(aigw_completion_tokens_total{model=~\"$model\"}[$__rate_interval]))",
+          "legendFormat": "{{client}}"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "type": "timeseries",
+      "title": "Requests by Caller",
+      "description": "Requests per caller.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 52,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (client) (increase(aigw_requests_total{model=~\"$model\"}[$__rate_interval]))",
+          "legendFormat": "{{client}}"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "type": "timeseries",
+      "title": "Spend by Caller",
+      "description": "What each caller's requests cost on OpenRouter.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 52,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (client) (increase(aigw_cost_usd_total{model=~\"$model\"}[$__rate_interval]))",
+          "legendFormat": "{{client}}"
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "type": "row",
+      "title": "GPU · mimir",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 60,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 37,
+      "type": "stat",
       "title": "GPU",
       "description": "The card nvidia-smi reports on mimir.",
       "datasource": {
@@ -2003,7 +2382,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 61,
         "w": 4,
         "h": 4
       },
@@ -2056,7 +2435,7 @@
       ]
     },
     {
-      "id": 31,
+      "id": 38,
       "type": "stat",
       "title": "GPU Utilization",
       "description": "How busy the GPU is.",
@@ -2066,7 +2445,7 @@
       },
       "gridPos": {
         "x": 4,
-        "y": 48,
+        "y": 61,
         "w": 4,
         "h": 4
       },
@@ -2125,7 +2504,7 @@
       ]
     },
     {
-      "id": 32,
+      "id": 39,
       "type": "stat",
       "title": "VRAM Used",
       "description": "Share of the card's memory in use: the loaded chat model plus everything else on the GPU.",
@@ -2135,7 +2514,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 48,
+        "y": 61,
         "w": 4,
         "h": 4
       },
@@ -2194,7 +2573,7 @@
       ]
     },
     {
-      "id": 33,
+      "id": 40,
       "type": "stat",
       "title": "Temperature",
       "description": "GPU core temperature.",
@@ -2204,7 +2583,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 48,
+        "y": 61,
         "w": 4,
         "h": 4
       },
@@ -2263,7 +2642,7 @@
       ]
     },
     {
-      "id": 34,
+      "id": 41,
       "type": "stat",
       "title": "Power Draw",
       "description": "Power the card is drawing.",
@@ -2273,7 +2652,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 48,
+        "y": 61,
         "w": 4,
         "h": 4
       },
@@ -2325,7 +2704,7 @@
       ]
     },
     {
-      "id": 35,
+      "id": 42,
       "type": "stat",
       "title": "Fan",
       "description": "Fan speed.",
@@ -2335,7 +2714,7 @@
       },
       "gridPos": {
         "x": 20,
-        "y": 48,
+        "y": 61,
         "w": 4,
         "h": 4
       },
@@ -2387,7 +2766,7 @@
       ]
     },
     {
-      "id": 36,
+      "id": 43,
       "type": "timeseries",
       "title": "GPU Utilization and VRAM",
       "description": "GPU load and memory use over time.",
@@ -2397,7 +2776,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 52,
+        "y": 65,
         "w": 12,
         "h": 8
       },
@@ -2484,7 +2863,7 @@
       ]
     },
     {
-      "id": 37,
+      "id": 44,
       "type": "timeseries",
       "title": "GPU Temperature and Power",
       "description": "Core temperature (left axis) and power draw (right axis).",
@@ -2494,7 +2873,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 52,
+        "y": 65,
         "w": 12,
         "h": 8
       },
@@ -2588,20 +2967,20 @@
       ]
     },
     {
-      "id": 38,
+      "id": 45,
       "type": "row",
       "title": "Request Lookup",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 60,
+        "y": 73,
         "w": 24,
         "h": 1
       },
       "panels": []
     },
     {
-      "id": 39,
+      "id": 46,
       "type": "logs",
       "title": "Request Lookup",
       "description": "The gateway's record of each request: model, tokens, timings. Paste the X-Request-Id of a response into Request ID at the top; clear the box to list every request.",
@@ -2611,7 +2990,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 61,
+        "y": 74,
         "w": 24,
         "h": 9
       },
