@@ -28,7 +28,18 @@
           { targets = [ "localhost:9100" ];      labels = { host = "heimdall"; }; }
           { targets = [ "10.0.20.10:9100" ];     labels = { host = "hella"; }; }
           { targets = [ "10.0.20.6:9100" ];      labels = { host = "truenas"; }; }
+          { targets = [ "10.0.20.18:9100" ];     labels = { host = "mimir"; }; }
         ];
+      }
+      # === ai-gateway (ai-gateway.nix): requests, tokens, latency per model ===
+      {
+        job_name = "ai-gateway";
+        static_configs = [{ targets = [ "localhost:4000" ]; }];
+      }
+      # === mimir's GPU via nvidia-smi (hosts/mimir/modules/system/exporters.nix) ===
+      {
+        job_name = "nvidia-gpu";
+        static_configs = [{ targets = [ "10.0.20.18:9835" ]; labels = { host = "mimir"; }; }];
       }
       # === Postgres exporters ===
       {

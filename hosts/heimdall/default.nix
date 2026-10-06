@@ -32,6 +32,7 @@
     ./modules/system/obsidian.nix
     ./modules/system/huginn.nix
     ./modules/system/brain.nix
+    ./modules/system/ai-gateway.nix       # OpenAI-style front door for mimir's models + OpenRouter, with metrics
     ./modules/system/hlidskjalf.nix
     ./modules/system/newt.nix
     ./modules/system/amneziawg.nix

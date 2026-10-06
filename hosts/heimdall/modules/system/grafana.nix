@@ -43,6 +43,7 @@ let
     EOF
     cp ${./switch-dashboard.json} $out/dashboards-json/switch.json
     cp ${./pfsense-geomap-dashboard.json} $out/dashboards-json/pfsense-geomap.json
+    cp ${./ai-gateway-dashboard.json} $out/dashboards-json/ai-gateway.json
   '';
 in
 {
