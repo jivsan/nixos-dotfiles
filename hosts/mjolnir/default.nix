@@ -16,6 +16,7 @@
     ../../modules/apps/octane.nix
     ../../modules/system/backup.nix
     ../../modules/apps/vlc.nix
+    ../../modules/apps/gimp.nix
     ../../modules/apps/remote.nix
     ../../modules/apps/claude-code.nix
     ../../modules/apps/codex.nix
