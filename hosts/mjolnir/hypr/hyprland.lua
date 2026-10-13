@@ -12,9 +12,11 @@ hl.monitor({ output = "DP-1", mode = "preferred", position = "1920x0", scale = "
 ---------------------
 ---- MY PROGRAMS ----
 ---------------------
-local terminal    = "alacritty"
+-- See-through terminals like on tyr (0.86). The flag keeps it to this session:
+-- oxwm still gets the 0.94 from modules/home/terminal.nix.
+local terminal    = "alacritty -o window.opacity=0.86"
 local fileManager = "thunar"
-local menu        = "rofi -show drun -theme /home/christina/.config/hypr/rofi.rasi"
+local menu        = "rofi -show run -theme /home/christina/.config/hypr/rofi.rasi"   -- every command on PATH, like dmenu_run in oxwm
 
 
 -------------------------------
@@ -30,13 +32,19 @@ hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
 -------------------
 ---- AUTOSTART ----
 -------------------
+-- One eclipse per screen (drawn by hypr/wallpaper.sh), each growing out of
+-- its own centre: tyr's pink one on the main screen, the cyan twin on the left.
+local walls = "/home/christina/.config/hypr/"
+local grow  = " --transition-type grow --transition-pos 0.5,0.64 --transition-fps 60"
+
 hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
     hl.exec_cmd("hypridle")
     hl.exec_cmd(
-        "awww-daemon & sleep 1 && awww img /home/christina/.config/hypr/wall.png --transition-type grow --transition-pos 0.1,0.9 --transition-fps 60")
-    hl.exec_cmd("alacritty --class scratchpad", { workspace = "special:scratch", float = true, size = "60% 60%" })
+        "awww-daemon & sleep 1 && awww img -o DP-1 " .. walls .. "wall.png" .. grow ..
+        "; awww img -o HDMI-A-1 " .. walls .. "wall-cyan.png" .. grow)
+    hl.exec_cmd(terminal .. " --class scratchpad", { workspace = "special:scratch", float = true, size = "60% 60%" })
     -- no wayvnc here: this is a local GPU session, not the remote VM
 end)
 
@@ -44,22 +52,34 @@ end)
 ------------------------------------
 ---- LAYER BLUR (frosted glass!) ----
 ------------------------------------
-hl.layer_rule({ match = { namespace = "waybar" }, blur = true, ignore_alpha = 0.1 })
-hl.layer_rule({ match = { namespace = "rofi" }, blur = true })
-hl.layer_rule({ match = { namespace = "notifications" }, blur = true })
+-- ignore_alpha: only blur behind what is actually drawn. That keeps the bar's
+-- pink underlight (fainter than 0.6) and the rounded corners of the launcher
+-- and the notifications from getting a square frosted patch.
+hl.layer_rule({ match = { namespace = "waybar" }, blur = true, ignore_alpha = 0.6 })
+hl.layer_rule({ match = { namespace = "rofi" }, blur = true, ignore_alpha = 0.5 })
+hl.layer_rule({ match = { namespace = "notifications" }, blur = true, ignore_alpha = 0.5 })
 
 
 -----------------------
 ---- LOOK AND FEEL ----
 -----------------------
+-- tyr's neon rice (hosts/tyr/modules/home/rice), on a real GPU: pink round the
+-- window you work in, cyan round the rest, and real frosted glass behind it.
 hl.config({
     general = {
-        gaps_in          = 6,
-        gaps_out         = 16,
-        border_size      = 2,
+        gaps_in          = 6,   -- 12 between two windows, as on tyr
+        -- The first 14px under the bar belong to its pink underlight, so the
+        -- top gap is smaller: windows still start 18px below the bar.
+        gaps_out         = { top = 4, right = 16, bottom = 16, left = 16 },
+        border_size      = 3,
         col              = {
-            active_border   = { colors = { "rgba(2de2e6aa)", "rgba(7aa2f7aa)" }, angle = 45 },
-            inactive_border = "rgba(2a2e3a88)",
+            -- Pink, with a lighter glint in it that circles the border once
+            -- when a window opens (the borderangle animation below).
+            active_border   = {
+                colors = { "rgba(ff4fa3ff)", "rgba(ff4fa3ff)", "rgba(ffc9e3ff)", "rgba(ff4fa3ff)", "rgba(ff4fa3ff)" },
+                angle = 45,
+            },
+            inactive_border = "rgba(2a2e45ff)",
         },
         resize_on_border = true,
         allow_tearing    = false,
@@ -73,11 +93,15 @@ hl.config({
     decoration = {
         rounding         = 14,
         rounding_power   = 2,
-        active_opacity   = 0.96,
-        inactive_opacity = 0.86,
+        -- The focused window is solid, the others step back a little.
+        active_opacity   = 1.0,
+        inactive_opacity = 0.95,
         dim_inactive     = true,
-        dim_strength     = 0.1,
-        shadow           = { enabled = true, range = 24, render_power = 3, color = 0xaa000000, color_inactive = 0x55000000 },
+        dim_strength     = 0.08,
+        -- Neon glow: a centred, coloured shadow. Pink for the focused window,
+        -- a fainter cyan for the rest (0xAARRGGBB; two cyan glows meet in
+        -- every gap, so that one has to stay low).
+        shadow           = { enabled = true, range = 26, render_power = 3, color = 0xb3ff4fa3, color_inactive = 0x382de2e6 },
         -- Full eye-candy: the 4060 Ti eats this for breakfast.
         blur             = { enabled = true, size = 8, passes = 3, new_optimizations = true, ignore_opacity = true, xray = false, vibrancy = 0.18 },
     },
@@ -92,6 +116,11 @@ hl.animation({ leaf = "windows", enabled = true, speed = 6, bezier = "glassy" })
 hl.animation({ leaf = "windowsIn", enabled = true, speed = 6, bezier = "glassy", style = "popin 92%" })
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 5, bezier = "glassy", style = "popin 92%" })
 hl.animation({ leaf = "border", enabled = true, speed = 10, bezier = "smoothOut" })
+-- The glint in the pink border goes round once, over two seconds, when a
+-- window opens. "once", not "loop": a looping border keeps the GPU drawing
+-- all the time, and that card is also Octane's.
+hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
+hl.animation({ leaf = "borderangle", enabled = true, speed = 20, bezier = "linear", style = "once" })
 hl.animation({ leaf = "fade", enabled = true, speed = 8, bezier = "smoothOut" })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "glassy", style = "slidefade 15%" })
 

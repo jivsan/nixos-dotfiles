@@ -16,6 +16,9 @@ id_ed25519
 id_rsa
 cloudflare-dns-token
 
+# Claude Code: local settings and session data stay out of the repo
+.claude/
+
 # Editor / OS noise
 *.swp
 *.swo

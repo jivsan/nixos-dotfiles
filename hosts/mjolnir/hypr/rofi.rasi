@@ -1,59 +1,89 @@
-/* Frosted glass launcher — the rofi layer is blurred by hyprland.lua */
+/* mjolnir — tyr's neon rofi theme (hosts/tyr/modules/home/rice/rofi/neon.rasi).
+   Used by Super+D, Alt+Tab and the bar's power menu. On mjolnir the panel is
+   glass as well: hyprland.lua blurs what is behind it. */
+
 * {
-    bg:        rgba(26, 27, 38, 0.55);
-    bg-alt:    rgba(255, 255, 255, 0.05);
-    fg:        #c8d3f5;
-    fg-dim:    #6c7393;
-    accent:    #2de2e6;
-    accent2:   #ff4fa3;
+    bg:       #0b0d17e0;
+    bg-alt:   #1e2430d0;
+    fg:       #d8dee9;
+    dim:      #63637d;
+    pink:     #ff4fa3;
+    cyan:     #2de2e6;
+
+    font:             "JetBrainsMono Nerd Font 12";
     background-color: transparent;
-    text-color: @fg;
-    font: "JetBrainsMono Nerd Font 13";
+    text-color:       @fg;
 }
 
 window {
-    transparency: "real";
+    transparency:     "real";
+    width:            640px;
+    location:         center;
     background-color: @bg;
-    border: 1px;
-    border-color: rgba(255, 255, 255, 0.08);
-    border-radius: 18px;
-    width: 640px;
-    location: center;
-    padding: 0;
+    border:           2px;
+    border-color:     @pink;
+    border-radius:    16px;
+    padding:          18px;
 }
 
-mainbox { padding: 18px; spacing: 14px; }
+mainbox {
+    spacing:  14px;
+    children: [ inputbar, listview ];
+}
 
 inputbar {
     background-color: @bg-alt;
-    border-radius: 12px;
-    padding: 12px 16px;
-    spacing: 10px;
-    children: [ prompt, entry ];
+    border:           0 0 2px 0;
+    border-color:     @cyan;
+    border-radius:    10px;
+    padding:          10px 14px;
+    spacing:          12px;
+    children:         [ prompt, entry ];
 }
-prompt { text-color: @accent; }
-entry  { placeholder: "Search…"; placeholder-color: @fg-dim; }
+
+prompt {
+    text-color: @pink;
+}
+
+entry {
+    placeholder:       "type to search";
+    placeholder-color: @dim;
+    cursor:            text;
+}
 
 listview {
-    lines: 8;
-    columns: 1;
-    spacing: 4px;
-    scrollbar: false;
-    fixed-height: false;
+    lines:        8;
+    columns:      1;
+    spacing:      6px;
+    scrollbar:    false;
+    fixed-height: false;    /* short lists (the power menu) stay short */
 }
 
 element {
-    padding: 10px 14px;
+    padding:       8px 14px;
     border-radius: 10px;
-    spacing: 12px;
+    spacing:       12px;
 }
-element normal normal { background-color: transparent; text-color: @fg; }
-element alternate normal { background-color: transparent; text-color: @fg; }
-element selected normal {
-    background-color: @bg-alt;
-    text-color: @accent;
-    border: 0px 0px 0px 3px;
-    border-color: @accent2;
+
+element normal.normal,
+element alternate.normal {
+    background-color: transparent;
+    text-color:       @fg;
 }
-element-icon { size: 22px; vertical-align: 0.5; }
-element-text { vertical-align: 0.5; }
+
+element selected.normal {
+    background-color: @pink;
+    text-color:       #0b0d17;
+}
+
+element-icon {
+    background-color: transparent;
+    size:             22px;
+    vertical-align:   0.5;
+}
+
+element-text {
+    background-color: transparent;
+    text-color:       inherit;
+    vertical-align:   0.5;
+}

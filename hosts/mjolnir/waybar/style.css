@@ -1,106 +1,146 @@
+/* mjolnir — waybar in tyr's neon look (hosts/tyr/modules/home/rice/oxwm).
+ *
+ * A square bar across the screen. Every block has one colour and a line
+ * under it; workspace icons are pink (shown), cyan (has windows) or grey.
+ * Unlike tyr's bar this one is real glass: hyprland.lua blurs what is behind
+ * it. Saving this file restyles the running bar.
+ */
+
+@define-color bg     #0b0d17;
+@define-color fg     #d8dee9;
+@define-color dim    #63637d;
+@define-color pink   #ff4fa3;
+@define-color cyan   #2de2e6;
+@define-color purple #a277ff;
+@define-color yellow #ebcb8b;
+@define-color green  #7fdbca;
+
 * {
   font-family: "JetBrainsMono Nerd Font";
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11pt;
+  font-weight: bold;
   border: none;
   border-radius: 0;
   min-height: 0;
 }
 
-/* The bar itself: translucent so Hyprland's layer blur frosts it.
-   Keep the alpha < 1 or the blur has nothing to show through. */
+/* The window is 14px taller than the bar (config.jsonc). The bar is the box
+   inside it; the spare strip below it holds the pink underlight. */
 window#waybar {
-  background: rgba(26, 27, 38, 0.45);
-  color: #c8d3f5;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+  color: @fg;
+}
+window#waybar > box {
+  background: alpha(@bg, 0.86);
+  margin-bottom: 14px;
+  box-shadow: 0 1px 12px 0 alpha(@pink, 0.8);
 }
 
-/* module pills */
-#workspaces,
-#window,
+/* ── blocks: coloured text with a line under it ─────────────────────────── */
+#custom-kernel,
 #clock,
+#custom-agents,
+#pulseaudio,
 #cpu,
 #temperature,
 #memory,
+#custom-gpu,
+#custom-vram,
 #disk,
-#pulseaudio,
-#network,
-#tray {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 2px 12px;
-  margin: 4px 0;
-  transition: all 0.2s ease;
+#network {
+  margin: 3px 9px 2px;
+  padding: 0 1px 1px;
+  border-bottom: 2px solid;   /* takes the colour of the text */
 }
+
+#custom-kernel { color: @pink; margin-left: 12px; }
+
+#clock      { color: @cyan; }
+#clock.date { color: @purple; }
+
+#custom-agents { color: @cyan; }
+#pulseaudio    { color: @green; }
+#cpu           { color: @purple; }
+#temperature   { color: @yellow; }
+#memory        { color: @pink; }
+#custom-gpu    { color: @cyan; }
+#custom-vram   { color: @green; }
+#disk          { color: @yellow; }
+#network       { color: @purple; }
+
+/* warnings */
+#pulseaudio.muted      { color: @dim; }
+#network.disconnected  { color: @dim; }
+#temperature.critical,
+#custom-gpu.gpu-hot,
+#custom-vram.vram-high { color: @pink; }
 
 #cpu:hover,
 #temperature:hover,
 #memory:hover,
-#disk:hover,
-#pulseaudio:hover,
-#clock:hover {
-  background: rgba(255, 255, 255, 0.10);
+#custom-gpu:hover,
+#custom-vram:hover,
+#pulseaudio:hover {
+  background: alpha(@fg, 0.08);
 }
 
-#workspaces { padding: 2px 4px; }
+/* ── workspaces ─────────────────────────────────────────────────────────── */
+#workspaces { margin: 0 6px; }
 #workspaces button {
-  padding: 0 8px;
-  margin: 2px 2px;
-  color: #6c7393;
-  border-radius: 10px;
+  margin: 3px 2px 2px;
+  padding: 0 6px 1px;
+  color: @cyan;                       /* has windows */
+  border-bottom: 2px solid @cyan;
   background: transparent;
-  transition: all 0.2s ease;
+  box-shadow: none;
+  text-shadow: none;
 }
-#workspaces button.active {
-  color: #16161e;
-  background: linear-gradient(135deg, #2de2e6, #ff4fa3);
+#workspaces button.empty {
+  color: @dim;
+  border-bottom-color: transparent;
 }
-#workspaces button:hover {
-  color: #c8d3f5;
-  background: rgba(255, 255, 255, 0.08);
+/* the workspace on this screen while the other screen has the focus */
+#workspaces button.visible.hosting-monitor {
+  color: @pink;
+  border-bottom-color: alpha(@pink, 0.4);
 }
-
-#window { color: #828bb8; background: transparent; }
-
-#clock {
-  color: #2de2e6;
-  font-weight: 700;
-  padding: 2px 18px;
+/* the focused one (two classes, so it wins over the rule above) */
+#workspaces button.active.visible {
+  color: @pink;
+  border-bottom-color: @pink;
 }
+#workspaces button.urgent {
+  color: @yellow;
+  border-bottom-color: @yellow;
+}
+#workspaces button:hover { background: alpha(@pink, 0.14); }
 
-#cpu     { color: #c8d3f5; }
-#memory  { color: #c099ff; }
-#network { color: #82aaff; }
-#network.disconnected { color: #ff4fa3; }
-#tray    { background: transparent; }
-#custom-gpu { color: #8bffb0; }
-#custom-gpu.gpu-hot { color: #ff4fa3; }
-
-/* kernel badge — inverse gradient pill, mirrors the active workspace */
-#custom-kernel {
-  color: #16161e;
-  background: linear-gradient(135deg, #2de2e6, #ff4fa3);
-  font-weight: 700;
-  border-radius: 12px;
-  padding: 2px 14px;
-  margin: 4px 0;
+#window {
+  color: @fg;
+  margin: 0 12px;
 }
 
-#temperature          { color: #ffe08a; }
-#temperature.critical { color: #ff4fa3; }
-#disk                 { color: #7fdbca; }
-#pulseaudio           { color: #ffc777; }
-#pulseaudio.muted     { color: #6c7393; }
+/* ── tray, power, tooltips ──────────────────────────────────────────────── */
+#tray { margin: 0 8px; }
 
 #custom-power {
-  color: #ff4fa3;
-  border-radius: 12px;
-  padding: 2px 14px;
-  margin: 4px 0;
-  transition: all 0.2s ease;
+  color: @pink;
+  margin: 3px 10px 2px 4px;
+  padding: 0 7px 1px;
+  border-bottom: 2px solid transparent;
 }
 #custom-power:hover {
-  color: #16161e;
-  background: linear-gradient(135deg, #ff4fa3, #2de2e6);
+  color: @bg;
+  background: @pink;
+}
+
+tooltip {
+  background: alpha(@bg, 0.94);
+  border: 2px solid @pink;
+  border-radius: 10px;
+}
+tooltip label {
+  color: @fg;
+  font-weight: normal;
+  padding: 2px 4px;
 }

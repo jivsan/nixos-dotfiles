@@ -1,23 +1,28 @@
 {
   "layer": "top",
   "position": "top",
-  "height": 34,
-  "margin-top": 10,
-  "margin-left": 16,
-  "margin-right": 16,
-  "spacing": 10,
+  // tyr's bar: square, across the whole screen. The window is 14px taller
+  // than the bar you see: that strip holds the pink underlight (style.css),
+  // and hyprland.lua has a smaller top gap to make up for it.
+  "height": 42,
+  "spacing": 0,
   "reload_style_on_change": true,
 
   "modules-left": ["custom/kernel", "hyprland/workspaces", "hyprland/window"],
-  "modules-center": ["clock"],
-  "modules-right": ["pulseaudio", "cpu", "temperature", "memory", "custom/gpu", "disk", "network", "tray", "custom/power"],
+  "modules-center": ["clock#date", "clock"],
+  "modules-right": ["custom/agents", "pulseaudio", "cpu", "temperature", "memory", "custom/gpu", "custom/vram", "disk", "network", "tray", "custom/power"],
 
   "hyprland/workspaces": {
     "format": "{icon}",
+    // tyr's tags: terminal, code, agents, git, web, files, monitor, chat, misc
     "format-icons": {
-      "1": "", "2": "", "3": "", "4": "", "5": "",
-      "6": "", "7": "", "8": "", "9": "", "default": ""
+      "1": "", "2": "", "3": "󰚩", "4": "", "5": "",
+      "6": "", "7": "", "8": "", "9": "", "default": ""
     },
+    // All nine always shown on both screens, like oxwm's tags; empty ones are
+    // grey. (A plain number here would give each screen its own nine.)
+    "all-outputs": true,
+    "persistent-workspaces": { "*": [1, 2, 3, 4, 5, 6, 7, 8, 9] },
     "on-click": "activate"
   },
 
@@ -27,53 +32,74 @@
     "format": "{}"
   },
 
+  "clock#date": {
+    "format": " {:%a %d %b}",
+    "tooltip-format": "<tt>{calendar}</tt>",
+    "calendar": {
+      "format": {
+        "months":   "<span color='#ff4fa3'><b>{}</b></span>",
+        "weekdays": "<span color='#2de2e6'><b>{}</b></span>",
+        "today":    "<span color='#0b0d17' bgcolor='#ff4fa3'><b>{}</b></span>"
+      }
+    }
+  },
+
   "clock": {
-    "format": "{:%H:%M}",
-    "format-alt": "{:%a %d %b}",
-    "tooltip-format": "<tt>{calendar}</tt>"
+    "format": " {:%H:%M:%S}",
+    "interval": 1,
+    "tooltip": false
   },
 
   "custom/kernel": {
     "exec": "uname -r",
-    "format": "\udb84\udd05 {}",
+    "format": "󱄅 {}",
     "interval": "once",
     "tooltip": false
   },
 
-  "cpu":    { "format": "\udb80\udccb {usage}%", "interval": 2, "on-click": "alacritty -e btop" },
-  "memory": { "format": "\udb80\udf5b {percentage}%", "interval": 5, "on-click": "alacritty -e btop" },
+  // running agent sessions (claude, codex, hermes), as on tyr's bar
+  "custom/agents": {
+    "exec": "/home/christina/.config/waybar/agents.sh",
+    "return-type": "json",
+    "interval": 5,
+    "format": "󰚩 {}"
+  },
+
+  "cpu":    { "format": "󰃋 {usage}%", "interval": 2, "on-click": "alacritty -e btop" },
+  "memory": { "format": "󰍛 {percentage}%", "interval": 5, "on-click": "alacritty -e btop" },
 
   "temperature": {
     "hwmon-path-abs": "/sys/devices/pci0000:00/0000:00:18.3/hwmon",
     "input-filename": "temp1_input",
     "critical-threshold": 80,
-    "format": "{icon} {temperatureC}\u00b0C",
-    "format-icons": ["\uf2cb", "\uf2c9", "\uf2c7"],
+    "format": "{icon} {temperatureC}°C",
+    "format-icons": ["", "", ""],
     "interval": 2
   },
 
   "disk": {
     "path": "/",
-    "format": "\udb80\udeca {percentage_used}%",
+    "format": "󰋊 {percentage_used}%",
     "interval": 30,
     "tooltip-format": "{used} used / {total} ({free} free)"
   },
 
   "pulseaudio": {
     "format": "{icon} {volume}%",
-    "format-muted": "\udb81\udf5f",
-    "format-icons": { "default": ["\uf026", "\uf027", "\uf028"] },
+    "format-muted": "󰝟",
+    "format-icons": { "default": ["", "", ""] },
     "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
     "on-click-right": "easyeffects",
     "scroll-step": 5
   },
 
   "custom/power": {
-    "format": "\uf011",
+    "format": "",
     "tooltip": false,
     "on-click": "/home/christina/.config/waybar/power.sh"
   },
 
+  // GPU load and GPU memory: one script, two blocks
   "custom/gpu": {
     "exec": "/home/christina/.config/waybar/gpu.sh",
     "return-type": "json",
@@ -81,9 +107,17 @@
     "format": "{}",
     "on-click": "alacritty -e nvtop"
   },
+  "custom/vram": {
+    "exec": "/home/christina/.config/waybar/gpu.sh mem",
+    "return-type": "json",
+    "interval": 3,
+    "format": "{}",
+    "on-click": "alacritty -e nvtop"
+  },
+
   "network": {
-    "format-ethernet": "\udb83\udf18 {ipaddr}",
-    "format-disconnected": "\udb83\udf19",
+    "format-ethernet": "󰼘 {ipaddr}",
+    "format-disconnected": "󰼙",
     "tooltip-format": "{ifname}: {ipaddr}"
   },
   "tray": { "spacing": 10 }
