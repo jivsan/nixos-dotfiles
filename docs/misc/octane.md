@@ -68,8 +68,9 @@ addons with compiled modules (e.g. the AI ones) need a fresh download for 5.2.
 
 ## Render node on mimir (after the RTX 5070 Ti is in)
 
-mimir's driver is already the open 595 module (Blackwell needs ≥ R572). Deploy
-`#mimir`, then:
+Driver: the RTX 5070 Ti needs the open 595 module (Blackwell needs ≥ R572). Since
+2026-10-13 mimir runs the 580 legacy driver for the GTX 1070 that is still in it
+(see below). Deploy `#mimir`, then:
 
 ```sh
 scp ~/octane-src/OctaneRender_Studio+_2026_4_node_linux.zip christina@10.0.20.18:
@@ -77,8 +78,22 @@ ssh christina@10.0.20.18
 sudo octane-node-install ~/OctaneRender_Studio+_2026_4_node_linux.zip
 # optional, the OTOY way to pick port/GPUs (writes run_octane_daemon.sh):
 cd /opt/octane/node && octane-node-env ./install-daemon.sh        # port 48000
-sudo systemctl start octane-node && journalctl -fu octane-node
+octane-node-start          # or ~/start-render-node
 ```
+
+The node does not start at boot. `octane-node-start` checks the card, starts the
+service and shows the node's first log lines; `octane-node-stop` (or
+`~/stop-render-node`) stops it and waits for the license logout.
+
+Without `install-daemon.sh` the service starts the daemon itself, the way that
+script would: `octane_node_daemon --port 48000 --slave /opt/octane/node/octane_node
+--alias mimir --out-of-core 16g`. The out-of-core amount (`outOfCoreGb` in
+`octane-node.nix`) matters: a node has to hold the whole scene on its own card,
+and OTOY's default for a node is out-of-core off.
+
+The GPU in the node needs a driver that knows it. The repo has the open 595
+module for the RTX 5070 Ti; a GTX 1070 (Pascal) has no driver under it and needs
+`open = false` + `nvidiaPackages.legacy_580` in `hosts/mimir/modules/system/nvidia.nix`.
 
 The service runs as `christina` so the node finds the OTOY sign-in in
 `~/.OctaneRender`. If the node asks for a sign-in and the journal shows no way
@@ -95,15 +110,17 @@ Then on mjolnir, OctaneServer ▸ Network preferences: enable network rendering,
 daemon port 48000, add `10.0.20.18` to the daemon list. The master port 1047 and
 48000 are open on mjolnir (`modules/system/networking.nix`); 48000 is open on mimir.
 
-Stop/update the node: `sudo systemctl stop octane-node` (SIGTERM, waits) —
-`octane-node-install` does this itself.
+Stop/update the node: `octane-node-stop` — `octane-node-install` does this
+itself. Stopping sends SIGTERM to `octane_node` first and waits for its license
+logout, then to the daemon. A plain signal to the service's main process would
+only hit the FHS wrapper, which dies and takes Octane with it by SIGKILL.
 
 ## Unverified (needs the real packages, which need the OTOY login)
 
-- Exact file names inside the Linux node zip. The service runs
-  `run_octane_daemon.sh` if `install-daemon.sh` was used, else `octane_daemon
-  --daemon-port 48000`. If the daemon binary is named differently, fix
-  `daemon-start` in `octane-node.nix`.
+- (Checked 2026-10-13 against the 2026.4 node zip: it holds `install-daemon.sh`,
+  `octane_node_daemon`, `octane_node`, `octane.dat`, `libsenseEIV.so`; the service
+  uses those names. Whether the daemon then starts and is seen by mjolnir is
+  still untested.)
 - Whether the 31.10 addon zip is a legacy addon or an extension; `octane-install`
   handles both and links it into the right Blender directory.
 - How a headless node signs in. The Standalone-over-`ssh -X` path above is the

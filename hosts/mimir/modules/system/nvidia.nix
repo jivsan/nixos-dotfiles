@@ -8,9 +8,12 @@
 
   hardware.nvidia = {
     modesetting.enable = true;
-    open = true;
+    # GTX 1070 (Pascal) until the RTX 5070 Ti is in: the open module and the 595
+    # branch have no driver for it, the 580 legacy branch does. For the 5070 Ti:
+    #   open = true;  package = config.boot.kernelPackages.nvidiaPackages.stable;
+    open = false;
     nvidiaSettings = false; # headless — no settings GUI
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
   };
 
   # Userspace GL/compute libraries (CUDA + containers need these)
