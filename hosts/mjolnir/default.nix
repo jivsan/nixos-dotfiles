@@ -52,4 +52,8 @@
   # See: nixos/modules/programs/ssh.nix (systemd-ssh-proxy.enable)
   programs.ssh.systemd-ssh-proxy.enable = false;
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
+
+  # ixgbe X540 + AMD IOMMU: an IO_PAGE_FAULT then tx hangs on enp10s0f1 froze mjolnir
+  # under sustained NFS load (2026-10-16). Passthrough: host devices DMA directly, no VMs here.
+  boot.kernelParams = [ "iommu=pt" ];
 }
