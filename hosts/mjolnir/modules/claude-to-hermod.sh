@@ -62,8 +62,9 @@ line was written for Claude Code on mjolnir; read it with these differences:
   the body with `todo:` or `jev:` (that turns it into a request).
 - Blender: the `blender` MCP server runs on mjolnir over SSH and drives the Blender Lab
   MCP extension there. Blender must be open on mjolnir, or its tools fail.
-- Your skills include `claude-memory`: Claude's notes from its sessions with Christina.
-  Load it before Blender or fleet work.
+- The `claude-memory` skill is loaded in every session: its index lists Claude's notes from
+  its sessions with Christina. Before Blender, character, scene or fleet work, read the
+  notes whose lines match the task.
 
 ---
 

@@ -38,6 +38,9 @@ in
     # context, copied from mjolnir by `claude-to-hermod`. Not in this repo: it is
     # public. The context lands in the workspace as AGENTS.md.
     settings.skills.external_dirs = [ "/var/lib/hermes/claude/skills" ];
+    # The index of Claude's notes (about 26 KB) is in every session, CLI, API and
+    # cron alike, so she never has to ask for it; the notes are read on demand.
+    settings.skills.auto_load = [ "claude-memory" ];
     # With the Codex login hermes picks OpenAI's native web search as its one web
     # backend, and that backend can only search: every web_extract failed. Pages
     # are read through Firecrawl's public tier instead, which needs no key; when
