@@ -6,7 +6,7 @@
 -- names, and switch to the explicit lines below to match your oxwm layout.
 -- hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "1" })
 hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "0x0", scale = "1" })
-hl.monitor({ output = "DP-1", mode = "preferred", position = "1920x0", scale = "1" })
+hl.monitor({ output = "DP-1", mode = "2560x1440@120", position = "1920x0", scale = "1" })   -- 120 Hz, as in oxwm (modules/system/desktop.nix)
 
 
 ---------------------

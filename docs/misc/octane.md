@@ -110,6 +110,22 @@ Then on mjolnir, OctaneServer ▸ Network preferences: enable network rendering,
 daemon port 48000, add `10.0.20.18` to the daemon list. The master port 1047 and
 48000 are open on mjolnir (`modules/system/networking.nix`); 48000 is open on mimir.
 
+How the two find each other (measured 2026-10-13 with tcpdump on mimir):
+OctaneServer sends a UDP broadcast to `10.0.20.255:48000` every 5 s. The daemon
+answers by opening a TCP connection back to mjolnir on a port OctaneServer picks
+by itself (seen: 1025, 1026, 1027, a new one after each firewall reload). Then
+the daemon starts `octane_node`, which connects to mjolnir on 1047 **and** 1048.
+A fixed port list on mjolnir therefore does not hold: `networking.nix` lets
+mimir (`10.0.20.18`) in on TCP whatever the port. Symptom without it: the node
+runs, is signed in and answers, but "Active network daemons" stays empty.
+
+First sign-in on the node: the daemon's first call of `octane_node` asks for the
+OTOY username and password on its terminal. As a service it has none ("Could not
+activate"), so run the daemon once in a terminal, inside the FHS env:
+`octane-node-env -c 'cd /opt/octane/node && LD_LIBRARY_PATH=/opt/octane/node:/opt/octane/node/lib ./run_octane_daemon.sh'`
+(`run_octane_daemon.sh` comes from `install-daemon.sh`; OTOY's programs never
+run bare on NixOS). `octane_node --info gpus` does not ask for a sign-in.
+
 Stop/update the node: `octane-node-stop` — `octane-node-install` does this
 itself. Stopping sends SIGTERM to `octane_node` first and waits for its license
 logout, then to the daemon. A plain signal to the service's main process would

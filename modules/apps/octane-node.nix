@@ -278,8 +278,9 @@ in
     };
   };
 
-  # mjolnir reaches the daemon on this port; the node connects back to the
-  # primary's master port (1047, already open on mjolnir in networking.nix).
+  # mjolnir reaches the daemon on this port (UDP broadcast). The daemon answers by
+  # TCP to a port OctaneServer picks itself, and the node then connects to the
+  # primary's 1047 and 1048: mjolnir's networking.nix lets this host in on TCP.
   networking.firewall.allowedTCPPorts = [ daemonPort ];
   networking.firewall.allowedUDPPorts = [ daemonPort ];
 
