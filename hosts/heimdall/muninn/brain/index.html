@@ -879,10 +879,10 @@
     <div class="usegrid" id="usegrid"><div class="ghost">connecting…</div></div>
   </section>
 
-  <!-- ── hermes: a direct line to the agent on hermod, no router ── -->
+  <!-- ── hermes: a direct line to the agent on yggdrasil, no router ── -->
   <section class="view" id="view-hermes">
     <div class="panel hchat">
-      <div class="phead"><div class="bar"></div><div class="tt"><i>⌬</i> Hermes — hermod · 10.0.20.21</div>
+      <div class="phead"><div class="bar"></div><div class="tt"><i>⌬</i> Hermes — yggdrasil · 10.0.20.21</div>
         <button class="tbtn" id="h-new" title="start a fresh conversation">new chat</button></div>
       <div class="msgs scroll" id="hmsgs" style="flex:1; min-height:0;"><div class="ghost">say something to hermes…</div></div>
       <div class="hrow">
@@ -1102,7 +1102,7 @@ const TITLES = {
   skills:  ['Skills',  'Every domain has tasks; repeat tasks become skills; reliable skills become automations.'],
   usage:   ['Usage',   'How much of each subscription is spent: the 5-hour and the weekly window.'],
   systems: ['Systems', 'Agent health, digests, and the vault audit trail.'],
-  hermes:  ['Hermes',  'A direct line to the hermes agent on hermod — no router, no job queue.'],
+  hermes:  ['Hermes',  'A direct line to the hermes agent on yggdrasil — no router, no job queue.'],
 };
 let curView = 'memory';
 function show(v) {
@@ -2608,7 +2608,7 @@ const NODES = {
   jev:      { x:770,  y:95,  w:160, name:'jev', sub:'router · openrouter', desc:'A tiny classifier that reads each request and picks command / answer / agent with confidence scores, in a few hundred ms.' },
   minimax:  { x:770,  y:215, w:170, name:'minimax', sub:'floor model · openrouter', desc:'The always-on fallback: answers when no subscription is reachable, and titles every agent report for filing.' },
   answers:  { x:770,  y:390, w:186, name:'codex + claude', sub:'answer tiers · heimdall clis', desc:'Light answers from GPT (Codex subscription), deep analysis from Opus (Claude subscription). Codex also runs the local agent tier, sandboxed to the vault.' },
-  hermes:   { x:1005, y:120, w:160, name:'hermes', sub:'hermod · :8642', desc:'Tool-using agent on its own VM: web research, investigations, deliverables the bridge files as reports.' },
+  hermes:   { x:1005, y:120, w:160, name:'hermes', sub:'yggdrasil · :8642', desc:'Tool-using agent on its own mini PC: web research, investigations, deliverables the bridge files as reports.' },
   voice:    { x:1005, y:300, w:176, name:'whisper + kokoro', sub:'mimir · :8000', desc:'Ears and mouth: faster-whisper speech-to-text and Kokoro text-to-speech on the AI box.' },
   embed:    { x:1005, y:400, w:176, name:'qwen3-embed', sub:'mimir · :8081/:8082', desc:'Qwen3-Embedding-4B: one vector per note (the embedder, :8081) and one per question (the bridge, :8082) — meaning-based search and note placement for the whole vault.' },
   vault:    { x:540,  y:530, w:170, name:'vault', sub:'odyn · zfs over nfs', desc:'The Obsidian vault — everything the OS remembers. Lives on the TrueNAS, mounted into heimdall.' },
@@ -2633,7 +2633,7 @@ const LANES = [
   { x:40,  y:60,  w:160, h:480, t:'mjolnir · you' },
   { x:240, y:60,  w:400, h:480, t:'heimdall · the brain' },
   { x:680, y:40,  w:210, h:430, t:'cloud + subscriptions' },
-  { x:915, y:60,  w:180, h:150, t:'hermod' },
+  { x:915, y:60,  w:180, h:150, t:'yggdrasil' },
   { x:915, y:240, w:180, h:240, t:'mimir' },
   { x:440, y:480, w:520, h:110, t:'odyn · storage' },
 ];

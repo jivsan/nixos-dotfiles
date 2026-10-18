@@ -2,7 +2,7 @@
 
 # odyn dataset vault/hermes-wowx (NFS share 13, every client mapped to the NAS user
 # christina, uid 3002): WoW models exported by wowx and their Upscayl upscales. Mounted
-# at the same path on mjolnir, where wowx and Upscayl run, and on hermod, where hermes
+# at the same path on mjolnir, where wowx and Upscayl run, and on yggdrasil, where hermes
 # reads and writes them, so a path one of them reports works on the other.
 {
   fileSystems."/mnt/hermes-wowx" = {

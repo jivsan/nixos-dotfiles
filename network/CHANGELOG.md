@@ -5,6 +5,39 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-10-18 — yggdrasil on Et12; admin key now mjolnir's; config file synced
+
+**Why:** yggdrasil (Lenovo ThinkCentre M93p) is the new always-on box outside hella that
+runs hermes, on `10.0.20.21`. It needs one untagged VLAN 20 port and nothing else.
+
+**Et12** was unused (default VLAN 1, no config). Now access VLAN 20 with portfast, so the
+NixOS installer got DHCP at once. Link is 1G (onboard Intel I217-LM).
+
+**Switch login:** Nexterm was removed from the fleet the same day; its key on `admin` was
+replaced with mjolnir's (`username admin ssh-key ...`, then `write memory`), so changes
+can be made from mjolnir with key login.
+
+**Config file synced** with the running config, which had drifted from this repo:
+Port-Channel2 is gone (odyn now uses Et4 alone as a trunk, native 20 + 30 tagged), Et5
+(odyn's second port, 1G only) is shut down, and Et10 / Et11 are the hella and odyn
+management ports (access VLAN 20). Dates of those older changes are not known.
+
+### Commands applied (EOS)
+```
+enable
+configure
+interface Ethernet12
+   description yggdrasil
+   switchport mode access
+   switchport access vlan 20
+   spanning-tree portfast
+   no shutdown
+end
+write memory
+```
+
+---
+
 ## 2026-07-01 — mimir on a single NIC: Et6 access VLAN 20 (unbundle Po3)
 
 **Why:** mimir (the new NixOS AI box) shipped with a single onboard 10GbE NIC —

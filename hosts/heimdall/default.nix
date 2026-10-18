@@ -58,8 +58,9 @@
 
   users.users.christina.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJzbgLEOUP00lHJUp6MYDOm2kDyHjr9khWaGc84YnpXL mimir"
+    # christina on yggdrasil (key made on hermod and carried over with it)
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqRu0/cwcMKm5+Rxm8jx8GfpaqCtPieqGaxetVH8Prj hermod"
-    # hermes on hermod (gateway and CLI): this key only starts the graphify MCP
+    # hermes on yggdrasil (gateway and CLI): this key only starts the graphify MCP
     # servers, so the gateway gets graph tools without a shell on heimdall.
     ''restrict,command="${pkgs.writeShellScript "graphify-mcp-only" ''
       for g in vault dotfiles; do

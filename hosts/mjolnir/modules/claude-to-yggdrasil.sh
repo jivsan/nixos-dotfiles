@@ -1,6 +1,6 @@
 # Copies Claude Code's skills, memory notes and homelab context from mjolnir to
-# hermod, where hermes reads them from /var/lib/hermes/claude (see
-# hosts/hermod/modules/system/hermes-agent.nix). Kept out of git: the repo is public.
+# yggdrasil, where hermes reads them from /var/lib/hermes/claude (see
+# hosts/yggdrasil/modules/system/hermes-agent.nix). Kept out of git: the repo is public.
 # Run it again after Claude's skills or notes change.
 set -euo pipefail
 
@@ -41,15 +41,15 @@ EOF
   grep '^- \[' "$mem/MEMORY.md" | sed -E 's/\]\(([^)]+\.md)\)/](references\/\1)/'
 } > "$m/SKILL.md"
 
-# Homelab context, with what differs on hermod first.
+# Homelab context, with what differs on yggdrasil first.
 {
   cat <<'EOF'
-# Context for hermes on hermod
+# Context for hermes on yggdrasil
 
-Copied from Claude Code's context on mjolnir by `claude-to-hermod`. The part after the
+Copied from Claude Code's context on mjolnir by `claude-to-yggdrasil`. The part after the
 line was written for Claude Code on mjolnir; read it with these differences:
 
-- You run on hermod (10.0.20.21) as the user hermes, not on mjolnir; the gateway and
+- You run on yggdrasil (10.0.20.21, an always-on mini PC) as the user hermes, not on mjolnir; the gateway and
   Christina's `hermes` CLI both do. The vault is at /mnt/muninn (not ~/muninn).
   Read /mnt/muninn/CLAUDE.md first: it holds the vault conventions.
 - Query the vault and the nixos-dotfiles repo with the graphify-vault and
@@ -76,7 +76,7 @@ EOF
   cat "$HOME/.claude/CLAUDE.md"
 } > "$stage/AGENTS.md"
 
-# hermod has no rsync: unpack into a fresh folder, then swap it in.
+# Unpack into a fresh folder, then swap it in, so hermes never sees a half-copied tree.
 tar -C "$stage" -cf - skills AGENTS.md | ssh -o BatchMode=yes "$host" "
   set -e
   umask 007
@@ -88,4 +88,4 @@ tar -C "$stage" -cf - skills AGENTS.md | ssh -o BatchMode=yes "$host" "
   cp $dest/.incoming/AGENTS.md /var/lib/hermes/workspace/AGENTS.md
   rm -rf $dest/.incoming
 "
-echo "copied $(find "$stage/skills" -maxdepth 1 -mindepth 1 | wc -l) skills ($(find "$m/references" -name '*.md' | wc -l) memory notes in claude-memory) and AGENTS.md to hermod"
+echo "copied $(find "$stage/skills" -maxdepth 1 -mindepth 1 | wc -l) skills ($(find "$m/references" -name '*.md' | wc -l) memory notes in claude-memory) and AGENTS.md to yggdrasil"

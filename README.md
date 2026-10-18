@@ -1,129 +1,151 @@
 # nixos-dotfiles
 
-Declarative [NixOS](https://nixos.org) configuration for all my machines — one flake, one
-source of truth. A Ryzen/RTX workstation plus self-hosted services on Proxmox, all sitting
-on a VLAN-segmented homelab network behind an Arista core switch.
+this is the nixos config for all my machines. one flake, one source of truth, everything declarative :3
+a ryzen workstation with an rtx card, a little lenovo mini pc that runs my agents and a bunch of self hosted
+stuff on proxmox, all on my own vlans behind an arista switch.
 
-**NixOS 26.05 (Yarara)** · flakes + [home-manager](https://github.com/nix-community/home-manager) · `git user: jivsan`
+**NixOS 26.05 (Yarara)** · flakes + [home-manager](https://github.com/nix-community/home-manager) · git user `jivsan`
 
-## Hosts
+## how i work on this
 
-All hosts sit on VLAN 20 (`10.0.20.0/24`); the VMs run on `hella` (Proxmox).
+i only ever edit on `mjolnir`. i commit there and push, and every other machine just does `git pull origin main`.
+they also pull by themselves every two minutes, but they never rebuild on their own, so a change goes from
+mjolnir to github to the host and then i rebuild on that host.
 
-| Host           | IP            | Role                                            | Desktop                                   |
-|----------------|---------------|-------------------------------------------------|-------------------------------------------|
-| `mjolnir`      | `10.0.20.100` | Workstation / daily driver (5900X, RTX 4060 Ti) | oxwm (X11, default) **+** Hyprland — pick at `ly` |
-| `heimdall`     | `10.0.20.17`  | Headless self-hosted services VM — Traefik, Immich, Paperless, Vaultwarden, Grafana, huginn | — |
-| `mimir`        | `10.0.20.18`  | Headless AI box (5950X, GTX 1070 — RTX 5070 Ti pending) — ComfyUI, Immich-ML | — |
-| `tyr`          | `10.0.20.19`  | Agent workstation VM — Claude Code, Codex, herdr, linked to the muninn vault; minimal otherwise | neon-riced oxwm over xrdp — connect from `mjolnir` with Remmina |
-| `njord`        | `10.0.20.20`  | Headless finance VM — [Sure](https://github.com/we-promise/sure), isolated from the rest of the fleet | — |
-| `hermod`       | `10.0.20.21`  | Headless Hermes Agent VM — minimal sandbox for the agent, linked to the muninn vault | — |
+## hosts
 
-> These are the **NixOS** hosts in this flake. The homelab also runs non-NixOS
-> infrastructure — the Arista switch, pfSense, TrueNAS, a Pi-hole LXC — described in the
-> network section below.
+everything sits on vlan 20 (`10.0.20.0/24`). heimdall, tyr and njord are vms on `hella` (proxmox). yggdrasil is its
+own little box, so my agents keep running even when hella is down.
 
-## Homelab network
+| host        | ip            | what it does                                                                   | desktop                                                 |
+|-------------|---------------|--------------------------------------------------------------------------------|---------------------------------------------------------|
+| `mjolnir`   | `10.0.20.100` | my workstation and daily driver (5900X, RTX 4060 Ti)                           | oxwm on X11 by default and Hyprland too, picked in `ly` |
+| `heimdall`  | `10.0.20.17`  | headless services vm with traefik, immich, paperless, vaultwarden, grafana and huginn | none                                             |
+| `mimir`     | `10.0.20.18`  | headless ai box (5950X, GTX 1070 until the RTX 5070 Ti is in) with comfyui and immich ml | none                                          |
+| `tyr`       | `10.0.20.19`  | agent workstation vm with claude code, codex and herdr, linked to the muninn vault | neon oxwm over xrdp, i connect from `mjolnir` with remmina |
+| `njord`     | `10.0.20.20`  | headless finance vm running [sure](https://github.com/we-promise/sure), walled off from everything else | none                    |
+| `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets | none |
 
-The network is built around an **Arista DCS-7050TX-48** core switch named `bifrost`
-(Norse: the bridge between the realms — fitting for a switch). It runs Arista EOS, not
-NixOS, so it isn't a flake host; its config lives in [`network/`](network/).
+> these are only the nixos hosts. the switch, pfsense, truenas and a pihole lxc aren't nixos, they're in the
+> network part below.
 
-pfSense does the routing on a stick, the Arista is a pure L2 core, and VLANs separate
-trusted gear from IoT, with a private storage VLAN that never touches the router.
+## homelab network
 
-| VLAN | Name      | Subnet         | What's on it                                   |
-|------|-----------|----------------|------------------------------------------------|
-| 20   | trusted   | `10.0.20.0/24` | workstation, Proxmox host, NAS, services       |
-| 30   | storage   | `10.0.30.0/24` | private NAS fast-path (L2-only, no gateway)    |
-| 50   | iot-wifi  | `10.0.50.0/24` | Wi-Fi, ESP32 / Shelly, Home Assistant          |
+the network is built around an **Arista DCS-7050TX-48** called `bifrost`, the norse bridge between the realms,
+which felt right for a switch. it runs arista eos and not nixos, so it isn't a flake host. its config lives in
+[`network/`](network/).
 
-- **Gateways / DNS** — pfSense is `.1` on VLAN 20 and 50 and does all inter-VLAN routing.
-  DNS chains **client → pfSense → Pi-hole (`10.0.20.4`, LXC on `hella`) → unbound → roots**,
-  so ad-blocking sits in the path for every client.
-- **Isolation** — IoT (VLAN 50) reaches DNS + the internet but is firewalled off every
-  private subnet; trusted reaches everything (incl. Home Assistant) via pfSense's stateful
-  return path, so the block is one-directional.
+pfsense does the routing on a stick, the arista is a plain layer 2 core, and vlans keep my trusted stuff away from
+iot. storage gets its own private vlan that never touches the router.
 
-**Switch port map:**
+| vlan | name     | subnet         | what's on it                                        |
+|------|----------|----------------|-----------------------------------------------------|
+| 20   | trusted  | `10.0.20.0/24` | workstation, proxmox, nas, services and yggdrasil   |
+| 30   | storage  | `10.0.30.0/24` | private fast path to the nas, layer 2 only with no gateway |
+| 50   | iot-wifi | `10.0.50.0/24` | wifi, esp32 and shelly stuff, home assistant        |
 
-| Port  | Device                       | Mode                          |
-|-------|------------------------------|-------------------------------|
-| Et1   | pfSense                      | trunk (native 20, +50 tagged) |
-| Et2–3 | `hella` (Proxmox)            | LACP `Po1`, trunk 20+50       |
-| Et4–5 | `odyn` (TrueNAS)             | LACP `Po2`, trunk 20+30       |
-| Et6   | `mimir` (NixOS AI)           | access, VLAN 20 (single 10G)  |
-| Et7   | *spare* (future mimir 2nd NIC) | shutdown                    |
-| Et8   | `mjolnir`                    | access, VLAN 20 (10G)         |
-| Et9   | TP-Link (IoT/Wi-Fi switch)   | access, VLAN 50               |
-| Et10  | `hella` onboard (management) | access, VLAN 20               |
+pfsense is `.1` on vlan 20 and 50 and does all the routing between vlans. dns goes client → pfsense → pihole
+(`10.0.20.4`, an lxc on `hella`) → unbound → the root servers, so ad blocking is in the path for everyone.
 
-Management: switch at `10.0.20.2` (SSH/EOS), pfSense at `10.0.20.1`, Proxmox/`hella` at
+iot on vlan 50 gets dns and the internet but is firewalled off from every private subnet. trusted can reach
+everything, home assistant too, through pfsense's stateful return path, so the block only goes one way.
+
+**switch ports**
+
+| port        | device                           | mode                                |
+|-------------|----------------------------------|-------------------------------------|
+| Et1         | pfsense                          | trunk, native 20 with 50 tagged     |
+| Et2 and Et3 | `hella` (proxmox)                | lacp `Po1`, trunk 20 and 50         |
+| Et4         | `odyn` (truenas)                 | trunk, native 20 with 30 tagged     |
+| Et5         | `odyn` second port               | shut down, that port only does 1G   |
+| Et6         | `mimir`                          | access vlan 20, single 10G          |
+| Et7         | spare for a second mimir nic     | shut down                           |
+| Et8         | `mjolnir`                        | access vlan 20, 10G                 |
+| Et9         | tp link switch for iot and wifi  | access vlan 50                      |
+| Et10        | `hella` onboard management       | access vlan 20                      |
+| Et11        | `odyn` management                | access vlan 20                      |
+| Et12        | `yggdrasil`                      | access vlan 20                      |
+
+the switch is at `10.0.20.2` (ssh, eos), pfsense at `10.0.20.1` and proxmox on `hella` at
 `https://10.0.20.10:8006`.
 
-## Quick start
+## quick start
 
 ```bash
 git clone https://github.com/jivsan/nixos-dotfiles ~/nixos-dotfiles
 cd ~/nixos-dotfiles
 
-# build a host
-sudo nixos-rebuild switch --flake .#mjolnir      # or #heimdall
+# build the host you're on
+sudo nixos-rebuild switch --flake .#mjolnir      # or #heimdall, #yggdrasil ...
+
+# push yggdrasil straight from mjolnir (it builds here, the mini pc only switches)
+nixos-rebuild switch --flake .#yggdrasil --target-host christina@10.0.20.21 --sudo
 
 # after changing flake inputs
 nix flake lock
 ```
 
-Rebuilds are non-destructive — roll back with `sudo nixos-rebuild switch --rollback` or
-pick an older generation at boot.
+rebuilds don't break anything. if something goes wrong i roll back with `sudo nixos-rebuild switch --rollback`
+or just pick an older generation at boot.
 
-## What's in here
+## what's in here
 
 ```
-flake.nix            # entry point: inputs + mkHost + the hosts
-configuration.nix    # mjolnir's umbrella (imports shared system modules)
+flake.nix            # the entry point with the inputs, mkHost and all the hosts
+configuration.nix    # mjolnir's umbrella that imports the shared system modules
 home.nix             # shared home-manager imports
-hosts/               # per-host config (default.nix, home.nix, hardware, host-local modules)
-modules/system/      # shared OS modules (boot, networking, nix, users, hyprland, …)
-modules/home/        # shared home modules (git, neovim, shell, terminal, …)
-modules/apps/        # workstation app bundles (blender, octane, gaming, nvidia, …)  — Octane runbook: docs/misc/octane.md
-config/              # program configs / suckless sources (nvim, rofi, dwm, st, …)
-network/             # homelab network: Arista EOS config + pfSense runbook (not NixOS)
+hosts/               # one folder per host (default.nix, home.nix, hardware and host only modules)
+modules/system/      # shared os modules (boot, networking, nix, users, hyprland …)
+modules/home/        # shared home modules (git, neovim, shell, terminal …)
+modules/apps/        # workstation app bundles (blender, octane, gaming, nvidia …), octane runbook in docs/misc/octane.md
+config/              # program configs and suckless sources (nvim, rofi, dwm, st …)
+network/             # the homelab network, arista eos config and pfsense runbook (not nixos)
 docs/                # documentation
 ```
 
-`mjolnir` pulls in everything via `configuration.nix`; the headless VM cherry-picks only
-the shared modules it needs. Full breakdown in [`docs/nixos-structure.md`](docs/nixos-structure.md).
+`mjolnir` pulls in everything through `configuration.nix`, the headless hosts only pick the shared modules they
+need. the full breakdown is in [`docs/nixos-structure.md`](docs/nixos-structure.md).
 
-## Highlights
+## highlights
 
-- **Dual desktop on the workstation** — oxwm (X11) and Hyprland (Wayland) coexist as
-  selectable `ly` sessions, fully isolated; switching has no side effects.
-- **Hyprland in Lua** (0.55), frosted-glass Tokyo Night theme, live-editable configs via
-  out-of-store symlinks (edit → hot-reload, no rebuild).
-- **Bleeding-edge GPU stack on `mjolnir`** — it takes `boot.kernelPackages` (and therefore
-  the NVIDIA driver) from `nixpkgs-unstable` rather than the pinned 26.05, because 26.05's
-  595.x driver no longer builds against kernel 7.2. Currently 7.2.5 + `nvidia-open` 610.x.
-  Everything else on the host still comes from 26.05.
-- **Self-hosted stack** on `heimdall` — Immich, Paperless, Vaultwarden, Crafty, behind
-  Traefik with a Prometheus/Loki/Grafana monitoring setup.
-- **[muninn](docs/muninn-agentic-os.md), an agentic OS** — an Obsidian vault on `odyn` as
-  shared memory for humans and headless Claude Code agents (`huginn`), with the config repo
-  rendered as a queryable knowledge graph and a live 3D `brain` frontend. Runs entirely on
-  `heimdall`; the workstation is just a consumer.
-- **Blast-radius isolation for financial data** — Sure runs on its own VM (`njord`) with
-  nftables accepting `:3000` from heimdall's Traefik only, rather than sharing the
-  services box.
-- **VLAN-segmented network** behind the `bifrost` Arista core — trusted / storage / IoT
-  separation, pfSense router-on-a-stick, Pi-hole DNS, IoT firewalled off the trusted side.
-- Reproducible end to end — deploy a whole machine from a fresh install with one command.
+**two desktops on the workstation.** oxwm (X11) and Hyprland (Wayland) live side by side as `ly` sessions, fully
+separate, and switching between them has no side effects.
 
-## Docs
+**Hyprland in lua** (0.55) riced in the same neon look as tyr. the configs are out of store symlinks, so i edit
+and it hot reloads without a rebuild.
 
-- [`docs/nixos-structure.md`](docs/nixos-structure.md) — repository structure & how hosts are assembled
-- [`docs/deploying-services.md`](docs/deploying-services.md) — adding/deploying self-hosted services
-- [`docs/deploy-new-host.md`](docs/deploy-new-host.md) — bringing a brand-new host into the flake
-- [`docs/heimdall-docs.md`](docs/heimdall-docs.md) — the services VM in detail
-- [`docs/muninn-agentic-os.md`](docs/muninn-agentic-os.md) — the vault, the agents, and the knowledge graph
-- [`network/bifrost-arista-core.cfg`](network/bifrost-arista-core.cfg) — Arista EOS core switch config
-- [`network/CHANGELOG.md`](network/CHANGELOG.md) — network change history
+**bleeding edge gpu stack on `mjolnir`.** it takes `boot.kernelPackages`, and with it the nvidia driver, from
+`nixpkgs-unstable` instead of the pinned 26.05, because the 595 driver in 26.05 doesn't build against kernel 7.2
+anymore. right now that's kernel 7.2 with `nvidia-open` 610. everything else on the host still comes from 26.05.
+
+**self hosted stack on `heimdall`** with immich, paperless, vaultwarden and crafty behind traefik, watched by
+prometheus, loki and grafana.
+
+**[muninn](docs/muninn-agentic-os.md), my agentic os.** an obsidian vault on `odyn` is shared memory for me and my
+agents. huginn's agents tidy and file the vault on `heimdall`, the config repo is a knowledge graph they can query,
+and the `brain` page shows it all live in 3d.
+
+**yggdrasil, the world tree.** a tiny thinkcentre that's always on and sits outside hella, so hermes keeps going
+even when proxmox is down. hermes is the agent i talk to, with tools into the vault and the dotfiles graph, blender
+on mjolnir and wowx for game assets, which it exports and upscales on a shared folder on the nas. the install
+script is in `hosts/yggdrasil/install.sh`.
+
+**my finances stay on their own vm.** sure runs on `njord` and its nftables only accepts port 3000 from heimdall's
+traefik, instead of sharing the services box.
+
+**a vlan split network** behind `bifrost`, with trusted, storage and iot kept apart, pfsense routing on a stick,
+pihole dns, and iot firewalled off the trusted side.
+
+**reproducible end to end.** a fresh machine is one command away from being exactly what it was.
+
+## docs
+
+| file                                                                   | what's in it                                            |
+|------------------------------------------------------------------------|---------------------------------------------------------|
+| [`docs/nixos-structure.md`](docs/nixos-structure.md)                   | how the repo is laid out and how hosts are put together |
+| [`docs/deploying-services.md`](docs/deploying-services.md)             | adding and deploying self hosted services               |
+| [`docs/deploy-new-host.md`](docs/deploy-new-host.md)                   | bringing a brand new host into the flake                |
+| [`docs/heimdall-docs.md`](docs/heimdall-docs.md)                       | the services vm in detail                               |
+| [`docs/muninn-agentic-os.md`](docs/muninn-agentic-os.md)               | the vault, the agents and the knowledge graph           |
+| [`network/bifrost-arista-core.cfg`](network/bifrost-arista-core.cfg)   | the arista switch config                                |
+| [`network/CHANGELOG.md`](network/CHANGELOG.md)                         | what changed on the network and why                     |

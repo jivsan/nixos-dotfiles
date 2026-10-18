@@ -315,7 +315,7 @@ let
   };
 
   # ── inbox poll: a capture written from another NFS client (mjolnir, tyr,
-  # hermod) never reaches the path unit's inotify, and one that lands while a
+  # yggdrasil) never reaches the path unit's inotify, and one that lands while a
   # sweep is running is missed by it too. Look every 20 s and start the sweep
   # for anything it has not seen. A capture that failed stays seen, so it is
   # left to the timer instead of being retried every 20 s.

@@ -485,7 +485,7 @@ in
       Group = "users";
       EnvironmentFile = [
         "-/var/lib/secrets/graphify-openrouter.env"   # OPENAI_API_KEY (OpenRouter): Jev + MiniMax
-        "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY: same value as API_SERVER_KEY on hermod
+        "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY: same value as API_SERVER_KEY on yggdrasil
         # MiniMax goes through the ai-gateway (ai-gateway.nix), counted as
         # "bridge". Read last, so it wins over the URL in the secrets file;
         # delete this entry to call OpenRouter directly again. Jev has its own

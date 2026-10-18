@@ -16,7 +16,7 @@ tool work. The desktop consumes these services.
 3. **Commands** open views, search, capture notes, or start an allowlisted systemd
    skill. **Answers** are made from three things: the notes retrieved from the
    vault, the config graph, and the live state of the system (below).
-   **Agent work** goes to Hermes on hermod or Codex on heimdall.
+   **Agent work** goes to Hermes on yggdrasil or Codex on heimdall.
 4. Before dispatch, the bridge saves the job and routing decision in
    `/var/lib/muninn-brain/jobs.db`. At most two agent jobs run concurrently;
    excess requests receive `busy: true` and can be retried later.
@@ -53,7 +53,7 @@ The bridge then matches the task to a worker by what each can do:
 
 | Worker | Internet | Changes the vault | Used for |
 |---|---|---|---|
-| hermes (hermod) | yes | yes, over NFS | the default: research, news, lookups, everyday tasks |
+| hermes (yggdrasil) | yes | yes, over NFS | the default: research, news, lookups, everyday tasks |
 | codex (heimdall) | no (sandbox) | yes, in the vault itself | changes to notes and files |
 | claude (heimdall) | yes | no | deep research only |
 
@@ -320,14 +320,14 @@ Secrets remain outside git:
   `OPENAI_BASE_URL` and `OPENAI_MODEL` (default `minimax/minimax-m3`). The
   inbox sweep loads only this file, so `JEV_*` overrides for filing and
   `MUNINN_BRIDGE_URL` (default `http://127.0.0.1:8093`) go here too.
-- `/var/lib/secrets/muninn-bridge.env`: `HERMES_API_KEY`, matching hermod's
+- `/var/lib/secrets/muninn-bridge.env`: `HERMES_API_KEY`, matching yggdrasil's
   `API_SERVER_KEY`. Optional bridge overrides: `JEV_API_KEY`, `JEV_URL`,
   `JEV_MODEL`, `JEV_MIN_CONFIDENCE`, `JEV_OUTCOME_MIN` (above 1 turns the
   outcome check off), `MUNINN_MAX_JOBS`, `MUNINN_JOBS_DB`,
   `MUNINN_HERMES_URL`. Native TypeSafe uses its key,
   `JEV_URL=https://api.typesafe.ai/v1/systemone` and `JEV_MODEL=jev-latest`.
 - Codex needs its existing login on heimdall. Hermes uses its configured provider
-  on hermod. Neither worker's credentials are supplied to Jev.
+  on yggdrasil. Neither worker's credentials are supplied to Jev.
 - `/var/lib/secrets/obsidian.env`: browser login.
 
 After review and merge, deploy the heimdall NixOS configuration using the usual
@@ -356,7 +356,7 @@ nix-instantiate --parse hosts/heimdall/modules/system/huginn.nix >/dev/null
 | Services, API, indexer, nginx | `hosts/heimdall/modules/system/brain.nix` |
 | Scheduled automations | `hosts/heimdall/modules/system/huginn.nix` |
 | Vault/NFS and hosted Obsidian | `hosts/heimdall/modules/system/obsidian.nix` |
-| Remote worker | `hosts/hermod/modules/system/hermes-agent.nix` |
+| Remote worker | `hosts/yggdrasil/modules/system/hermes-agent.nix` |
 | Desktop commands | `modules/system/muninn.nix` |
 
 ## Research basis

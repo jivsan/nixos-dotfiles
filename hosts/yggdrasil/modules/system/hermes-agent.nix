@@ -35,7 +35,7 @@ in
     # so MCP tools with arguments never ran; called directly they work on Sail.
     settings.tools.tool_search.enabled = "off";
     # Claude Code's skills, memory notes (skill `claude-memory`) and homelab
-    # context, copied from mjolnir by `claude-to-hermod`. Not in this repo: it is
+    # context, copied from mjolnir by `claude-to-yggdrasil`. Not in this repo: it is
     # public. The context lands in the workspace as AGENTS.md.
     settings.skills.external_dirs = [ "/var/lib/hermes/claude/skills" ];
     # The index of Claude's notes (about 26 KB) is in every session, CLI, API and
@@ -55,7 +55,7 @@ in
       graphify-dotfiles = graphify "dotfiles";
       graphify-vault = graphify "vault";
       # MCP servers on mjolnir: the key's forced command there starts the one
-      # named by the last word (hosts/mjolnir/modules/hermod-link.nix). blender
+      # named by the last word (hosts/mjolnir/modules/yggdrasil-link.nix). blender
       # drives the extension on mjolnir's localhost:9876, so Blender must be open;
       # wowx finds, exports and upscales WoW models into /mnt/hermes-wowx, which
       # is mounted here too. A wowx run takes 12 to 20 s, a building minutes.
