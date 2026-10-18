@@ -22,12 +22,13 @@
         }
 
         # `claude` = Anthropic (me) · `claude-kimi` = Kimi K3 through OpenRouter.
-        # :floor = always the cheapest provider; every tier maps to it so nothing
-        # falls back to a Claude model. The key (~/.config/openrouter.env, chmod 600)
-        # is only loaded in this subshell, not into every terminal.
+        # @preset/claude-kimi (OpenRouter account preset) = Sail Research fp4 only,
+        # no fallbacks; every tier maps to it so nothing falls back to a Claude model.
+        # The key (~/.config/openrouter.env, chmod 600) is only loaded in this
+        # subshell, not into every terminal.
         claude-kimi() (
           [ -f ~/.config/openrouter.env ] && . ~/.config/openrouter.env
-          kimi="moonshotai/kimi-k3:floor"
+          kimi="moonshotai/kimi-k3@preset/claude-kimi"
           ANTHROPIC_BASE_URL="https://openrouter.ai/api" \
           ANTHROPIC_AUTH_TOKEN="$OPENROUTER_API_KEY" \
           ANTHROPIC_API_KEY="" \
