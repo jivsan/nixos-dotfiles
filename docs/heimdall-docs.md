@@ -52,7 +52,6 @@ Exact subdomains live in that file — the pattern is `<service>.oryxserver.org`
 | Loki | native | log aggregation (promtail currently commented out) |
 | postgres-exporter | native | Postgres metrics |
 | blackbox-exporter | native | HTTPS probes |
-| Nexterm | podman | SSH/remote-access manager |
 | Scrutiny | native | drive health (collector runs on odyn, pushes here) |
 | Odyn UI proxy | route | `https://truenas.oryxserver.org` → `https://10.0.20.6` (insecure transport) |
 
@@ -102,7 +101,6 @@ hosts/heimdall/
         ├── crafty.nix              # Minecraft controller
         ├── paperless.nix
         ├── homepage.nix            # dashboard
-        ├── nexterm.nix
         ├── grafana.nix
         ├── prometheus.nix          # scrape targets + alerting
         ├── loki.nix

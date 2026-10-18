@@ -21,6 +21,7 @@ in
     podman = {
       enable = true;
       defaultNetwork.settings.dns_enabled = true;
+      dockerCompat = true;   # `docker` alias; was set by the removed nexterm.nix
     };
     oci-containers.backend = "podman";
   };

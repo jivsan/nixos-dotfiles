@@ -27,7 +27,6 @@
 #   ./modules/system/promtail.nix
     ./modules/system/postgres-exporter.nix
     ./modules/system/blackbox-exporter.nix
-    ./modules/system/nexterm.nix
     ./modules/system/scrutiny.nix
     ./modules/system/obsidian.nix
     ./modules/system/huginn.nix

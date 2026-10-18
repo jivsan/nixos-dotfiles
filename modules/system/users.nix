@@ -15,8 +15,6 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEA+3wCqGYzfe9u9zkU5beCkzBT9YWNc7M1nz/alhLaa hlidskjalf-dev"
       # tyr — agent workstation; reaches the whole fleet the way mjolnir does
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ6bnnGGpBRPpHocQbpv/EfXM550646mUUCLAaoLeuhk tyr"
-      # Nexterm (heimdall) — web SSH console; private half lives in Nexterm's identity store
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICv5EKRDOCy5PIuPwglImox8QAia8PX4+nvtoNLE1Vmr nexterm@heimdall"
     ];
   };
 

@@ -115,14 +115,6 @@
             middlewares = [ "lan-only" ];
           };
 
-          nexterm = {
-            rule = "Host(`nexterm.oryxserver.org`)";
-            entryPoints = [ "websecure" ];
-            service = "nexterm";
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
           scrutiny = {
             rule = "Host(`scrutiny.oryxserver.org`)";
             entryPoints = [ "websecure" ];
@@ -236,13 +228,6 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:3002"; }
-              ];
-            };
-          };
-          nexterm = {
-            loadBalancer = {
-              servers = [
-                { url = "http://127.0.0.1:6989"; }
               ];
             };
           };

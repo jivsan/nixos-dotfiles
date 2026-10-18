@@ -181,7 +181,7 @@ Host-local service modules under `hosts/heimdall/modules/system/`:
 
 ```
 acme  blackbox-exporter  crafty  grafana  homepage  immich  loki  nas  nextcloud
-nexterm  paperless  postgres-exporter  prometheus  promtail  scrutiny  traefik
+paperless  postgres-exporter  prometheus  promtail  scrutiny  traefik
 ```
 
 Reverse-proxied behind Traefik (Let's Encrypt wildcard via Cloudflare DNS-01), with a
