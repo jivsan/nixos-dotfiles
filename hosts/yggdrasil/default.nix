@@ -37,7 +37,9 @@
   networking.firewall.enable = true;
 
   hardware.cpu.intel.updateMicrocode = true;
-  hardware.enableRedistributableFirmware = true;
+  # The onboard Intel port (e1000e) and Haswell graphics need no firmware files; the
+  # 800 MB linux-firmware bundle is for other hardware.
+  hardware.enableRedistributableFirmware = false;
   services.fstrim.enable = true;
   services.thermald.enable = true;
   zramSwap.enable = true;
