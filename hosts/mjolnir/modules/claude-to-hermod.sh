@@ -62,6 +62,10 @@ line was written for Claude Code on mjolnir; read it with these differences:
   the body with `todo:` or `jev:` (that turns it into a request).
 - Blender: the `blender` MCP server runs on mjolnir over SSH and drives the Blender Lab
   MCP extension there. Blender must be open on mjolnir, or its tools fail.
+- WoW game files: the `wowx` MCP tools (also on mjolnir) find items and files, export
+  models with their textures into /mnt/hermes-wowx/exported and upscale PNGs with Upscayl
+  on mjolnir's GPU. /mnt/hermes-wowx is the same NAS folder on mjolnir and here, so read,
+  write and organise those files directly; import into Blender as wow_export describes.
 - The `claude-memory` skill is loaded in every session: its index lists Claude's notes from
   its sessions with Christina. Before Blender, character, scene or fleet work, read the
   notes whose lines match the task.

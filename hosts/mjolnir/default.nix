@@ -32,7 +32,8 @@
     ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture` (terminal ↔ knowledge base)
     ../../modules/apps/obs.nix             # OBS Studio + ~/OBS-recordings (odyn NFS over 10GbE)
     ../../modules/apps/comfyui.nix         # ComfyUI (podman + CDI), models on odyn over 10GbE
-    ./modules/hermod-link.nix              # hermes on hermod: Blender MCP over SSH + `claude-to-hermod`
+    ./modules/hermod-link.nix              # hermes on hermod: Blender + wowx MCP over SSH, `claude-to-hermod`
+    ../../modules/system/hermes-wowx.nix   # /mnt/hermes-wowx on odyn: WoW exports + upscales, shared with hermod
   ];
 
   networking.hostName = "mjolnir";

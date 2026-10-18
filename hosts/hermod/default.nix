@@ -9,6 +9,7 @@
     ../../modules/system/users.nix
     ../../modules/system/dotfiles-pull.nix
     ../../modules/system/muninn.nix
+    ../../modules/system/hermes-wowx.nix
     ../../modules/apps/herdr.nix
 
     ./modules/system/hermes-agent.nix

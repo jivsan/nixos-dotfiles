@@ -54,12 +54,19 @@ in
     mcpServers = {
       graphify-dotfiles = graphify "dotfiles";
       graphify-vault = graphify "vault";
-      # Blender Lab MCP server on mjolnir: the key's forced command there starts
-      # it, and it drives the extension on mjolnir's localhost:9876, so Blender
-      # must be open on mjolnir. See hosts/mjolnir/modules/hermod-link.nix.
+      # MCP servers on mjolnir: the key's forced command there starts the one
+      # named by the last word (hosts/mjolnir/modules/hermod-link.nix). blender
+      # drives the extension on mjolnir's localhost:9876, so Blender must be open;
+      # wowx finds, exports and upscales WoW models into /mnt/hermes-wowx, which
+      # is mounted here too. A wowx run takes 12 to 20 s, a building minutes.
       blender = {
         command = "ssh";
-        args = ssh ++ [ "christina@10.0.20.100" ];
+        args = ssh ++ [ "christina@10.0.20.100" "blender" ];
+      };
+      wowx = {
+        command = "ssh";
+        args = ssh ++ [ "christina@10.0.20.100" "wowx" ];
+        timeout = 300;
       };
     };
   };
@@ -76,7 +83,7 @@ in
   fileSystems."/mnt/muninn" = {
     inherit (config.fileSystems."/home/christina/muninn") device fsType options;
   };
-  systemd.services.hermes-agent.serviceConfig.ReadWritePaths = [ "-/mnt/muninn" ];
+  systemd.services.hermes-agent.serviceConfig.ReadWritePaths = [ "-/mnt/muninn" "-/mnt/hermes-wowx" ];
 
   networking.firewall.allowedTCPPorts = [ 8642 ];
 
