@@ -9,9 +9,6 @@
       PS1='\[\e[38;2;255;79;163m\][\u@\h:\[\e[38;2;45;226;230m\]\w\[\e[38;2;255;79;163m\]]\$\[\e[0m\] '
       fastfetch
 
-        # Kimi/Moonshot key (chmod 600) — powers hermes CLI + claude-kimi
-        [ -f ~/.config/moonshot.env ] && . ~/.config/moonshot.env
-
         # ComfyUI runs on demand — the container is autoStart=false so the
         # 4060 Ti's 8G of VRAM stays free for games until you actually want it.
         comfyui() {
@@ -24,14 +21,24 @@
           esac
         }
 
-        # `claude` = Anthropic (me) · `claude-kimi` = Kimi direct
-        claude-kimi() {
-          ANTHROPIC_BASE_URL="https://api.moonshot.ai/anthropic" \
-          ANTHROPIC_AUTH_TOKEN="$KIMI_API_KEY" \
-          ANTHROPIC_MODEL="kimi-k3" \
-          ANTHROPIC_SMALL_FAST_MODEL="kimi-k2.7-code-highspeed" \
+        # `claude` = Anthropic (me) · `claude-kimi` = Kimi K3 through OpenRouter.
+        # :floor = always the cheapest provider; every tier maps to it so nothing
+        # falls back to a Claude model. The key (~/.config/openrouter.env, chmod 600)
+        # is only loaded in this subshell, not into every terminal.
+        claude-kimi() (
+          [ -f ~/.config/openrouter.env ] && . ~/.config/openrouter.env
+          kimi="moonshotai/kimi-k3:floor"
+          ANTHROPIC_BASE_URL="https://openrouter.ai/api" \
+          ANTHROPIC_AUTH_TOKEN="$OPENROUTER_API_KEY" \
+          ANTHROPIC_API_KEY="" \
+          ANTHROPIC_MODEL="$kimi" \
+          ANTHROPIC_DEFAULT_OPUS_MODEL="$kimi" \
+          ANTHROPIC_DEFAULT_SONNET_MODEL="$kimi" \
+          ANTHROPIC_DEFAULT_HAIKU_MODEL="$kimi" \
+          ANTHROPIC_SMALL_FAST_MODEL="$kimi" \
+          CLAUDE_CODE_SUBAGENT_MODEL="$kimi" \
           command claude "$@"
-        }
+        )
     '';
   };
 
