@@ -60,6 +60,17 @@
   users.users.christina.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJzbgLEOUP00lHJUp6MYDOm2kDyHjr9khWaGc84YnpXL mimir"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqRu0/cwcMKm5+Rxm8jx8GfpaqCtPieqGaxetVH8Prj hermod"
+    # hermes on hermod (gateway and CLI): this key only starts the graphify MCP
+    # servers, so the gateway gets graph tools without a shell on heimdall.
+    ''restrict,command="${pkgs.writeShellScript "graphify-mcp-only" ''
+      for g in vault dotfiles; do
+        if [ "$SSH_ORIGINAL_COMMAND" = "env HOME=/var/lib/huginn /var/lib/huginn/.local/bin/graphify-mcp /var/lib/huginn/graphs/$g/graph.json" ]; then
+          HOME=/var/lib/huginn exec /var/lib/huginn/.local/bin/graphify-mcp "/var/lib/huginn/graphs/$g/graph.json"
+        fi
+      done
+      echo "this key only starts graphify-mcp" >&2
+      exit 1
+    ''}" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEAh74ChiC+JFYRzamn8iwVW03txv1S8HgkDxUvOqCXb hermes-mcp@hermod''
   ];
 
   environment.systemPackages = with pkgs; [
