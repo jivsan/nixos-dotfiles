@@ -1,4 +1,4 @@
-{ inputs, config, ... }:
+{ inputs, config, lib, ... }:
 let
   # One key for every MCP server reached over SSH, used by the gateway (user
   # hermes) and by christina's CLI alike. root:hermes 0640: ssh only checks the
@@ -89,11 +89,21 @@ in
 
   users.users.christina.extraGroups = [ config.services.hermes-agent.group ];
 
-  systemd.tmpfiles.rules = [
-    "d /etc/hermes     0755 root root -"
-    "f /etc/hermes/env 0600 root root -"
-    "d /var/lib/hermes-ssh 0750 root hermes -"
-    "z /var/lib/hermes-ssh/id_ed25519 0640 root hermes -"
-    "d /var/lib/hermes/claude 2770 hermes hermes -"
+  # The CLI refuses to reach the gateway while hermes' home is group-writable
+  # (unsafe_control_permissions), but the module sets it to 2770 on every activation
+  # and in tmpfiles. Everything runs as the hermes user here, so the group only reads:
+  # take the write bit away right after the module's setup, and put our tmpfiles
+  # line first (tmpfiles keeps the first line for a path and ignores the duplicate).
+  system.activationScripts.hermes-home-not-group-writable =
+    lib.stringAfter [ "hermes-agent-setup" ] "chmod g-w /var/lib/hermes/.hermes";
+  systemd.tmpfiles.rules = lib.mkMerge [
+    (lib.mkBefore [ "d /var/lib/hermes/.hermes 2750 hermes hermes - -" ])
+    [
+      "d /etc/hermes     0755 root root -"
+      "f /etc/hermes/env 0600 root root -"
+      "d /var/lib/hermes-ssh 0750 root hermes -"
+      "z /var/lib/hermes-ssh/id_ed25519 0640 root hermes -"
+      "d /var/lib/hermes/claude 2770 hermes hermes -"
+    ]
   ];
 }
