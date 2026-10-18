@@ -62,7 +62,10 @@
 
   environment.systemPackages = with pkgs; [
     git vim curl wget htop tree jq rsync
+    python3   # for scripts hermes writes and runs from its terminal (the CLI's PATH)
   ];
+  # The gateway's own PATH; hermes' code-execution tool brings its own Python.
+  services.hermes-agent.extraPackages = [ pkgs.python3 ];
 
   system.stateVersion = "26.05";
 }
