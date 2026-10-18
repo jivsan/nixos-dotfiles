@@ -1,6 +1,6 @@
 # nixos-dotfiles
 
-this is the nixos config for all my machines. one flake, one source of truth, everything declarative :3
+this is the nixos config for all my machines. one flake, one source of truth, everything declarative.
 a ryzen workstation with an rtx card, a little lenovo mini pc that runs my agents and a bunch of self hosted
 stuff on proxmox, all on my own vlans behind an arista switch.
 
