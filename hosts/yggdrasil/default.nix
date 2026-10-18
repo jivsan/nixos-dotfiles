@@ -61,7 +61,7 @@
   nix.settings.trusted-users = [ "root" "@wheel" ];
 
   environment.systemPackages = with pkgs; [
-    git vim curl wget htop tree jq rsync
+    git vim curl wget btop tree jq rsync
     python3   # for scripts hermes writes and runs from its terminal (the CLI's PATH)
   ];
   # The gateway's own PATH; hermes' code-execution tool brings its own Python.
