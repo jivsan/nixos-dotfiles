@@ -24,6 +24,7 @@
       "x-systemd.idle-timeout=600"
       "x-systemd.mount-timeout=30"
       "retry=2"
+      "x-gvfs-hide"   # still mounted for OBS, just not in the Files sidebar
     ];
   };
 }
