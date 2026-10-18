@@ -25,7 +25,8 @@
         # @preset/claude-kimi (OpenRouter account preset) = Sail Research fp4 only,
         # no fallbacks; every tier maps to it so nothing falls back to a Claude model.
         # The key (~/.config/openrouter.env, chmod 600) is only loaded in this
-        # subshell, not into every terminal.
+        # subshell, not into every terminal. ArtifactData is left out: a regex in
+        # its schema makes Sail Research hang with no answer (pings only).
         claude-kimi() (
           [ -f ~/.config/openrouter.env ] && . ~/.config/openrouter.env
           kimi="moonshotai/kimi-k3@preset/claude-kimi"
@@ -38,7 +39,7 @@
           ANTHROPIC_DEFAULT_HAIKU_MODEL="$kimi" \
           ANTHROPIC_SMALL_FAST_MODEL="$kimi" \
           CLAUDE_CODE_SUBAGENT_MODEL="$kimi" \
-          command claude "$@"
+          command claude --disallowedTools ArtifactData "$@"
         )
     '';
   };
