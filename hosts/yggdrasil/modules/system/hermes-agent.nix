@@ -34,6 +34,10 @@ in
     # dropped the arguments it passed through tool_call (graphify's `question`),
     # so MCP tools with arguments never ran; called directly they work on Sail.
     settings.tools.tool_search.enabled = "off";
+    # Kimi still reasons, the thinking just isn't printed: every streamed reasoning
+    # line made the CLI redraw its status bar, which flickered badly over SSH.
+    # `/reasoning show` brings it back for one session.
+    settings.display.show_reasoning = false;
     # Claude Code's skills, memory notes (skill `claude-memory`) and homelab
     # context, copied from mjolnir by `claude-to-yggdrasil`. Not in this repo: it is
     # public. The context lands in the workspace as AGENTS.md.
