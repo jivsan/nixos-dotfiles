@@ -83,6 +83,7 @@
         tyr      = mkHost ./hosts/tyr/default.nix      ./hosts/tyr/home.nix;
         njord    = mkHost ./hosts/njord/default.nix    ./hosts/njord/home.nix;
         hermod   = mkHost ./hosts/hermod/default.nix   ./hosts/hermod/home.nix;
+        yggdrasil = mkHost ./hosts/yggdrasil/default.nix ./hosts/yggdrasil/home.nix;
       };
     };
 }
