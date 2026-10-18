@@ -49,9 +49,9 @@ EOF
 Copied from Claude Code's context on mjolnir by `claude-to-hermod`. The part after the
 line was written for Claude Code on mjolnir; read it with these differences:
 
-- You run on hermod (10.0.20.21), not mjolnir. The vault is at /mnt/muninn when you run
-  as the gateway (user hermes) and at ~/muninn when Christina runs the hermes CLI.
-  Read the vault's CLAUDE.md first: it holds the vault conventions.
+- You run on hermod (10.0.20.21) as the user hermes, not on mjolnir; the gateway and
+  Christina's `hermes` CLI both do. The vault is at /mnt/muninn (not ~/muninn).
+  Read /mnt/muninn/CLAUDE.md first: it holds the vault conventions.
 - Query the vault and the nixos-dotfiles repo with the graphify-vault and
   graphify-dotfiles MCP tools (they run on heimdall over SSH), or read notes directly.
 - File a report by writing one Markdown note into the vault's _inbox/ folder, mode 0644,

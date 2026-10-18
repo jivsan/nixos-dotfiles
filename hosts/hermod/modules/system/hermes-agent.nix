@@ -30,6 +30,10 @@ in
       default = "moonshotai/kimi-k3";
     };
     settings.provider_routing.only = [ "sail-research/fp4" ];
+    # Every tool goes to the model as is. With the tool_search bridge Kimi K3
+    # dropped the arguments it passed through tool_call (graphify's `question`),
+    # so MCP tools with arguments never ran; called directly they work on Sail.
+    settings.tools.tool_search.enabled = "off";
     # Claude Code's skills, memory notes (skill `claude-memory`) and homelab
     # context, copied from mjolnir by `claude-to-hermod`. Not in this repo: it is
     # public. The context lands in the workspace as AGENTS.md.
