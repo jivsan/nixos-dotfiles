@@ -23,6 +23,7 @@ in
 {
   users.users.christina.openssh.authorizedKeys.keys = [
     ''restrict,command="${yggdrasilMcp}" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEAh74ChiC+JFYRzamn8iwVW03txv1S8HgkDxUvOqCXb hermes-mcp@hermod''
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqRu0/cwcMKm5+Rxm8jx8GfpaqCtPieqGaxetVH8Prj hermod"
   ];
 
   environment.systemPackages = [
