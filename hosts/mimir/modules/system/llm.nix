@@ -31,7 +31,9 @@ in
 {
   # Chat models for the ai-gateway on heimdall: llama-server in router mode,
   # which loads a model when it is first asked for and swaps it out for the
-  # other one on demand. Needs the RTX 5070 Ti; import this once it is in.
+  # other one on demand. Needs a 16 GB card: the RTX 5070 Ti it was planned for went
+  # into mjolnir (2026-10-19), and mimir's RTX 4060 Ti has 8 GB, shared with ComfyUI
+  # and the Octane node. Not imported (hosts/mimir/default.nix).
   #
   # Talk to it through the gateway (http://10.0.20.17:4000/v1), not directly:
   # a direct request for the model that is not loaded makes llama-server kill

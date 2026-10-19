@@ -32,7 +32,8 @@ let
   daemonPort = 48000;      # what mjolnir's OctaneServer scans for (its default)
   # A node must hold the whole scene on its own card. Without this the node runs
   # with "out-of-core textures disabled" (install-daemon.sh's default) and a scene
-  # that fills mjolnir's 8 GB card does not load on it. Gigabytes of mimir's RAM.
+  # bigger than mimir's 8 GB card does not load on it (mjolnir's RTX 5070 Ti has
+  # 16 GB since 2026-10-19, so its scenes can outgrow the node). Gigabytes of mimir's RAM.
   outOfCoreGb = 16;
   nodeUser = "christina";  # the OTOY sign-in lives in this user's ~/.OctaneRender
   octaneLibs = import ./octane-libs.nix { inherit config; };

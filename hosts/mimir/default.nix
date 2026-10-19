@@ -25,8 +25,8 @@
     ./modules/system/embeddings.nix       # Qwen3-Embedding-4B for vault search and placement (heimdall)
     ./modules/system/exporters.nix        # host numbers for heimdall's Prometheus
     ./modules/system/gpu-exporter.nix     # GPU numbers for heimdall's Prometheus (polls nvidia-smi; see the file)
-#   ./modules/system/llm.nix              # chat models behind heimdall's ai-gateway — needs the RTX 5070 Ti
-    ../../modules/apps/octane-node.nix    # OctaneRender render node for mjolnir (needs the RTX 5070 Ti)
+#   ./modules/system/llm.nix              # chat models behind heimdall's ai-gateway — needs a 16 GB card (see the file)
+    ../../modules/apps/octane-node.nix    # OctaneRender render node for mjolnir, on the RTX 4060 Ti (8 GB)
     ./modules/system/test-node.nix        # the agents' Blender test node (`blender-job`, run by `mimir-blender`)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];

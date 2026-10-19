@@ -8,8 +8,9 @@
 
   hardware.nvidia = {
     modesetting.enable = true;
-    # GTX 1070 (Pascal) until the RTX 5070 Ti is in: the open module and the 595
-    # branch have no driver for it, the 580 legacy branch does. For the 5070 Ti:
+    # RTX 4060 Ti (Ada, 8 GB) since 2026-10-19, mjolnir's old card. It runs on the 580
+    # legacy branch that was put here for the GTX 1070 (Pascal has no driver in the
+    # open module or the 595 branch). The 4060 Ti also runs on the newer driver:
     #   open = true;  package = config.boot.kernelPackages.nvidiaPackages.stable;
     open = false;
     nvidiaSettings = false; # headless — no settings GUI

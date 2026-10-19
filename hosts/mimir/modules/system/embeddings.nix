@@ -37,8 +37,9 @@ in
   # heimdall calls the OpenAI-style /v1/embeddings here; nothing else does.
   #
   # CPU for now, like the voice server: measured on the 5950X, a question takes
-  # about 0.5 s and a 4,000-character note about 25 s. When the RTX 5070 Ti is
-  # in, use a CUDA build and offload the layers:
+  # about 0.5 s and a 4,000-character note about 25 s. mimir has the RTX 4060 Ti
+  # since 2026-10-19 (8 GB, shared with ComfyUI and the Octane node); to use it,
+  # take a CUDA build and offload the layers:
   #   package = pkgs.llama-cpp.override { cudaSupport = true; };  extraFlags ++ [ "-ngl" "99" ]
   services.llama-cpp = {
     enable = true;

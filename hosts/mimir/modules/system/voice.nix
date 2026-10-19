@@ -8,8 +8,9 @@ in
   # OpenAI-compatible API (Speaches). heimdall's bridge calls it at :8000; the
   # browser never talks to mimir directly, and no audio leaves the LAN.
   #
-  # CPU image for now. When the RTX 5070 Ti is in, switch the tag to
-  # `latest-cuda` and add:  extraOptions = [ "--device=nvidia.com/gpu=all" ];
+  # CPU image. mimir has the RTX 4060 Ti since 2026-10-19 (8 GB, shared with ComfyUI
+  # and the Octane node); to run voice on it, switch the tag to `latest-cuda` and
+  # add:  extraOptions = [ "--device=nvidia.com/gpu=all" ];
   systemd.tmpfiles.rules = [
     "d /var/lib/speaches 0755 1000 1000 -"   # model cache; the container runs as uid 1000
   ];
