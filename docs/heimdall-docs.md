@@ -45,6 +45,7 @@ phone, tailscale).
 | influxdb             | podman  | pfsense metrics from telegraf, 90 days                      |
 | scrutiny             | podman  | drive health, the collector runs on odyn and pushes here    |
 | prometheus + loki    | native  | metrics and logs (no log shipper yet, promtail is off)       |
+| alertmanager         | native  | fleet alert rules in `alerting.nix` (hosts, odyn, pi-hole, failed units, disks, sites, cert) → ntfy `alerts` |
 | blackbox-exporter    | native  | https probes of the main sites                               |
 | postgres-exporter    | native  | immich db metrics                                            |
 | switch-snmp          | native  | telegraf polls bifrost over snmp for prometheus             |

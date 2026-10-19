@@ -36,6 +36,7 @@
     ./modules/system/amneziawg.nix
     ./modules/system/vaultwarden.nix
     ./modules/system/ntfy.nix             # push notifications at ntfy.oryxserver.org
+    ./modules/system/alerting.nix         # prometheus alert rules + alertmanager → ntfy
   ];
 
   networking.hostName = "heimdall";

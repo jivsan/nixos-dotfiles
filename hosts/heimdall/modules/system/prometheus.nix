@@ -84,6 +84,8 @@
             "https://traefik.oryxserver.org"
             "https://home.oryxserver.org"
             "https://paperless.oryxserver.org"
+            "https://vault.oryxserver.org"
+            "https://brain.oryxserver.org"
           ];
         }];
         relabel_configs = [

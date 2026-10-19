@@ -3,7 +3,27 @@ let
   grafanaBackupDir = "/mnt/nas/nix-services/grafana-backups";
 
   grafanaProvisioning = pkgs.runCommand "grafana-provisioning" {} ''
-    mkdir -p $out/datasources $out/dashboards $out/dashboards-json
+    mkdir -p $out/datasources $out/dashboards $out/dashboards-json $out/alerting
+
+    # every grafana alert goes to the ntfy topic "alerts" (ntfy.nix); $NTFY_TOKEN comes from ntfy-publish.env
+    cat > $out/alerting/ntfy.yaml <<'EOF'
+    apiVersion: 1
+    contactPoints:
+      - orgId: 1
+        name: ntfy
+        receivers:
+          - uid: ntfy-alerts
+            type: webhook
+            settings:
+              url: http://host.containers.internal:2586/alerts?template=grafana
+              httpMethod: POST
+              authorization_scheme: Bearer
+              authorization_credentials: $NTFY_TOKEN
+    policies:
+      - orgId: 1
+        receiver: ntfy
+        group_by: [grafana_folder, alertname]
+    EOF
     cat > $out/datasources/datasources.yaml <<'EOF'
     apiVersion: 1
     datasources:
@@ -56,7 +76,10 @@ in
     image = "docker.io/grafana/grafana-oss:latest";
     autoStart = true;
     ports = [ "127.0.0.1:3002:3000" ];
-    environmentFiles = [ "/var/lib/secrets/grafana.env" ];
+    environmentFiles = [
+      "/var/lib/secrets/grafana.env"
+      "/var/lib/secrets/ntfy-publish.env"   # NTFY_TOKEN for the ntfy contact point
+    ];
     environment = {
       GF_SERVER_ROOT_URL = "https://grafana.oryxserver.org";
       GF_SECURITY_COOKIE_SECURE = "true";

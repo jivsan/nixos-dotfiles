@@ -66,6 +66,9 @@ in
         SCRUTINY_WEB_INFLUXDB_HOST = "scrutiny-influxdb";
         SCRUTINY_WEB_INFLUXDB_PORT = "8086";
       };
+      # SCRUTINY_NOTIFY_URLS=ntfy://:<token>@ntfy.oryxserver.org/alerts?..., a failing drive pushes to my phone.
+      # it goes through traefik (ntfy-allow lets this network in); test: curl -X POST 127.0.0.1:8080/api/health/notify
+      environmentFiles = [ "/var/lib/secrets/scrutiny-notify.env" ];
       dependsOn = [ "scrutiny-influxdb" ];
       extraOptions = [
         "--network=scrutiny-net"

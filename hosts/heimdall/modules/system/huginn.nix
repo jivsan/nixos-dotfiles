@@ -51,9 +51,19 @@ let
   # written there directly, never via _inbox, or the sweep would retitle and move it
   notify = pkgs.writeShellApplication {
     name = "huginn-notify";
-    runtimeInputs = [ pkgs.coreutils pkgs.systemd pkgs.gnused pkgs.gnugrep ];
+    runtimeInputs = [ pkgs.coreutils pkgs.systemd pkgs.gnused pkgs.gnugrep pkgs.curl ];
     text = ''
       umask 0022  # nginx serves these reports through /vault
+
+      # push <title> <priority> <tag> <message> to the ntfy topic "alerts" (ntfy.nix).
+      # NTFY_TOKEN comes from ntfy-publish.env; without it the note is still written
+      push() {
+        [ -n "''${NTFY_TOKEN:-}" ] || return 0
+        curl -fsS -m 10 -o /dev/null \
+          -H "Authorization: Bearer $NTFY_TOKEN" -H "Title: $1" -H "Priority: $2" -H "Tags: $3" \
+          --data-binary "$4" http://127.0.0.1:2586/alerts || true
+      }
+
       unit="''${1:-unknown-unit}"
       event="''${2:-failed}"
       dir="${vault}/Resources/Reports"
@@ -66,6 +76,7 @@ let
         if [ "$open" = yes ]; then
           sed -i 's/^status: failed$/status: resolved/' "$f"
           printf '\nResolved: %s ran clean again at %s.\n' "$unit" "$now" >> "$f"
+          push "huginn: $unit is fine again" 2 white_check_mark "$unit ran clean on heimdall at $now."
         fi
         exit 0
       fi
@@ -102,6 +113,11 @@ let
       } > "$tmp"
       chmod 0644 "$tmp"   # mktemp makes it 0600; vault notes must stay group-readable
       mv -f "$tmp" "$f"
+
+      lines="$(journalctl -u "$unit" -n 3 --no-pager -o cat 2>/dev/null || true)"
+      push "huginn: $unit failed" 4 rotating_light \
+        "Failed on heimdall at $now (failure $count). Note: Resources/Reports/alert-$unit.md
+      $lines"
     '';
   };
 
@@ -613,6 +629,7 @@ in
       User = "christina";
       Group = "users";
       ExecStart = "${notify}/bin/huginn-notify %i";
+      EnvironmentFile = "-/var/lib/secrets/ntfy-publish.env";   # NTFY_TOKEN, so the alert also reaches my phone
     };
   };
   systemd.services."huginn-resolve@" = {
@@ -626,6 +643,7 @@ in
       User = "christina";
       Group = "users";
       ExecStart = "${notify}/bin/huginn-notify %i resolved";
+      EnvironmentFile = "-/var/lib/secrets/ntfy-publish.env";
     };
   };
 

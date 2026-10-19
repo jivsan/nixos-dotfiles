@@ -174,7 +174,7 @@
             entryPoints = [ "websecure" ];
             service = "ntfy";
             tls = {};
-            middlewares = [ "lan-only" ];
+            middlewares = [ "ntfy-allow" ];
           };
 
           pihole = {
@@ -346,6 +346,19 @@
               "100.64.0.0/10"
               "127.0.0.1/32"
               "10.88.200.10/32"  # homarr's container (homarr.nix), it checks the sites by their https names
+            ];
+          };
+
+          # lan-only plus heimdall's own podman networks: scrutiny sends drive alerts to ntfy by its
+          # https name. ntfy still wants a login or a token from every one of them
+          ntfy-allow = {
+            ipAllowList.sourceRange = [
+              "10.0.20.0/24"
+              "10.0.50.10/32"    # my phone
+              "100.64.0.0/10"
+              "127.0.0.1/32"
+              "10.88.0.0/16"     # podman's default network
+              "10.89.0.0/16"     # the per-app networks (immich, paperless, scrutiny)
             ];
           };
 
