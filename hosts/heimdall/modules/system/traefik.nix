@@ -169,6 +169,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          ntfy = {
+            rule = "Host(`ntfy.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "ntfy";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
           pihole = {
             rule = "Host(`pihole.oryxserver.org`)";
             entryPoints = [ "websecure" ];
@@ -263,6 +271,14 @@
             loadBalancer = {
               servers = [
                 { url = "http://127.0.0.1:8222"; }
+              ];
+            };
+          };
+
+          ntfy = {
+            loadBalancer = {
+              servers = [
+                { url = "http://127.0.0.1:2586"; }
               ];
             };
           };

@@ -38,6 +38,7 @@ phone, tailscale).
 | paperless            | podman  | documents, with its own postgres + redis                    |
 | vaultwarden          | podman  | passwords at `vault.oryxserver.org`, sqlite on local disk, daily backup to odyn |
 | homarr               | podman  | dashboard at `home.oryxserver.org`, sqlite in `/var/lib/homarr` |
+| ntfy                 | native  | push notifications at `ntfy.oryxserver.org`, login or token only, ios wake-ups via ntfy.sh |
 | crafty               | podman  | minecraft server control                                     |
 | obsidian             | podman  | the muninn vault in the browser at `obsidian.oryxserver.org` |
 | grafana              | podman  | dashboards at `grafana.oryxserver.org`                      |

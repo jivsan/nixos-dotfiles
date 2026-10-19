@@ -35,6 +35,7 @@
     ./modules/system/ai-gateway.nix       # one openai-style endpoint for my models, with metrics
     ./modules/system/amneziawg.nix
     ./modules/system/vaultwarden.nix
+    ./modules/system/ntfy.nix             # push notifications at ntfy.oryxserver.org
   ];
 
   networking.hostName = "heimdall";
