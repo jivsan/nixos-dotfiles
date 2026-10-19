@@ -21,7 +21,7 @@ done
 # The memory notes as one skill: SKILL.md is the index, the notes are its files.
 m="$stage/skills/claude-memory"
 mkdir -p "$m/references"
-cp "$mem"/*.md "$m/references/"
+install -m 0644 "$mem"/*.md "$m/references/"
 rm -f "$m/references/MEMORY.md"
 {
   cat <<'EOF'
@@ -75,6 +75,10 @@ line was written for Claude Code on mjolnir; read it with these differences:
 EOF
   cat "$HOME/.claude/CLAUDE.md"
 } > "$stage/AGENTS.md"
+
+# Readable for the hermes group whatever the source modes were (the shared notes on odyn
+# were 0600 once, and hermes could open none of them).
+chmod -R u=rwX,go=rX "$stage"
 
 # Unpack into a fresh folder, then swap it in, so hermes never sees a half-copied tree.
 tar -C "$stage" -cf - skills AGENTS.md | ssh -o BatchMode=yes "$host" "

@@ -8,16 +8,7 @@
 # is for sim caches and job scratch (mimir-blender's job folders) and has none. Same
 # paths on mjolnir, mimir and yggdrasil.
 let
-  # Everything she uses for Blender (her list, 2026-10-19). DF BETA (WoW) and the rest of
-  # the data SSD stay on mjolnir.
-  moved = [
-    "3DBLENDER"
-    "Fluid_Painter_v0.07.1"
-    "My Third Party Content"
-    "refsart"
-    "TIL DAZ LEGG TIL"
-    "Sanctus Libary"
-  ];
+  moved = import ./studio-folders.nix;
 
   share = name: extra: {
     device = "10.0.20.6:/mnt/vault/${name}";
