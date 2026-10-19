@@ -71,6 +71,11 @@ hl.on("hyprland.start", function()
     -- X11 games and apps (XWayland) open on the screen marked primary; mark the main one.
     hl.exec_cmd("sleep 3; DISPLAY=${DISPLAY:-:0} xrandr --output " .. main .. " --primary")
     hl.exec_cmd(terminal .. " --class scratchpad", { workspace = "special:scratch", float = true, size = "60% 60%" })
+    -- Two shells on yggdrasil, side by side on workspace 2 (the BenQ).
+    -- "silent" keeps you on workspace 1 on the Dell.
+    local ygg = terminal .. " --title yggdrasil -e ssh christina@10.0.20.21"
+    hl.exec_cmd(ygg, { workspace = "2 silent" })
+    hl.exec_cmd(ygg, { workspace = "2 silent" })
     -- no wayvnc here: this is a local GPU session, not the remote VM
 end)
 
