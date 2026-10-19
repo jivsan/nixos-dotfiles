@@ -33,8 +33,6 @@
     ./modules/system/huginn.nix
     ./modules/system/brain.nix
     ./modules/system/ai-gateway.nix       # one openai-style endpoint for my models, with metrics
-    ./modules/system/hlidskjalf.nix
-    ./modules/system/newt.nix
     ./modules/system/amneziawg.nix
     ./modules/system/vaultwarden.nix
   ];

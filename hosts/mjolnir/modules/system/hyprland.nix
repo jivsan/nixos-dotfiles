@@ -11,10 +11,6 @@
   programs.hyprlock.enable = true;
   security.pam.services.hyprlock = { };
 
-  # hyprexpo, off: only used if hyprland.lua runs `hyprctl plugin load`
-  # environment.sessionVariables.HYPREXPO_PLUGIN =
-  #   "${inputs.hyprland-plugins.packages.${pkgs.stdenv.hostPlatform.system}.hyprexpo}/lib/libhyprexpo.so";
-
   # hyprland's cache, so the flake's hyprland isn't compiled here
   nix.settings = {
     extra-substituters = [ "https://hyprland.cachix.org" ];

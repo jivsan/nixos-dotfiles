@@ -51,8 +51,6 @@ phone, tailscale).
 | huginn               | native  | my vault agents (systemd timers on minimax via openrouter)   |
 | brain                | native  | the muninn brain page + bridge at `brain.oryxserver.org`     |
 | ai-gateway           | native  | one openai-style endpoint on `:4000` for mimir's models and openrouter |
-| hlidskjalf           | native  | hlidskjalf panel on `:8787`                                  |
-| newt                 | native  | pangolin tunnel, dials out                                   |
 | amneziawg            | native  | obfuscated wireguard for remote access                       |
 
 traefik also proxies to other hosts: `truenas` → odyn, `comfyui` → mimir, `sure` → njord,
@@ -105,4 +103,4 @@ sudo systemctl start acme-order-renew-oryxserver.org.service
 - **before a switch:** check the brain bridge for running agent jobs (`curl -s 127.0.0.1:8093/bridge/jobs`)
   when the change touches `brain.nix`, a restart ends them
 
-the history (the k8s move, nextcloud's removal, the old `thor` and `nix-oryx` hosts) is in my vault.
+the history (the k8s move, nextcloud's removal, hlidskjalf, the old `thor` and `nix-oryx` hosts) is in my vault.

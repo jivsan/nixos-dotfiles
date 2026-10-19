@@ -8,10 +8,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hyprland.url = "github:hyprwm/Hyprland/v0.55.0";
-    hyprland-plugins = {
-      url = "github:hyprwm/hyprland-plugins";
-      inputs.hyprland.follows = "hyprland";
-    };
     oxwm = {
       url = "github:tonybanters/oxwm";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -25,10 +21,6 @@
     };
     llm-agents = {
       url = "github:numtide/llm-agents.nix";
-    };
-    hlidskjalf = {
-      url = "github:jivsan/Hlidskjalf";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
     hermes-agent.url = "github:NousResearch/hermes-agent";
   };

@@ -74,12 +74,10 @@ changes the build, even though nothing else changed.
 | `nixpkgs-unstable` | passed in as `pkgs-unstable` (mjolnir's kernel + nvidia driver come from here) |
 | `home-manager`     | `release-26.05`, as a nixos module                               |
 | `hyprland`         | pinned `v0.55.0`, not following nixpkgs so the cachix cache keeps working |
-| `hyprland-plugins` | `hyprexpo`, follows `hyprland`                                   |
 | `oxwm`             | tony's X11 window manager configured in lua                     |
 | `helium`           | helium browser                                                   |
 | `claude-code`      | claude code, applied as an overlay                               |
 | `llm-agents`       | numtide's agent packages: codex and herdr, from their binary cache |
-| `hlidskjalf`       | my hlidskjalf flake, its nixos module runs on heimdall           |
 | `hermes-agent`     | hermes, its nixos module runs on yggdrasil                       |
 
 `mkHost hostPath homeFile` wraps `nixpkgs.lib.nixosSystem`: it passes `inputs` and `pkgs-unstable`
@@ -100,8 +98,7 @@ nixosConfigurations = {
 ## Hyprland on mjolnir
 
 `hosts/mjolnir/modules/system/hyprland.nix` turns on `programs.hyprland` with the pinned package and
-portal, hyprlock with its pam service, the `hyprland.cachix.org` cache, and puts the `hyprexpo` plugin
-path in `$HYPREXPO_PLUGIN`.
+portal, hyprlock with its pam service and the `hyprland.cachix.org` cache.
 
 `hosts/mjolnir/modules/home/hyprland.nix` installs the wayland userland (waybar, awww, mako, hypridle,
 cliphist, wl-clipboard, grim, slurp, swappy) and links `hosts/mjolnir/{hypr,waybar,mako}` into

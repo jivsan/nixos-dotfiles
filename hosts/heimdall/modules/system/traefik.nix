@@ -152,14 +152,6 @@
             tls = {};
             middlewares = [ "lan-only" ];
           };
-          
-          hlidskjalf = {
-            rule = "Host(`hlidskjalf.oryxserver.org`)";
-            entryPoints = [ "websecure" ];
-            service = "hlidskjalf";
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
 
           sure = {
             rule = "Host(`sure.oryxserver.org`)";
@@ -286,15 +278,7 @@
               ];
             };
           };
-
-          hlidskjalf = {
-            loadBalancer = {
-              servers = [
-                { url = "http://127.0.0.1:8787"; }
-              ];
-            };
-          };
-        }; 
+        };
 
         serversTransports = {
           insecure = {
