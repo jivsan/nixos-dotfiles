@@ -169,6 +169,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          pihole = {
+            rule = "Host(`pihole.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "pihole";
+            tls = {};
+            middlewares = [ "lan-only" "pihole-admin" ];
+          };
+
         };
 
         services = {
@@ -278,6 +286,15 @@
               ];
             };
           };
+
+          # pi-hole v6, LXC 152 on hella
+          pihole = {
+            loadBalancer = {
+              servers = [
+                { url = "http://10.0.20.4"; }
+              ];
+            };
+          };
         };
 
         serversTransports = {
@@ -295,6 +312,14 @@
               "127.0.0.1/32"
               "10.88.200.10/32"  # homarr's container (homarr.nix), it checks the sites by their https names
             ];
+          };
+
+          # pi-hole answers 403 on / for any name but pi.hole, so send / to the admin page
+          pihole-admin = {
+            redirectRegex = {
+              regex = "^https://pihole\\.oryxserver\\.org/?$";
+              replacement = "https://pihole.oryxserver.org/admin/";
+            };
           };
 
         };
