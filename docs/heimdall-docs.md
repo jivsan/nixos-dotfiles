@@ -100,6 +100,8 @@ sudo systemctl start acme-order-renew-oryxserver.org.service
 - **acme `environmentFile`:** has to be on the cert itself, `defaults` doesn't reach
   `acme-order-renew-*.service`
 - **odyn's web ui has a self-signed cert:** traefik needs the `insecure` servers transport for it
+- **podman ports skip the firewall:** a published container port is forwarded, so `allowedTCPPorts`
+  doesn't gate it. limit it with the bind address (`127.0.0.1:`) or a raw-table rule like `influxdb.nix`
 - **before a switch:** check the brain bridge for running agent jobs (`curl -s 127.0.0.1:8093/bridge/jobs`)
   when the change touches `brain.nix`, a restart ends them
 

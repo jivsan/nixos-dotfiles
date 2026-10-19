@@ -119,10 +119,10 @@ lock, `Super+Escape` power menu, `Print` region screenshot, `` Super+` `` overvi
    minutes), then `sudo nixos-rebuild switch --flake ~/nixos-dotfiles#<host>`
 4. yggdrasil can be pushed from mjolnir:
    `nixos-rebuild switch --flake .#yggdrasil --target-host christina@10.0.20.21 --sudo`
-5. njord only has 1.9 GB of ram and gets oom-killed evaluating the flake, so check on mjolnir first
-   whether it needs a rebuild at all:
-   `nix eval --raw .#nixosConfigurations.njord.config.system.build.toplevel.outPath` against its
-   `/run/current-system`
+5. njord only has 1.9 GB of ram and gets oom-killed evaluating the flake, so mjolnir evaluates and
+   njord builds:
+   `nixos-rebuild switch --flake .#njord --build-host christina@10.0.20.20 --target-host christina@10.0.20.20 --sudo`.
+   a plain `--target-host` push fails, njord won't take unsigned paths from my user
 6. after changing flake inputs: `nix flake lock` before rebuilding
 
 roll back with `sudo nixos-rebuild switch --rollback` or pick an older generation at boot.
