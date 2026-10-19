@@ -83,7 +83,7 @@
             "https://immich.oryxserver.org"
             "https://grafana.oryxserver.org"
             "https://traefik.oryxserver.org"
-            "https://homepage.oryxserver.org"
+            "https://home.oryxserver.org"
             "https://paperless.oryxserver.org"
           ];
         }];

@@ -91,9 +91,9 @@
             middlewares = [ "lan-only" ];
           };
 
-          homepage = {
+          homarr = {
             rule = "Host(`home.oryxserver.org`)";
-            service = "homepage";
+            service = "homarr";
             entryPoints = [ "websecure" ];
             tls = {};
             middlewares = [ "lan-only" ];
@@ -208,10 +208,10 @@
             };
           };
 
-          homepage = {
+          homarr = {
             loadBalancer = {
               servers = [
-                { url = "http://127.0.0.1:3004"; }
+                { url = "http://127.0.0.1:7575"; }
               ];
             };
           };

@@ -16,7 +16,7 @@
     ./modules/system/nas.nix
     ./modules/system/immich.nix
     ./modules/system/crafty.nix
-    ./modules/system/homepage.nix
+    ./modules/system/homarr.nix          # dashboard at home.oryxserver.org (replaced homepage)
     ./modules/system/paperless.nix
     ./modules/system/grafana.nix
     ./modules/system/prometheus.nix

@@ -17,7 +17,7 @@ decommissioned). Storage lives on `odyn`, the TrueNAS box.
 - **Resources:** 6 vCPU / 16 GB RAM (likely over-provisioned for current load — could trim)
 - **OS:** NixOS 26.05 (flake-managed; `stateVersion = "25.11"`)
 - **Workloads:** mix of native NixOS services (Traefik, Grafana, Prometheus, Loki) and
-  Podman containers (Immich, Nextcloud, Crafty, Paperless, Homepage)
+  Podman containers (Immich, Nextcloud, Crafty, Paperless, Homarr)
 
 ## Storage — odyn (TrueNAS)
 
@@ -46,7 +46,7 @@ Exact subdomains live in that file — the pattern is `<service>.oryxserver.org`
 | Immich | podman | photos; data on odyn NFS (`vault/immich` dataset) |
 | Crafty | podman | Minecraft server controller |
 | Paperless | podman | document management |
-| Homepage | podman | dashboard / landing page |
+| Homarr | podman | dashboard / landing page at `home.oryxserver.org` (v2, SQLite in `/var/lib/homarr`) |
 | Grafana | native | monitoring dashboards |
 | Prometheus | native | metrics scraping |
 | Loki | native | log aggregation (promtail currently commented out) |
@@ -100,7 +100,7 @@ hosts/heimdall/
         ├── immich.nix              # immich-server + postgres + redis
         ├── crafty.nix              # Minecraft controller
         ├── paperless.nix
-        ├── homepage.nix            # dashboard
+        ├── homarr.nix              # dashboard (replaced homepage.nix 2026-10-19)
         ├── grafana.nix
         ├── prometheus.nix          # scrape targets + alerting
         ├── loki.nix
