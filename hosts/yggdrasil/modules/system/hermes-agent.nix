@@ -45,10 +45,13 @@ in
     # The index of Claude's notes (about 26 KB) is in every session, CLI, API and
     # cron alike, so she never has to ask for it; the notes are read on demand.
     settings.skills.auto_load = [ "claude-memory" ];
-    # With the Codex login hermes picks OpenAI's native web search as its one web
-    # backend, and that backend can only search: every web_extract failed. Pages
-    # are read through Firecrawl's public tier instead, which needs no key; when
-    # it throttles, hermes moves on to Keenable, Exa and Parallel by itself.
+    # Searches go to Brave (BRAVE_SEARCH_API_KEY in /etc/hermes/env, free tier
+    # 2,000 a month). Brave only searches, it can't read pages. When a Brave call
+    # fails (quota used up, bad key), hermes retries that one search on the free
+    # keyless backends and tries Brave again on the next search.
+    settings.web.search_backend = "brave-free";
+    # Pages are read through Firecrawl's public tier, which needs no key; when it
+    # throttles, hermes moves on to Keenable, Exa and Parallel by itself.
     settings.web.extract_backend = "firecrawl";
     environmentFiles = [ "/etc/hermes/env" ];
     environment = {
