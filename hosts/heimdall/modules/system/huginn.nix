@@ -670,12 +670,28 @@ in
   systemd.paths."huginn-inbox-sweep" = {
     description = "huginn: watch _inbox and sweep on change";
     wantedBy = [ "paths.target" ];
-    unitConfig.RequiresMountsFor = vault;
+    unitConfig = {
+      RequiresMountsFor = vault;
+      OnFailure = [ "huginn-inbox-rearm.service" ];
+    };
     pathConfig = {
       PathChanged = "${vault}/_inbox";
-      # a 4th trigger within 2 min fails this path unit until restart; the poll covers that
+      # a runaway loop stops after 20 sweeps in 2 min; then huginn-inbox-rearm turns the watch back on
       TriggerLimitIntervalSec = "2min";
-      TriggerLimitBurst = 3;
+      TriggerLimitBurst = 20;
+    };
+  };
+  # a path unit that hits its trigger limit stops watching for good, so wait out the window and re-arm it
+  systemd.services."huginn-inbox-rearm" = {
+    description = "huginn: watch _inbox again after the path unit hit its trigger limit";
+    serviceConfig = {
+      Type = "oneshot";
+      TimeoutStartSec = "5min";
+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 120";
+      ExecStart = [
+        "${pkgs.systemd}/bin/systemctl reset-failed huginn-inbox-sweep.path"
+        "${pkgs.systemd}/bin/systemctl start huginn-inbox-sweep.path"
+      ];
     };
   };
   systemd.timers."huginn-inbox-sweep" = {
