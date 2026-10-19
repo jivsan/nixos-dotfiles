@@ -86,8 +86,10 @@ in
   systemd.services.hermes-agent.serviceConfig.ReadWritePaths =
     [ "-/mnt/muninn" "-/mnt/hermes-wowx" "-/mnt/studio-cache" ];
 
-  # gateway api, the brain bridge on heimdall calls it
-  networking.firewall.allowedTCPPorts = [ 8642 ];
+  # gateway api: only the brain bridge on heimdall calls it (with the api key), so only heimdall gets in
+  networking.firewall.extraCommands = ''
+    iptables -A nixos-fw -p tcp -s 10.0.20.17 --dport 8642 -j nixos-fw-accept
+  '';
 
   users.users.christina.extraGroups = [ config.services.hermes-agent.group ];
 
