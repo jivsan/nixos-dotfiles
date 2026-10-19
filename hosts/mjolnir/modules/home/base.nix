@@ -1,16 +1,16 @@
-{ config, pkgs, inputs, ... }:
+{ pkgs, inputs, ... }:
 
 {
   imports = [
-    ./modules/home/git.nix
-    ./modules/home/shell.nix
-    ./modules/home/terminal.nix
-    ./modules/home/xdg.nix
-    ./modules/home/programs.nix
-    ./modules/home/suckless.nix
-    ./modules/home/neovim.nix
-    ./modules/home/gtk.nix
-    ./modules/home/picom.nix
+    ../../../../modules/home/git.nix
+    ../../../../modules/home/shell.nix
+    ../../../../modules/home/terminal.nix
+    ./xdg.nix
+    ./programs.nix
+    ../../../../modules/home/suckless.nix
+    ../../../../modules/home/neovim.nix
+    ./gtk.nix
+    ./picom.nix
   ];
 
   home.username = "christina";
@@ -18,11 +18,11 @@
   home.stateVersion = "25.11";
   home.packages = [
     inputs.helium.packages.${pkgs.stdenv.hostPlatform.system}.default
-      pkgs.brave
+    pkgs.brave
   ];
 
   services.easyeffects.enable = true;
-  
+
   services.udiskie = {
     enable = true;
     automount = true;

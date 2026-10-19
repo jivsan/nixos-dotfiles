@@ -1,12 +1,10 @@
 { ... }:
-# mjolnir's home = your existing shared (oxwm/X11) home + the Hyprland module.
-# Both sets of dotfiles are deployed; each session uses only its own.
 {
   imports = [
-    ../../home.nix
+    ./modules/home/base.nix
     ./modules/home/hyprland.nix
   ];
 
-  # Her herdr session on yggdrasil (Claude Code, hermes, panes on mimir), from here.
+  # my herdr session on yggdrasil (claude code, hermes, panes on mimir)
   programs.bash.shellAliases.ygg = "herdr --remote christina@10.0.20.21";
 }

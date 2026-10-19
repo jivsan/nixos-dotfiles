@@ -1,42 +1,42 @@
 { inputs, pkgs, pkgs-unstable, ... }:
 {
   imports = [
-    ../../configuration.nix
+    ./modules/system/base.nix
     ./hardware-configuration.nix
     ../../modules/apps/unfree.nix
-    ../../modules/apps/discord.nix
-    ../../modules/apps/audio.nix
-    ../../modules/apps/gaming.nix
-    ../../modules/apps/wow.nix
-    ../../modules/apps/nvidia.nix
-    ../../modules/apps/screenshot.nix
-    ../../modules/apps/nvtop.nix
-    ../../modules/apps/wallpaper.nix
-    ../../modules/apps/filemanager.nix
-    ../../modules/apps/octane.nix
-    ../../modules/system/backup.nix
-    ../../modules/apps/vlc.nix
-    ../../modules/apps/gimp.nix
-    ../../modules/apps/remote.nix
+    ./modules/apps/discord.nix
+    ./modules/apps/audio.nix
+    ./modules/apps/gaming.nix
+    ./modules/apps/wow.nix
+    ./modules/apps/nvidia.nix
+    ./modules/apps/screenshot.nix
+    ./modules/apps/nvtop.nix
+    ./modules/apps/wallpaper.nix
+    ./modules/apps/filemanager.nix
+    ./modules/apps/octane.nix
+    ./modules/system/backup.nix
+    ./modules/apps/vlc.nix
+    ./modules/apps/gimp.nix
+    ./modules/apps/remote.nix
     ../../modules/apps/claude-code.nix
     ../../modules/apps/codex.nix
     ../../modules/apps/herdr.nix
-    ../../modules/apps/telegram.nix
-    ../../modules/apps/wowexport.nix
+    ./modules/apps/telegram.nix
+    ./modules/apps/wowexport.nix
     ../../modules/apps/blender.nix
-    ../../modules/apps/upscayl.nix
-    ../../modules/apps/quixel-bridge.nix
-    ../../modules/apps/remote-desktop.nix
+    ./modules/apps/upscayl.nix
+    ./modules/apps/quixel-bridge.nix
+    ./modules/apps/remote-desktop.nix
     ../../modules/system/tailscale.nix
-    ../../modules/system/hyprland.nix      # Hyprland session (additive; oxwm untouched)
+    ./modules/system/hyprland.nix      # Hyprland session (additive; oxwm untouched)
     ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture` (terminal ↔ knowledge base)
-    ../../modules/apps/obs.nix             # OBS Studio + ~/OBS-recordings (odyn NFS over 10GbE)
-    ../../modules/apps/comfyui.nix         # ComfyUI (podman + CDI), models on odyn over 10GbE
-    ./modules/yggdrasil-link.nix           # hermes on yggdrasil: Blender + wowx MCP over SSH, `claude-to-yggdrasil`
+    ./modules/apps/obs.nix             # OBS Studio + ~/OBS-recordings (odyn NFS over 10GbE)
+    ./modules/apps/comfyui.nix         # ComfyUI (podman + CDI), models on odyn over 10GbE
+    ./modules/system/yggdrasil-link.nix           # hermes on yggdrasil: Blender + wowx MCP over SSH, `claude-to-yggdrasil`
     ../../modules/system/hermes-wowx.nix   # /mnt/hermes-wowx on odyn: WoW exports + upscales, shared with yggdrasil
     ../../modules/system/studio.nix        # /mnt/studio on odyn: all Blender files and projects (3DBLENDER moved there)
     ../../modules/apps/mimir-blender.nix   # `mimir-blender`: agents run their Blender checks on mimir, not here
-    ./modules/mimir-test-node.nix          # `blender-config-to-mimir`: her add-ons for mimir's Blender, without Octane
+    ./modules/system/mimir-test-node.nix          # `blender-config-to-mimir`: her add-ons for mimir's Blender, without Octane
     ../../modules/system/agent-memory.nix  # /mnt/agent-memory on odyn: Claude's memory notes, shared with yggdrasil
   ];
 

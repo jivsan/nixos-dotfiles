@@ -20,7 +20,7 @@
 { pkgs, config, lib, ... }:
 let
   octaneBase = "/opt/octane";
-  octaneLibs = import ./octane-libs.nix { inherit config; };
+  octaneLibs = import ../../../../modules/apps/octane-libs.nix { inherit config; };
 
   # The 31.x server zip is flat (liboctane.so, libcef.so next to the binary) and
   # the binary's RUNPATH points at OTOY's build tree, so add the install dir

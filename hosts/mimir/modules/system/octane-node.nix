@@ -36,7 +36,7 @@ let
   # 16 GB since 2026-10-19, so its scenes can outgrow the node). Gigabytes of mimir's RAM.
   outOfCoreGb = 16;
   nodeUser = "christina";  # the OTOY sign-in lives in this user's ~/.OctaneRender
-  octaneLibs = import ./octane-libs.nix { inherit config; };
+  octaneLibs = import ../../../../modules/apps/octane-libs.nix { inherit config; };
 
   # Generic FHS shell: `octane-node-env <cmd>` runs <cmd> with OTOY's expected libs.
   # Octane stores third-party downloads (cuDNN) under /etc/OctaneRender; the FHS
