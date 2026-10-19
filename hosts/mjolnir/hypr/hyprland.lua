@@ -1,12 +1,33 @@
 ------------------
 ---- MONITORS ----
 ------------------
--- Wayland connector names differ from Xorg (DP-0 -> often DP-1, HDMI-0 -> HDMI-A-1).
--- Auto-config for the first boot; then run `hyprctl monitors`, read the real
--- names, and switch to the explicit lines below to match your oxwm layout.
--- hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "1" })
-hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "0x0", scale = "1" })
-hl.monitor({ output = "DP-1", mode = "2560x1440@120", position = "1920x0", scale = "1" })   -- 120 Hz, as in oxwm (modules/system/desktop.nix)
+-- The Dell is the main screen (120 Hz, on the right), the BenQ the second one on the
+-- left, as in oxwm (modules/system/desktop.nix). Both are matched by their description,
+-- not their connector: the RTX 5070 Ti (2026-10-19) renamed the Dell's port from DP-1
+-- to DP-3 and listed the BenQ first, which gave the BenQ workspace 1 and the focus.
+-- `hyprctl monitors` prints the descriptions.
+local MAIN = "Dell Inc. Dell S2716DG #ASPWhPwBLKbd"   -- 2560x1440
+local SIDE = "BNQ BenQ GW2470 L4G00969019"            -- 1920x1080
+
+hl.monitor({ output = "desc:" .. SIDE, mode = "preferred", position = "0x0", scale = "1" })
+hl.monitor({ output = "desc:" .. MAIN, mode = "2560x1440@120", position = "1920x0", scale = "1" })
+
+-- Workspace 1 starts on the main screen, 2 on the second one.
+hl.workspace_rule({ workspace = "1", monitor = "desc:" .. MAIN, default = true })
+hl.workspace_rule({ workspace = "2", monitor = "desc:" .. SIDE, default = true })
+
+-- Connector name of a screen (DP-3, HDMI-A-1, ...) by its description; nil before
+-- the screens are up, e.g. while the config first loads at login.
+local function output_of(desc)
+    local ok, mons = pcall(hl.get_monitors)
+    for _, m in ipairs(ok and mons or {}) do
+        if m.description == desc then return m.name end
+    end
+end
+
+-- The cursor starts on the main screen (this option takes a connector name).
+local main_output = output_of(MAIN)
+if main_output then hl.config({ cursor = { default_monitor = main_output } }) end
 
 
 ---------------------
@@ -38,12 +59,17 @@ local walls = "/home/christina/.config/hypr/"
 local grow  = " --transition-type grow --transition-pos 0.5,0.64 --transition-fps 60"
 
 hl.on("hyprland.start", function()
+    -- Start on the main screen: workspace 1 lives there (rule above).
+    hl.dispatch(hl.dsp.focus({ workspace = 1 }))
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
     hl.exec_cmd("hypridle")
+    local main, side = output_of(MAIN) or "DP-3", output_of(SIDE) or "HDMI-A-1"
     hl.exec_cmd(
-        "awww-daemon & sleep 1 && awww img -o DP-1 " .. walls .. "wall.png" .. grow ..
-        "; awww img -o HDMI-A-1 " .. walls .. "wall-cyan.png" .. grow)
+        "awww-daemon & sleep 1 && awww img -o " .. main .. " " .. walls .. "wall.png" .. grow ..
+        "; awww img -o " .. side .. " " .. walls .. "wall-cyan.png" .. grow)
+    -- X11 games and apps (XWayland) open on the screen marked primary; mark the main one.
+    hl.exec_cmd("sleep 3; DISPLAY=${DISPLAY:-:0} xrandr --output " .. main .. " --primary")
     hl.exec_cmd(terminal .. " --class scratchpad", { workspace = "special:scratch", float = true, size = "60% 60%" })
     -- no wayvnc here: this is a local GPU session, not the remote VM
 end)

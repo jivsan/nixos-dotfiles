@@ -2,8 +2,8 @@
 # mjolnir's two wallpapers, drawn by tyr's script so both machines share one
 # picture (hosts/tyr/modules/home/rice/wallpaper.sh, ImageMagick):
 #
-#   wall.png       DP-1      the neon eclipse as on tyr: pink corona, cyan grid
-#   wall-cyan.png  HDMI-A-1  its twin with the two colours swapped
+#   wall.png       Dell (main screen)    the neon eclipse as on tyr: pink corona, cyan grid
+#   wall-cyan.png  BenQ (second screen)  its twin with the two colours swapped
 #
 # The PNGs are kept next to this file because hyprland.lua and hyprlock.conf
 # read them from ~/.config/hypr. Run this again after changing tyr's script:
