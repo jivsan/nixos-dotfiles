@@ -4,7 +4,6 @@
   services.traefik = {
     enable = true;
 
-    # ─── Static config: entrypoints, API, providers, metrics ───
     staticConfigOptions = {
       api = {
         dashboard = true;
@@ -40,7 +39,6 @@
       accessLog = {};
     };
 
-    # ─── Dynamic config: routers, services, middleware, TLS ───
     dynamicConfigOptions = {
       tls = {
         stores.default.defaultCertificate = {
@@ -261,8 +259,7 @@
             };
           };
 
-          # ComfyUI runs on mimir (GPU box), reached over the storage VLAN.
-          # WebSockets (progress/preview) pass through Traefik natively.
+          # comfyui on mimir
           comfyui = {
             loadBalancer = {
               servers = [
@@ -271,8 +268,7 @@
             };
           };
 
-          # Sure (personal finance) runs on njord, its own isolated VM.
-          # njord's nftables rules only accept :3000 from heimdall.
+          # sure (finance) on njord, whose nftables only accept :3000 from heimdall
           sure = {
             loadBalancer = {
               servers = [
@@ -281,8 +277,8 @@
             };
           };
 
-          # Home Assistant OS on the IoT VLAN. Needs use_x_forwarded_for +
-          # trusted_proxies set in its configuration.yaml or it returns 400.
+          # home assistant on the iot vlan; needs use_x_forwarded_for + trusted_proxies
+          # in its configuration.yaml or it answers 400
           homeassistant = {
             loadBalancer = {
               servers = [
@@ -310,8 +306,7 @@
           lan-only = {
             ipAllowList.sourceRange = [
               "10.0.20.0/24"
-              "10.0.50.10/32"    # Christina's phone (static DHCP mapping on the IoT VLAN) —
-                                 # single host, NOT the VLAN; IoT gear stays locked out
+              "10.0.50.10/32"    # my phone (static lease on the iot vlan), just this one host
               "100.64.0.0/10"
               "127.0.0.1/32"
             ];

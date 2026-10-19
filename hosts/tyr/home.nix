@@ -14,12 +14,12 @@
   ];
 
   home.packages = [
-    inputs.helium.packages.${pkgs.stdenv.hostPlatform.system}.default   # Helium browser, as on mjolnir
+    inputs.helium.packages.${pkgs.stdenv.hostPlatform.system}.default   # helium browser, as on mjolnir
     pkgs.gcc                                                            # nvim-treesitter compiles its parsers
   ];
 
-  # nvim config straight from the repo clone (what modules/home/xdg.nix does
-  # on mjolnir; that module also links rofi, which rice.nix owns here).
+  # nvim config linked from the repo clone, like mjolnir's xdg.nix does
+  # (that module isn't imported here: it links rofi too, which rice.nix owns)
   xdg.configFile."nvim".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nixos-dotfiles/config/nvim";
 }

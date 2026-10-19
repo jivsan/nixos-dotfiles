@@ -1,14 +1,11 @@
 { pkgs, inputs, ... }:
-# ── muninn brain — live animated knowledge-graph frontend ────────────────────
-# A builder regenerates graph.json + activity.json from the vault every 30s
-# (fast, no LLM), nginx serves the single-page 3D force-graph app on localhost,
-# and Traefik exposes it at brain.oryxserver.org (behind lan-only).
+# muninn brain: my dashboard (a 3d graph of the vault) and the services behind it, all on localhost
+# nginx 8090 (brain.oryxserver.org via traefik.nix, lan-only), capture 8091, api 8092, bridge 8093
 let
   vault = "/mnt/nas/obsidian/muninn";
   www   = "/var/lib/muninn-brain/www";
 
-  # Keep the durable job store and the embedding index beside the bridge for
-  # its Python imports; embed.py is also the embedder service's entry point.
+  # bridge.py imports jobs.py and embed.py, so they sit next to it; embed.py also runs the embedder
   bridge = pkgs.runCommand "muninn-bridge" {} ''
     mkdir -p "$out"
     cp ${../../muninn/brain/bridge.py} "$out/bridge.py"
@@ -16,10 +13,8 @@ let
     cp ${../../muninn/brain/embed.py} "$out/embed.py"
   '';
 
-  # Vendored, pinned JS libs served same-origin — no CDN at runtime (the esm.sh
-  # module chain proved flaky in-browser and one failed import killed all page JS).
-  # three 0.160.0 is the last release shipping a classic UMD build; 3d-force-graph
-  # 1.79.0 accepts three >=0.118 and its official examples use exactly this pairing.
+  # pinned js served by my own nginx, no cdn at runtime (one failed cdn import used to kill the whole page)
+  # three stays at 0.160.0, the last with a classic umd build; 3d-force-graph 1.79.0 goes with it
   threeJs = pkgs.fetchurl {
     url = "https://unpkg.com/three@0.160.0/build/three.min.js";
     hash = "sha256-FwxnifQyF8lrMXD0tC+v4TXef3zUhJekIY+XV+4dSfo=";
@@ -31,14 +26,12 @@ let
 
   buildGraph = pkgs.writeShellApplication {
     name = "muninn-brain-build";
-    # git + systemctl: activity.json includes the vault audit log and huginn
-    # timer/service health
+    # git + systemd: activity.json shows the vault's git log and huginn's timers and units
     runtimeInputs = [ pkgs.python3Minimal pkgs.coreutils pkgs.git pkgs.systemd ];
     text = ''python3 ${../../muninn/brain/build-graph.py}'';
   };
 
-  # Tiny stdlib-only capture endpoint.
-  # POST /capture with {"text": "..."} or raw text → writes capture-*.md into the vault _inbox/.
+  # the dashboard's quick notes: POST /capture {"text": ...} or raw text writes _inbox/capture-<time>.md
   capturePy = pkgs.writeText "muninn-capture.py" ''
 #!/usr/bin/env python3
 import http.server
@@ -92,7 +85,6 @@ if __name__ == "__main__":
         httpd.serve_forever()
 '';
 
-  # ── muninn FTS5 search indexer (from muninn-os v0.3) ──────────────────────
   indexerPy = pkgs.writeText "muninn-indexer.py" ''
 #!/usr/bin/env python3
 import os, sys, time, sqlite3, signal, logging
@@ -196,7 +188,6 @@ def main():
 if __name__ == "__main__": main()
 '';
 
-  # ── muninn REST API (from muninn-os v0.3) ─────────────────────────────────
   apiPy = pkgs.writeText "muninn-api.py" ''
 #!/usr/bin/env python3
 import hmac, json, os, re, time, datetime, sqlite3
@@ -351,8 +342,7 @@ if __name__ == "__main__": main()
 
 in
 {
-  # claude-code (the deep answer tier) is unfree; allow just it on heimdall,
-  # which unlike mjolnir does not import modules/apps/unfree.nix.
+  # claude-code is unfree and heimdall doesn't import modules/apps/unfree.nix, so allow just it here
   nixpkgs.config.allowUnfreePredicate = pkg:
     builtins.elem (pkgs.lib.getName pkg) [ "claude-code" ];
 
@@ -360,14 +350,13 @@ in
     "d /var/lib/muninn-brain 0755 christina users -"
     "d ${www} 0755 christina users -"
     "d /var/lib/muninn-brain/indexer-state 0755 christina users -"
-    # index.html + vendored libs are served from the store; refreshed on each rebuild
+    # links into the store: a change to index.html shows up after a rebuild
     "L+ ${www}/index.html - - - - ${../../muninn/brain/index.html}"
     "d ${www}/vendor 0755 christina users -"
     "L+ ${www}/vendor/three.min.js - - - - ${threeJs}"
     "L+ ${www}/vendor/3d-force-graph.min.js - - - - ${forceGraphJs}"
   ];
 
-  # regenerate the graph data from the vault, on a fast cadence for a "live" feel
   systemd.services."muninn-brain-build" = {
     description = "muninn brain: rebuild graph.json + activity.json from the vault";
     unitConfig.RequiresMountsFor = vault;
@@ -387,7 +376,6 @@ in
     };
   };
 
-  # Live capture endpoint (writes directly to _inbox/)
   systemd.services."muninn-brain-capture" = {
     description = "muninn brain: capture endpoint for dashboard quick notes";
     unitConfig.RequiresMountsFor = vault;
@@ -402,9 +390,7 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
-  # ── FTS5 search indexer (from muninn-os v0.3) ──────────────────────────
-  # Real-time SQLite FTS5 index over the vault. Powers muninn-api /search.
-  # Runs as christina, same vault perms model as the rest of muninn.
+  # sqlite fts5 index of the vault in /var/lib/muninn-brain/index.db, read by the api and the embedder
   systemd.services."muninn-indexer" = {
     description = "muninn indexer: keep FTS5 search index in sync with the vault";
     unitConfig.RequiresMountsFor = vault;
@@ -420,12 +406,9 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
-  # ── embedder: one vector per note, for search and placement by meaning ──
-  # Reads the notes from the FTS index above and asks the embedding model on
-  # mimir (hosts/mimir/modules/system/embeddings.nix) for a vector whenever a
-  # note is new or changed; the bridge searches them. If mimir is down it
-  # waits, and the bridge falls back to keyword search. The first run embeds
-  # the whole vault, which takes about an hour on mimir's CPU.
+  # embeds new or changed notes with the model on mimir (hosts/mimir/modules/system/embeddings.nix)
+  # if mimir is down it waits and the bridge falls back to keyword search
+  # a first run over the whole vault takes about an hour
   systemd.services."muninn-embedder" = {
     description = "muninn embedder: keep the vault's embedding index in sync";
     after = [ "muninn-indexer.service" "network-online.target" ];
@@ -442,9 +425,7 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
-  # ── muninn REST API (from muninn-os v0.3) ─────────────────────────────
-  # Stdlib HTTP API on 127.0.0.1:8092. /health, /search, /graph, /read,
-  # /mocs, POST /inbox. Reads from the FTS5 index built by muninn-indexer.
+  # rest api for agents (/health /search /graph /read /mocs, POST /inbox), nginx serves it as /api/
   systemd.services."muninn-api" = {
     description = "muninn API: HTTP API for agents to query + write to the vault";
     after = [ "muninn-indexer.service" ];
@@ -462,34 +443,28 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
-  # ── muninn bridge — the front door: Jev sorts every request, then a command,
-  # a quick answer (MiniMax) or an agent handles it. Also proxies the local
-  # voice server on mimir and starts skills. Reuses the OpenRouter secret.
-  # No NoNewPrivileges here: "run now" starts huginn units through sudo.
+  # the front door: jev sorts each request into a command, an answer or agent work
+  # no NoNewPrivileges here: "run now" starts huginn units through sudo
   systemd.services."muninn-bridge" = {
     description = "muninn bridge: Jev-routed talk, voice proxy and skills for the brain";
     after = [ "muninn-indexer.service" "network-online.target" ];
     wants = [ "network-online.target" ];
     unitConfig.RequiresMountsFor = vault;
-    # git + shell tools are for the Codex agent tier, which works inside the vault;
-    # util-linux is for setpriv, which starts every worker unable to sudo
+    # git + shell tools for codex, which works in the vault; util-linux for setpriv, so workers can't sudo
     path = [ pkgs.systemd pkgs.git pkgs.bashInteractive pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.gnused pkgs.ripgrep pkgs.util-linux ];
     environment.MUNINN_CODEX =
       "${inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.codex}/bin/codex";
-    # Deep answer tier: headless Claude on the Claude Code subscription
-    # (christina must log in once on heimdall: `claude` → /login)
+    # claude (deep answer tier) uses my claude code subscription: run claude on heimdall once and /login
     environment.MUNINN_CLAUDE = "${pkgs.claude-code}/bin/claude";
     serviceConfig = {
       Type = "simple";
       User = "christina";
       Group = "users";
       EnvironmentFile = [
-        "-/var/lib/secrets/graphify-openrouter.env"   # OPENAI_API_KEY (OpenRouter): Jev + MiniMax
-        "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY: same value as API_SERVER_KEY on yggdrasil
-        # MiniMax goes through the ai-gateway (ai-gateway.nix), counted as
-        # "bridge". Read last, so it wins over the URL in the secrets file;
-        # delete this entry to call OpenRouter directly again. Jev has its own
-        # URL and is not affected.
+        "-/var/lib/secrets/graphify-openrouter.env"   # OPENAI_API_KEY (openrouter) for jev and minimax
+        "-/var/lib/secrets/muninn-bridge.env"         # HERMES_API_KEY=<API_SERVER_KEY from yggdrasil>
+        # minimax goes through my ai-gateway (client "bridge" in ai-gateway.nix); read last so its url wins,
+        # drop it to call openrouter direct. jev has its own url and isn't affected
         (pkgs.writeText "bridge-via-gateway.env" "OPENAI_BASE_URL=http://127.0.0.1:4000/client/bridge/v1\n")
       ];
       ExecStart = "${pkgs.python3}/bin/python3 ${bridge}/bridge.py";
@@ -499,7 +474,6 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
-  # static server on localhost; Traefik fronts it (see traefik.nix → brain router)
   services.nginx = {
     enable = true;
     virtualHosts."muninn-brain" = {
@@ -507,9 +481,9 @@ in
       root = www;
       locations."/".index = "index.html";
       locations."~ \\.json$".extraConfig = "add_header Cache-Control no-store;";
-      # raw vault markdown for the Memory reader (read-only; behind lan-only Traefik).
-      # ^~ = prefix-priority so the .json regex above can't shadow vault files;
-      # the nested location denies dotfiles/-dirs (.obsidian, .git, …).
+      # raw vault markdown for the memory reader, read-only
+      # ^~ so the .json regex above can't take vault files
+      # the nested location 404s dotfiles (.obsidian, .git)
       locations."^~ /vault/" = {
         alias = "${vault}/";
         extraConfig = ''
@@ -519,7 +493,6 @@ in
           location ~ /\. { return 404; }
         '';
       };
-      # muninn REST API (search, graph, read, mocs, inbox) — from muninn-os v0.3
       locations."/api/" = {
         proxyPass = "http://127.0.0.1:8092/";
         extraConfig = ''
@@ -527,7 +500,7 @@ in
           proxy_set_header Host $host;
         '';
       };
-      # bridge (talk, voice, skills) — audio uploads and model calls need room and time
+      # voice uploads and model calls need the bigger body size and the long timeout
       locations."/bridge/" = {
         proxyPass = "http://127.0.0.1:8093";
         extraConfig = ''
@@ -536,7 +509,6 @@ in
           client_max_body_size 25m;
         '';
       };
-      # capture endpoint (dashboard quick notes → _inbox/)
       locations."/capture" = {
         proxyPass = "http://127.0.0.1:8091";
         extraConfig = ''

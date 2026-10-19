@@ -9,10 +9,8 @@
     ./modules/home/fastfetch.nix
   ];
 
-  # The hermes CLI runs as the hermes user, like the gateway. Its sessions, login
-  # and databases in /var/lib/hermes/.hermes are 0600, and hermes tightens that
-  # folder to 0700 whenever it saves a login, so as christina it lost its history
-  # and then could not start. Its vault is /mnt/muninn.
+  # the hermes cli runs as the hermes user, like the gateway: its files in /var/lib/hermes/.hermes
+  # are 0600 and it tightens the folder to 0700 on login, so as me it can't read its history or start
   programs.bash.initExtra = ''
     hermes() {
       ( cd /var/lib/hermes/workspace &&

@@ -1,10 +1,8 @@
 { pkgs, ... }:
 
-# mimir as the agents' Blender test node: `mimir-blender` on mjolnir and yggdrasil
-# (modules/apps/mimir-blender.nix) ssh in here and run `blender-job`. Same Blender build
-# as mjolnir (modules/apps/blender.nix), the studio at the same paths (studio.nix), her
-# add-ons copied from mjolnir without Octane and the MCP extension
-# (`blender-config-to-mimir` on mjolnir). Skill `mimir-test-node`.
+# the agents' blender test node: mimir-blender (modules/apps/mimir-blender.nix) on mjolnir
+# and yggdrasil sshes in and runs blender-job. same blender and studio paths as mjolnir,
+# my add-ons minus octane and the mcp extension come from blender-config-to-mimir on mjolnir
 let
   blender-job = pkgs.writeShellApplication {
     name = "blender-job";
@@ -78,10 +76,10 @@ in
   environment.systemPackages = [ blender-job ];
 
   users.users.christina.openssh.authorizedKeys.keys = [
-    # christina on yggdrasil (the key was made on hermod): Claude Code there.
+    # claude on yggdrasil (the key's name is from hermod)
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqRu0/cwcMKm5+Rxm8jx8GfpaqCtPieqGaxetVH8Prj hermod"
-    # hermes on yggdrasil: only blender-job. (Blender runs Python, so this is code on
-    # mimir all the same; the lock keeps the key from being a plain login.)
+    # hermes on yggdrasil: only blender-job. blender runs python, so it's still code on
+    # mimir, but the key is no plain login
     ''restrict,command="${blender-job}/bin/blender-job" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEAh74ChiC+JFYRzamn8iwVW03txv1S8HgkDxUvOqCXb hermes-mcp@hermod''
   ];
 }

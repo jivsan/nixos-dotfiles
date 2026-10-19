@@ -1,8 +1,7 @@
 { pkgs, ... }:
 {
-  # InfluxDB 1.x (InfluxQL) — receives streamed metrics from pfSense's Telegraf.
-  # pfSense stores nothing locally; all retention lives here (bounded to 90d).
-  # Grafana reads it via the InfluxDB datasource (see grafana.nix).
+  # influxdb 1.8 for pfsense's telegraf and pfsense-geoip.nix, read by grafana
+  # pfsense keeps no history itself, these 90 days are all there is
   systemd.tmpfiles.rules = [
     "d /var/lib/influxdb 0750 root root -"
   ];
@@ -11,10 +10,10 @@
   virtualisation.oci-containers.containers.influxdb = {
     image = "docker.io/library/influxdb:1.8";
     autoStart = true;
-    # 0.0.0.0:8086 so pfSense (10.0.20.1) can push; gated by the firewall below.
+    # on all interfaces so pfsense (10.0.20.1) can push
     ports = [ "8086:8086" ];
     environment = {
-      INFLUXDB_HTTP_AUTH_ENABLED = "false";   # trusted VLAN 20 only
+      INFLUXDB_HTTP_AUTH_ENABLED = "false";   # no auth: anything that reaches 8086 can read and write
       INFLUXDB_REPORTING_DISABLED = "true";
     };
     volumes = [
@@ -22,7 +21,6 @@
     ];
   };
 
-  # Ensure the pfsense DB exists with a bounded 90-day retention (self-limiting disk)
   systemd.services.influxdb-init = {
     description = "Create InfluxDB pfsense database + 90d retention";
     after = [ "podman-influxdb.service" ];
@@ -39,6 +37,5 @@
     '';
   };
 
-  # pfSense pushes metrics here over the trusted VLAN
   networking.firewall.allowedTCPPorts = [ 8086 ];
 }

@@ -1,10 +1,7 @@
 { config, pkgs, utils, ... }:
 let
-  # Qwen3-Embedding-4B, 8-bit. Chosen 2026-10-04 as the strongest open English
-  # embedding model this box can serve (MTEB English v2: 74.6 overall, 68.5
-  # retrieval; Apache 2.0; reads 32K tokens). Pinned to a revision: a different
-  # file would give vectors that cannot be compared with the stored ones, and
-  # heimdall's embedder re-embeds the whole vault when the model name changes.
+  # pinned to a revision: another file gives vectors that don't compare with the stored
+  # ones, and a new model name makes heimdall's embedder re-embed the whole vault
   model = pkgs.fetchurl {
     url = "https://huggingface.co/Qwen/Qwen3-Embedding-4B-GGUF/resolve/f4602530db1d980e16da9d7d3a70294cf5c190be/Qwen3-Embedding-4B-Q8_0.gguf";
     hash = "sha256-tgrlzi3WoLd/gsrfId7x8xCj4QzeOArQCBsHqdQWlJ0=";
@@ -21,8 +18,8 @@ let
   window = n: [ "--ctx-size" (toString n) "--batch-size" (toString n) "--ubatch-size" (toString n) ];
   queryFlags = [ "--host" "0.0.0.0" "--port" (toString queryPort) "-m" model ]
     ++ common ++ window 2048 ++ [ "--threads" "8" ];
-  # The first request to a fresh instance pages the model in (25 s under load):
-  # spend that here, not on the first question.
+  # the first request pages the model in (25 s under load), so pay that here,
+  # not on the first question
   warmUp = pkgs.writeShellScript "llama-cpp-query-warm-up" ''
     for _ in $(${pkgs.coreutils}/bin/seq 1 40); do
       ${pkgs.curl}/bin/curl -fsS -m 2 http://127.0.0.1:${toString queryPort}/health >/dev/null 2>&1 && break
@@ -33,13 +30,9 @@ let
   '';
 in
 {
-  # Embeddings for the muninn vault: meaning-based search and note placement.
-  # heimdall calls the OpenAI-style /v1/embeddings here; nothing else does.
-  #
-  # CPU for now, like the voice server: measured on the 5950X, a question takes
-  # about 0.5 s and a 4,000-character note about 25 s. mimir has the RTX 4060 Ti
-  # since 2026-10-19 (8 GB, shared with ComfyUI and the Octane node); to use it,
-  # take a CUDA build and offload the layers:
+  # embeddings for vault search and note placement, only heimdall calls /v1/embeddings here
+  # on cpu: a question ~0.5 s, a 4,000-char note ~25 s. to put it on the card (8 gb, shared
+  # with comfyui and the octane node):
   #   package = pkgs.llama-cpp.override { cudaSupport = true; };  extraFlags ++ [ "-ngl" "99" ]
   services.llama-cpp = {
     enable = true;
@@ -49,11 +42,9 @@ in
     extraFlags = common ++ window 8192 ++ [ "--threads" "16" ];   # the physical cores
   };
 
-  # A second instance of the same model, for questions only. llama-server runs
-  # all slots of one instance in the same pass, so a question sent to the
-  # instance above waits for whatever note it is embedding: measured 17-30 s
-  # there, 0.5 s here while the other one was busy. Both map the same model
-  # file, so the weights are in memory once.
+  # second instance for questions only: llama-server runs all slots in one pass, so a
+  # question sent above waits for the note being embedded (17-30 s there, 0.5 s here).
+  # both map the same model file, so the weights are in memory once
   systemd.services.llama-cpp-query = {
     description = "LLaMA C++ server: question embeddings for the muninn bridge";
     inherit (config.systemd.services.llama-cpp) after wantedBy;

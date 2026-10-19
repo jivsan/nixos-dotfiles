@@ -3,11 +3,8 @@ let
   port = 8080;
   models = "/var/lib/llama-chat/models";
 
-  # One section per model; the section name is the model's name on the API and
-  # must match `models` in heimdall's ai-gateway.nix. Picked from the vault note
-  # "Local LLM recommendation for RTX 5070 Ti 16GB" (2026-10-04): the 9B as the
-  # everyday model, the 27B for hard jobs. Neither is measured on the card yet.
-  # ctx-size is shared by the slots: 32768 over 2 slots is 16k tokens each.
+  # a section's name is the model's name on the api, it must match `models` in heimdall's
+  # ai-gateway.nix. ctx-size is shared by the slots: 32768 over 2 slots is 16k each
   preset = pkgs.writeText "llama-chat-models.ini" ''
     [qwen3.5-9b]
     model = ${models}/Qwen3.5-9B-Q6_K.gguf
@@ -25,24 +22,15 @@ let
   flags = [
     "--host" "0.0.0.0" "--port" (toString port)
     "--models-preset" preset
-    "--models-max" "1"   # 16 GB of VRAM: one chat model loaded at a time
+    "--models-max" "1"   # one chat model in vram at a time
   ];
 in
 {
-  # Chat models for the ai-gateway on heimdall: llama-server in router mode,
-  # which loads a model when it is first asked for and swaps it out for the
-  # other one on demand. Needs a 16 GB card: the RTX 5070 Ti it was planned for went
-  # into mjolnir (2026-10-19), and mimir's RTX 4060 Ti has 8 GB, shared with ComfyUI
-  # and the Octane node. Not imported (hosts/mimir/default.nix).
-  #
-  # Talk to it through the gateway (http://10.0.20.17:4000/v1), not directly:
-  # a direct request for the model that is not loaded makes llama-server kill
-  # whatever the loaded one is generating, and it is not counted on the
-  # dashboard. For the same reason nothing scrapes this server's own /metrics:
-  # that call loads the model it asks about.
-  #
-  # The model files are not in the Nix store. Download them once (runbook:
-  # docs/misc/ai-gateway.md) into /var/lib/llama-chat/models.
+  # chat models for heimdall's ai-gateway, llama-server in router mode (swaps models on demand)
+  # not imported: needs a 16 gb card, mimir's 4060 ti has 8 gb shared with comfyui and octane
+  # only call it through the gateway (http://10.0.20.17:4000/v1): a direct request for the
+  # unloaded model kills the running one. nothing scrapes its /metrics, that loads a model too
+  # model files aren't in the store, download them once (docs/misc/ai-gateway.md)
   systemd.tmpfiles.rules = [
     "d ${models} 0755 root root -"
   ];

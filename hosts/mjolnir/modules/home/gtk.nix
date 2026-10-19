@@ -3,8 +3,7 @@ let
   tokyonight = pkgs.tokyonight-gtk-theme;
 in
 {
-  # Cursor — applied everywhere (GTK apps, Wayland/XWayland, and oxwm via x11).
-  # This also exports XCURSOR_THEME/XCURSOR_SIZE for the session.
+  # one cursor for gtk, hyprland and oxwm (also sets XCURSOR_THEME/XCURSOR_SIZE)
   home.pointerCursor = {
     name = "Bibata-Modern-Ice";
     package = pkgs.bibata-cursors;
@@ -14,8 +13,7 @@ in
   };
 
   gtk = {
-    # GTK4 apps keep following the theme below. home-manager 26.05 changed
-    # this default to null and warns until it is set explicitly.
+    # gtk4 follows the theme below; home-manager 26.05 defaults this to null and warns until set
     gtk4.theme = config.gtk.theme;
 
     enable = true;

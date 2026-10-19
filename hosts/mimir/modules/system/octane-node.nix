@@ -1,48 +1,25 @@
-# modules/apps/octane-node.nix — OctaneRender network render node (mimir)
-#
-# Runs the OTOY render-node daemon so mjolnir's OctaneServer can use mimir's GPU
-# over the LAN. The node package is "OctaneRender_Studio+_<ver>_node_linux.zip"
-# from the OctaneRender release thread (OTOY login). The node version MUST equal
-# the OctaneServer version on mjolnir, or the primary refuses it:
-#   addon 31.10 = Octane 2026.4  ->  OctaneRender_Studio+_2026_4_node_linux.zip
-#
-# Install:  sudo octane-node-install ~/OctaneRender_Studio+_2026_4_node_linux.zip
-# Sign-in:  the node needs the OTOY account on this machine once. The node pulls
-#           one of the Studio+ render-node licenses (10 included); it does not
-#           take the workstation license. Headless option: run the Standalone
-#           over `ssh -X mimir` (sshd has X11Forwarding on) and sign in there:
-#             sudo octane-node-install ~/OctaneRender_Studio+_2026_4_linux.zip
-#             octane-standalone --no-opengl
-#
-# Start / stop (on mimir; the same two are linked into the home folder as
-# ~/start-render-node and ~/stop-render-node):
-#   octane-node-start     starts the service, shows the card and the node's log
-#   octane-node-stop      stops it and waits for the license logout
-# The service does not start at boot: the node takes a render-node license and
-# the card while it runs, so it is started when it is wanted.
-#
-# License safety: stopping sends SIGTERM to octane_node first and waits for its
-# license logout, then to the daemon (see node-stop-run). Never `kill -9`
-# octane_node / octane_node_daemon.
+# octane render node: mjolnir's OctaneServer renders on mimir's card over the lan
+# the node version must equal mjolnir's OctaneServer (2026.4 now), or it gets refused
+# install: sudo octane-node-install <node zip>, then octane-node-start / octane-node-stop
+# (also ~/start-render-node, ~/stop-render-node). more in docs/misc/octane.md
+# never kill -9 octane_node or the daemon: the license stays bound to this machine
 { pkgs, config, lib, ... }:
 let
   octaneBase = "/opt/octane";
   nodeBase = "${octaneBase}/node";
   standaloneBase = "${octaneBase}/standalone";
-  daemonPort = 48000;      # what mjolnir's OctaneServer scans for (its default)
-  # A node must hold the whole scene on its own card. Without this the node runs
-  # with "out-of-core textures disabled" (install-daemon.sh's default) and a scene
-  # bigger than mimir's 8 GB card does not load on it (mjolnir's RTX 5070 Ti has
-  # 16 GB since 2026-10-19, so its scenes can outgrow the node). Gigabytes of mimir's RAM.
+  daemonPort = 48000;      # octane's default, what mjolnir's OctaneServer looks for
+  # gb of mimir's ram for out-of-core textures. a node must hold the whole scene on its own
+  # card (8 gb here, 16 on mjolnir), and install-daemon.sh's default turns this off
   outOfCoreGb = 16;
-  nodeUser = "christina";  # the OTOY sign-in lives in this user's ~/.OctaneRender
+  nodeUser = "christina";  # the otoy sign-in lives in this user's ~/.OctaneRender
   octaneLibs = import ../../../../modules/apps/octane-libs.nix { inherit config; };
 
-  # Generic FHS shell: `octane-node-env <cmd>` runs <cmd> with OTOY's expected libs.
-  # Octane stores third-party downloads (cuDNN) under /etc/OctaneRender; the FHS
-  # sandbox has its own /etc, so bind a user-writable dir there (see octane.nix).
+  # octane keeps its downloads (cudnn) in /etc/OctaneRender, but the fhs sandbox has
+  # its own /etc, so a writable dir is bound there (same as mjolnir's octane.nix)
   etcBind = [ "--bind ${octaneBase}/etc /etc/OctaneRender" ];
 
+  # octane-node-env <cmd>: runs a command with the libs otoy expects
   octane-node-env = pkgs.buildFHSEnv {
     name = "octane-node-env";
     targetPkgs = octaneLibs;
@@ -50,8 +27,8 @@ let
     runScript = "bash";
   };
 
-  # OTOY's Linux zips are flat (liboctane.so next to the binary) and the RUNPATH
-  # points at their build tree, so the install dir goes on the library path.
+  # otoy's zips are flat and their RUNPATH points at otoy's build tree, so the
+  # install dir goes on LD_LIBRARY_PATH
   octane-standalone = pkgs.buildFHSEnv {
     name = "octane-standalone";
     targetPkgs = octaneLibs;
@@ -63,11 +40,8 @@ let
     '';
   };
 
-  # What the service runs. The 2026.4 node zip holds: install-daemon.sh,
-  # octane_node_daemon, octane_node, octane.dat, libsenseEIV.so (read 2026-10-13).
-  # install-daemon.sh (interactive, optional) writes run_octane_daemon.sh with the
-  # chosen port/GPUs; if it was not run, start the daemon the way that script
-  # would:  octane_node_daemon --port P --slave <octane_node> --alias NAME
+  # uses run_octane_daemon.sh if install-daemon.sh wrote one, else starts the daemon
+  # the way that script would
   daemon-start = pkgs.writeShellScript "octane-node-daemon-run" ''
     cd ${nodeBase} || exit 1
     export LD_LIBRARY_PATH="${nodeBase}:${nodeBase}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -83,12 +57,9 @@ let
     exit 1
   '';
 
-  # What stopping the service runs. The unit's main process is the bwrap wrapper
-  # of the FHS env (--die-with-parent): a SIGTERM to it never reaches Octane, the
-  # wrapper dies and the daemon is SIGKILLed with it, then systemd SIGKILLs what
-  # is left. No license logout that way. So the signals go to the Octane
-  # processes themselves, octane_node first (it holds the license), the daemon
-  # after it. Process names are cut to 15 characters: octane_node_dae.
+  # the unit's main process is the fhs bwrap wrapper: a SIGTERM to it never reaches octane,
+  # the daemon gets SIGKILLed and the license isn't logged out. so signal octane_node first
+  # (it holds the license), then the daemon. process names are cut to 15 chars: octane_node_dae
   node-stop-run = pkgs.writeShellScript "octane-node-stop-run" ''
     pg=${pkgs.procps}/bin/pgrep
     pk=${pkgs.procps}/bin/pkill
@@ -112,7 +83,7 @@ let
     exit 0
   '';
 
-  # The two commands she runs. sudo on mimir asks for no password.
+  # the two commands i run (sudo on mimir asks for no password)
   octane-node-start = pkgs.writeShellScriptBin "octane-node-start" ''
     PATH=${lib.makeBinPath (with pkgs; [ coreutils systemd gnugrep iproute2 ])}:/run/current-system/sw/bin:$PATH
     root() { if [ "$(id -u)" = 0 ]; then "$@"; else /run/wrappers/bin/sudo "$@"; fi; }
@@ -238,7 +209,6 @@ in
     "d ${standaloneBase}   0755 ${nodeUser} users -"
     "d ${octaneBase}/etc             0755 ${nodeUser} users -"
     "d ${octaneBase}/etc/thirdparty  0755 ${nodeUser} users -"
-    # The start and stop commands, also reachable in the home folder.
     "L+ /home/${nodeUser}/start-render-node - - - - ${octane-node-start}/bin/octane-node-start"
     "L+ /home/${nodeUser}/stop-render-node  - - - - ${octane-node-stop}/bin/octane-node-stop"
   ];
@@ -253,12 +223,11 @@ in
 
   systemd.services.octane-node = {
     description = "OctaneRender render-node daemon (network rendering for mjolnir)";
-    # No wantedBy: started with octane-node-start when the node is wanted.
+    # no wantedBy: it holds a render-node license and the card while it runs,
+    # so i start it with octane-node-start when i want it
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    # Not started until the package is installed. The test is on the daemon file:
-    # tmpfiles creates the directory, so a test on the directory was always true
-    # and the unit failed and restarted every 15 s on a box without the package.
+    # test the daemon file, not the dir: tmpfiles makes the dir, so that test is always true
     unitConfig.ConditionPathExists = "${nodeBase}/octane_node_daemon";
     serviceConfig = {
       Type = "simple";
@@ -267,8 +236,7 @@ in
       WorkingDirectory = nodeBase;
       Environment = [ "HOME=/home/${nodeUser}" ];
       ExecStart = "${octane-node-env}/bin/octane-node-env ${daemon-start}";
-      # Graceful stop = license logout, done by node-stop-run (see there). What
-      # systemd sends after it only meets the empty wrapper.
+      # the license logout happens here, what systemd sends after only hits the empty wrapper
       ExecStop = node-stop-run;
       Restart = "on-failure";
       RestartSec = 15;
@@ -279,13 +247,12 @@ in
     };
   };
 
-  # mjolnir reaches the daemon on this port (UDP broadcast). The daemon answers by
-  # TCP to a port OctaneServer picks itself, and the node then connects to the
-  # primary's 1047 and 1048: mjolnir's networking.nix lets this host in on TCP.
+  # mjolnir finds the daemon by udp broadcast on this port. the node then calls mjolnir back
+  # on tcp (1047, 1048 and a port OctaneServer picks), mjolnir's networking.nix lets mimir in
   networking.firewall.allowedTCPPorts = [ daemonPort ];
   networking.firewall.allowedUDPPorts = [ daemonPort ];
 
-  # One-time sign-in via `ssh -X` from mjolnir (CEF window over X forwarding).
+  # for the one-time otoy sign-in: octane-standalone --no-opengl over ssh -X from mjolnir
   services.openssh.settings.X11Forwarding = true;
   programs.ssh.setXAuthLocation = true;
 }

@@ -1,22 +1,13 @@
 { pkgs, lib, ... }:
 
-# `mimir-blender <blender arguments>`: runs Blender on mimir instead of here. For agents'
-# checks (dry runs, test scenes, bakes, look pictures) while Christina works in her own
-# Blender on mjolnir, so mjolnir's RAM and card stay hers. Skill `mimir-test-node`.
-#
-# Paths are the same on every host (/mnt/studio, /mnt/studio-cache and the
-# /mnt/data_ssd/<folder> links), so a .blend or script path works as it is. A file given
-# from a path mimir cannot see (a scratchpad in /tmp) is copied into the job folder
-# first. Every run gets its own folder /mnt/studio-cache/jobs/<time>-<host>-<pid>, which
-# Blender sees as $MIMIR_JOB_DIR: write results there. Memory cap 12G, or
-# MIMIR_BLENDER_MEM=20G. Octane is not installed on mimir's Blender: Octane renders stay
-# in her Blender (the one licence seat is on mjolnir).
-#
-# The arguments go to mimir's `blender-job` NUL-separated on stdin, never on the SSH
-# command line, so hermes' key there can be locked to that one command.
+# `mimir-blender <blender args>`: blender on mimir for agents' checks, so my blender on mjolnir
+# keeps its ram and card (skill mimir-test-node). results go in $MIMIR_JOB_DIR, which is
+# /mnt/studio-cache/jobs/<time>-<host>-<pid>; files mimir can't see (like /tmp) are copied in first
+# no octane on mimir's blender: the one licence seat is on mjolnir
+# the args go to mimir's `blender-job` on stdin, never on the ssh command line, so hermes'
+# key on mimir can be locked to that one command
 let
-  # Paths mimir sees as they are: the studio, its cache, and only the moved data SSD
-  # folders (the rest of mjolnir's data SSD, e.g. DF BETA, is not on mimir).
+  # paths mimir sees as they are; the rest of mjolnir's data ssd (DF BETA) isn't on mimir
   sharedPatterns = lib.concatStringsSep "|" (
     [ "/mnt/studio/*" "/mnt/studio-cache/*" ]
     ++ map (d: "${lib.escapeShellArg "/mnt/data_ssd/${d}/"}*") (import ../system/studio-folders.nix)

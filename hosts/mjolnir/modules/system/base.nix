@@ -1,3 +1,4 @@
+# mjolnir's desktop base, imported as its own file so module order stays the same
 { ... }:
 
 {

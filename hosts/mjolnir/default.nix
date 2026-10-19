@@ -28,21 +28,21 @@
     ./modules/apps/quixel-bridge.nix
     ./modules/apps/remote-desktop.nix
     ../../modules/system/tailscale.nix
-    ./modules/system/hyprland.nix      # Hyprland session (additive; oxwm untouched)
-    ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture` (terminal ↔ knowledge base)
-    ./modules/apps/obs.nix             # OBS Studio + ~/OBS-recordings (odyn NFS over 10GbE)
-    ./modules/apps/comfyui.nix         # ComfyUI (podman + CDI), models on odyn over 10GbE
-    ./modules/system/yggdrasil-link.nix           # hermes on yggdrasil: Blender + wowx MCP over SSH, `claude-to-yggdrasil`
-    ../../modules/system/hermes-wowx.nix   # /mnt/hermes-wowx on odyn: WoW exports + upscales, shared with yggdrasil
-    ../../modules/system/studio.nix        # /mnt/studio on odyn: all Blender files and projects (3DBLENDER moved there)
-    ../../modules/apps/mimir-blender.nix   # `mimir-blender`: agents run their Blender checks on mimir, not here
-    ./modules/system/mimir-test-node.nix          # `blender-config-to-mimir`: her add-ons for mimir's Blender, without Octane
-    ../../modules/system/agent-memory.nix  # /mnt/agent-memory on odyn: Claude's memory notes, shared with yggdrasil
+    ./modules/system/hyprland.nix          # hyprland as a second session, oxwm stays
+    ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture`
+    ./modules/apps/obs.nix                 # obs, records to ~/OBS-recordings on odyn
+    ./modules/apps/comfyui.nix             # comfyui in podman, models on odyn
+    ./modules/system/yggdrasil-link.nix    # hermes on yggdrasil: blender + wowx mcp over ssh, `claude-to-yggdrasil`
+    ../../modules/system/hermes-wowx.nix   # /mnt/hermes-wowx on odyn: wow exports, shared with yggdrasil
+    ../../modules/system/studio.nix        # /mnt/studio on odyn: my blender files
+    ../../modules/apps/mimir-blender.nix   # `mimir-blender`: agents run blender checks on mimir, not here
+    ./modules/system/mimir-test-node.nix   # `blender-config-to-mimir`: my add-ons for mimir's blender
+    ../../modules/system/agent-memory.nix  # ~/.agent-memory on odyn: claude's memory notes
   ];
 
   networking.hostName = "mjolnir";
 
-  # X11/oxwm stays your default; Hyprland is just another option in ly.
+  # oxwm on x11 stays my default, hyprland is just another option in ly
   services.xserver.windowManager.oxwm.enable = true;
 
   nix.settings = {
@@ -52,14 +52,12 @@
   nix.daemonCPUSchedPolicy = "idle";
   nix.daemonIOSchedClass = "idle";
 
-  # Disable systemd-ssh-proxy feature. Its ssh_config Include pulls in a
-  # store file owned by nobody, which OpenSSH rejects ("Bad owner or permissions").
-  # This was breaking all `ssh` (including graphify MCP over SSH and `ask`/`capture`).
-  # See: nixos/modules/programs/ssh.nix (systemd-ssh-proxy.enable)
+  # off: its ssh_config Include is a store file owned by nobody, openssh refuses it
+  # ("Bad owner or permissions") and every ssh breaks, graphify mcp, `ask` and `capture` too
   programs.ssh.systemd-ssh-proxy.enable = false;
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
 
-  # ixgbe X540 + AMD IOMMU: an IO_PAGE_FAULT then tx hangs on enp10s0f1 froze mjolnir
-  # under sustained NFS load (2026-10-16). Passthrough: host devices DMA directly, no VMs here.
+  # the X540 10GbE card froze mjolnir under long nfs copies (IO_PAGE_FAULT, then tx hangs).
+  # passthrough costs nothing, no vms here
   boot.kernelParams = [ "iommu=pt" ];
 }

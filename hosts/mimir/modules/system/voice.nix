@@ -1,16 +1,12 @@
 { pkgs, ... }:
 let
-  # Keep in sync with MUNINN_STT_MODEL / MUNINN_TTS_MODEL in heimdall's bridge.py.
+  # keep in sync with MUNINN_STT_MODEL / MUNINN_TTS_MODEL in heimdall's bridge.py
   models = [ "Systran/faster-whisper-small" "speaches-ai/Kokoro-82M-v1.0-ONNX" ];
 in
 {
-  # Local voice for the muninn brain: Whisper (ears) + Kokoro (mouth) behind one
-  # OpenAI-compatible API (Speaches). heimdall's bridge calls it at :8000; the
-  # browser never talks to mimir directly, and no audio leaves the LAN.
-  #
-  # CPU image. mimir has the RTX 4060 Ti since 2026-10-19 (8 GB, shared with ComfyUI
-  # and the Octane node); to run voice on it, switch the tag to `latest-cuda` and
-  # add:  extraOptions = [ "--device=nvidia.com/gpu=all" ];
+  # voice for the muninn brain: whisper + kokoro behind one openai-style api (speaches).
+  # only heimdall's bridge calls :8000, so no audio leaves the lan
+  # cpu image. for the card: tag latest-cuda + extraOptions = [ "--device=nvidia.com/gpu=all" ];
   systemd.tmpfiles.rules = [
     "d /var/lib/speaches 0755 1000 1000 -"   # model cache; the container runs as uid 1000
   ];
@@ -23,8 +19,7 @@ in
     volumes = [ "/var/lib/speaches:/home/ubuntu/.cache/huggingface/hub" ];
   };
 
-  # Models are not bundled: ask the server to download them once it is up.
-  # Safe to repeat; an already-installed model returns straight away.
+  # the image has no models: ask the server for them once it's up (safe to repeat)
   systemd.services.speaches-models = {
     description = "speaches: download the Whisper and Kokoro models";
     after = [ "podman-speaches.service" "network-online.target" ];

@@ -4,16 +4,13 @@
     enable = true;
     backend = "glx";
 
-    # Transparency
     activeOpacity = 1.0;
     inactiveOpacity = 0.9;
 
-    # Fade animations
     fade = true;
     fadeSteps = [ 0.03 0.03 ];
     fadeDelta = 5;
 
-    # Blur behind transparent windows
     settings = {
       blur = {
         method = "dual_kawase";
@@ -27,7 +24,7 @@
       ];
     };
 
-    # Don't dim or change opacity for fullscreen windows
+    # fullscreen and these apps stay fully opaque, even when inactive
   opacityRules = [
     "100:fullscreen"
     "100:class_g = 'dmenu'"

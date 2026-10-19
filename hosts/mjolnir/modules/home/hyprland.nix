@@ -1,17 +1,14 @@
 { config, lib, pkgs, ... }:
-# mjolnir Hyprland home config. Coexists with your oxwm/X11 home modules — the
-# files live under ~/.config/{hypr,waybar,mako} and are only read when you log
-# into the Hyprland session. Nothing here touches oxwm.
+# hyprland, waybar and mako config, only read in the hyprland session; oxwm uses none of it
 {
   home.packages = with pkgs; [
     waybar awww mako hypridle      # bar, wallpaper engine, notifications, idle
     cliphist wl-clipboard          # clipboard history
     grim slurp swappy              # screenshots + annotate
-    # rofi comes from your shared modules/home/programs.nix
-    # hyprlock comes from programs.hyprlock.enable (system module)
+    # rofi is in ./programs.nix, hyprlock in the system hyprland.nix
   ];
 
-  # Live-edit symlinks: edit files in the repo, Hyprland/waybar pick them up.
+  # links into the repo, so i edit hypr, waybar and mako there without a rebuild
   xdg.configFile."hypr".source =
     config.lib.file.mkOutOfStoreSymlink
       "${config.home.homeDirectory}/nixos-dotfiles/hosts/mjolnir/hypr";

@@ -1,12 +1,8 @@
 { config, lib, ... }:
 
-# odyn datasets vault/studio and vault/studio-cache (NFS shares 14 and 15, every client
-# mapped to the NAS user christina, uid 3002). The studio holds all Blender files and
-# projects: 3DBLENDER and the other folders she uses for Blender, moved off mjolnir's
-# data SSD in 2026-10. It has hourly (2 days), daily (30 days) and weekly (12 weeks)
-# snapshots, so older versions of a file are under /mnt/studio/.zfs/snapshot/. The cache
-# is for sim caches and job scratch (mimir-blender's job folders) and has none. Same
-# paths on mjolnir, mimir and yggdrasil.
+# /mnt/studio (all my blender files and projects) and /mnt/studio-cache (sim caches and
+# job scratch, no snapshots) on odyn, same paths on mjolnir, mimir and yggdrasil
+# old versions of a studio file are in /mnt/studio/.zfs/snapshot/
 let
   moved = import ./studio-folders.nix;
 
@@ -15,8 +11,8 @@ let
     fsType = "nfs";
     options = [
       "nfsvers=4.2"
-      # hard, unlike the other shares: when odyn hiccups, Blender waits instead of
-      # getting a write error halfway through saving a file.
+      # hard, unlike my other shares: on an odyn hiccup blender waits instead of
+      # failing halfway through saving a file
       "hard"
       "noatime"
       "_netdev"
@@ -30,22 +26,20 @@ let
   };
 in
 {
-  # In the Files sidebar as a bookmark (~/.config/gtk-3.0/bookmarks on mjolnir), not
-  # x-gvfs-show: Files would try to mount the NFS share as her user, which NixOS refuses.
+  # no x-gvfs-show: files would mount it as my user, which nixos refuses.
+  # it's a bookmark in ~/.config/gtk-3.0/bookmarks on mjolnir instead
   fileSystems."/mnt/studio" = share "studio" [ ];
   fileSystems."/mnt/studio-cache" = share "studio-cache" [ ];
 
-  # The old paths keep working: .blend files, scripts and notes point at
-  # /mnt/data_ssd/<folder>. On mjolnir those links sit on the data SSD itself (made by
-  # hand when the folders moved), so they are only declared on hosts without that disk.
-  # Plain L never replaces a file or folder that is already there.
+  # the old /mnt/data_ssd/<folder> paths in my .blend files and scripts keep working.
+  # on mjolnir those links are on the data ssd itself (made by hand), so only hosts
+  # without that disk declare them. plain L never replaces what's already there
   systemd.tmpfiles.rules = lib.mkMerge [
     (lib.mkIf (!(config.fileSystems ? "/mnt/data_ssd")) (
       [ "d /mnt/data_ssd 0755 root root -" ]
       ++ map (d: ''L "/mnt/data_ssd/${d}" - - - - /mnt/studio/${d}'') moved
     ))
-    # Her Blender preferences keep four asset libraries (Fia base/extra, Sanctus,
-    # Strandkit) under /mnt/data-ssd/3DBLENDER, with a dash; this makes them resolve.
+    # my blender prefs have four asset libraries under /mnt/data-ssd/3DBLENDER, with a dash
     [ "L /mnt/data-ssd - - - - /mnt/data_ssd" ]
   ];
 }

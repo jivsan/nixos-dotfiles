@@ -1,10 +1,8 @@
 { inputs, config, lib, ... }:
 let
-  # One key for every MCP server reached over SSH, used by the gateway (user
-  # hermes) and by christina's CLI alike. root:hermes 0640: ssh only checks the
-  # permissions of keys the caller owns, so both accept it. Made on hermod
-  # (comment hermes-mcp@hermod) and carried over to yggdrasil. Its public half is authorized
-  # on heimdall for graphify only and on mjolnir for the blender and wowx MCP servers only.
+  # one key for every mcp server over ssh, for the gateway (hermes) and my cli alike.
+  # root:hermes 0640 works for both: ssh only checks the permissions of keys the caller owns.
+  # its public half is allowed on heimdall for graphify only, on mjolnir for blender and wowx only
   mcpKey = "/var/lib/hermes-ssh/id_ed25519";
   ssh = [ "-o" "BatchMode=yes" "-o" "ConnectTimeout=10" "-o" "IdentitiesOnly=yes" "-i" mcpKey ];
   graphify = graph: {
@@ -22,36 +20,28 @@ in
   services.hermes-agent = {
     enable = true;
     addToSystemPackages = true;
-    # Kimi K3 through OpenRouter (OPENROUTER_API_KEY in /etc/hermes/env), on Sail
-    # Research only: the cheapest output price for K3. The Codex login stays in
-    # auth.json, so provider "openai-codex" + "gpt-6-astra" switches back.
+    # kimi k3 on openrouter (OPENROUTER_API_KEY=... in /etc/hermes/env), sail research only: cheapest k3 output.
+    # the codex login is still in auth.json, so provider "openai-codex" + "gpt-6-astra" switches back
     settings.model = {
       provider = "openrouter";
       default = "moonshotai/kimi-k3";
     };
     settings.provider_routing.only = [ "sail-research/fp4" ];
-    # Every tool goes to the model as is. With the tool_search bridge Kimi K3
-    # dropped the arguments it passed through tool_call (graphify's `question`),
-    # so MCP tools with arguments never ran; called directly they work on Sail.
+    # tool_search off: through its bridge kimi dropped the arguments (graphify's `question`),
+    # so mcp tools with arguments never ran. called directly they work
     settings.tools.tool_search.enabled = "off";
-    # Kimi still reasons, the thinking just isn't printed: every streamed reasoning
-    # line made the CLI redraw its status bar, which flickered badly over SSH.
-    # `/reasoning show` brings it back for one session.
+    # kimi still reasons, it's just not printed: every reasoning line redrew the cli's status bar
+    # and it flickered badly over ssh. `/reasoning show` brings it back for one session
     settings.display.show_reasoning = false;
-    # Claude Code's skills, memory notes (skill `claude-memory`) and homelab
-    # context, copied from mjolnir by `claude-to-yggdrasil`. Not in this repo: it is
-    # public. The context lands in the workspace as AGENTS.md.
+    # claude's skills, notes (skill `claude-memory`) and homelab context, pushed from mjolnir by
+    # `claude-to-yggdrasil`. not in this repo since it's public; the context lands in the workspace as AGENTS.md
     settings.skills.external_dirs = [ "/var/lib/hermes/claude/skills" ];
-    # The index of Claude's notes (about 26 KB) is in every session, CLI, API and
-    # cron alike, so she never has to ask for it; the notes are read on demand.
+    # the index of claude's notes (~26 KB) goes into every session, the notes are read on demand
     settings.skills.auto_load = [ "claude-memory" ];
-    # Searches go to Brave (BRAVE_SEARCH_API_KEY in /etc/hermes/env, free tier
-    # 2,000 a month). Brave only searches, it can't read pages. When a Brave call
-    # fails (quota used up, bad key), hermes retries that one search on the free
-    # keyless backends and tries Brave again on the next search.
+    # brave: BRAVE_SEARCH_API_KEY=... in /etc/hermes/env, free tier 2,000 a month, search only (can't read pages).
+    # a failed brave call is retried on the free keyless backends, brave again on the next search
     settings.web.search_backend = "brave-free";
-    # Pages are read through Firecrawl's public tier, which needs no key; when it
-    # throttles, hermes moves on to Keenable, Exa and Parallel by itself.
+    # pages via firecrawl's keyless public tier; when it throttles hermes moves on to keenable, exa and parallel
     settings.web.extract_backend = "firecrawl";
     environmentFiles = [ "/etc/hermes/env" ];
     environment = {
@@ -61,11 +51,9 @@ in
     mcpServers = {
       graphify-dotfiles = graphify "dotfiles";
       graphify-vault = graphify "vault";
-      # MCP servers on mjolnir: the key's forced command there starts the one
-      # named by the last word (hosts/mjolnir/modules/yggdrasil-link.nix). blender
-      # drives the extension on mjolnir's localhost:9876, so Blender must be open;
-      # wowx finds, exports and upscales WoW models into /mnt/hermes-wowx, which
-      # is mounted here too. A wowx run takes 12 to 20 s, a building minutes.
+      # on mjolnir the key's forced command starts the server named by the last word
+      # (hosts/mjolnir/modules/system/yggdrasil-link.nix). blender needs my blender open
+      # (extension on mjolnir's localhost:9876); wowx can take minutes on a building, hence the timeout
       blender = {
         command = "ssh";
         args = ssh ++ [ "christina@10.0.20.100" "blender" ];
@@ -81,28 +69,24 @@ in
   programs.ssh.knownHosts."10.0.20.100".publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIly980X2Lw7E3AiWvKeNs042hmgTaVEFzCcq6Ugqxiw";
 
-  # The gateway runs as the hermes user, which cannot enter /home/christina
-  # (0700), so it never saw the vault at ~/muninn. Mount the same export where
-  # the service can reach it; odyn squashes every client to the vault owner, so
-  # hermes reads and writes there. The unit is ProtectSystem=strict: without the
-  # ReadWritePaths entry, a vault already mounted when the gateway starts would
-  # be read-only inside it. The bridge on heimdall tells hermes this path.
+  # the vault again at /mnt/muninn: hermes can't enter my home (0700), and odyn maps every client
+  # to the vault owner so it can write there. the unit is ProtectSystem=strict, so a mount without
+  # a ReadWritePaths entry is read-only inside it. the brain bridge on heimdall tells hermes this path
   fileSystems."/mnt/muninn" = {
     inherit (config.fileSystems."/home/christina/muninn") device fsType options;
   };
-  # /mnt/studio-cache: `mimir-blender` makes its job folders there (skill mimir-test-node).
+  # /mnt/studio-cache: `mimir-blender` makes its job folders there
   systemd.services.hermes-agent.serviceConfig.ReadWritePaths =
     [ "-/mnt/muninn" "-/mnt/hermes-wowx" "-/mnt/studio-cache" ];
 
+  # gateway api, the brain bridge on heimdall calls it
   networking.firewall.allowedTCPPorts = [ 8642 ];
 
   users.users.christina.extraGroups = [ config.services.hermes-agent.group ];
 
-  # The CLI refuses to reach the gateway while hermes' home is group-writable
-  # (unsafe_control_permissions), but the module sets it to 2770 on every activation
-  # and in tmpfiles. Everything runs as the hermes user here, so the group only reads:
-  # take the write bit away right after the module's setup, and put our tmpfiles
-  # line first (tmpfiles keeps the first line for a path and ignores the duplicate).
+  # the cli won't reach the gateway while .hermes is group-writable (unsafe_control_permissions),
+  # and the module sets 2770 on every activation and in tmpfiles. so: chmod g-w right after its
+  # setup, and my tmpfiles line goes first (tmpfiles keeps the first line for a path)
   system.activationScripts.hermes-home-not-group-writable =
     lib.stringAfter [ "hermes-agent-setup" ] "chmod g-w /var/lib/hermes/.hermes";
   systemd.tmpfiles.rules = lib.mkMerge [

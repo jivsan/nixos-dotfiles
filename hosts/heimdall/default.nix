@@ -17,7 +17,7 @@
     ./modules/system/nas.nix
     ./modules/system/immich.nix
     ./modules/system/crafty.nix
-    ./modules/system/homarr.nix          # dashboard at home.oryxserver.org (replaced homepage)
+    ./modules/system/homarr.nix          # dashboard at home.oryxserver.org
     ./modules/system/paperless.nix
     ./modules/system/grafana.nix
     ./modules/system/prometheus.nix
@@ -32,7 +32,7 @@
     ./modules/system/obsidian.nix
     ./modules/system/huginn.nix
     ./modules/system/brain.nix
-    ./modules/system/ai-gateway.nix       # OpenAI-style front door for mimir's models + OpenRouter, with metrics
+    ./modules/system/ai-gateway.nix       # one openai-style endpoint for my models, with metrics
     ./modules/system/hlidskjalf.nix
     ./modules/system/newt.nix
     ./modules/system/amneziawg.nix
@@ -46,7 +46,7 @@
     prefixLength = 24;
   }];
   networking.defaultGateway = "10.0.20.1";
-  networking.nameservers = [ "10.0.20.4" ];   # Pi-hole — so *.oryxserver.org local records resolve
+  networking.nameservers = [ "10.0.20.4" ];   # pi-hole, so the local *.oryxserver.org records resolve
   networking.firewall.enable = true;
 
   services.openssh = {
@@ -59,10 +59,9 @@
 
   users.users.christina.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJzbgLEOUP00lHJUp6MYDOm2kDyHjr9khWaGc84YnpXL mimir"
-    # christina on yggdrasil (key made on hermod and carried over with it)
+    # me on yggdrasil (the key still says hermod)
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJqRu0/cwcMKm5+Rxm8jx8GfpaqCtPieqGaxetVH8Prj hermod"
-    # hermes on yggdrasil (gateway and CLI): this key only starts the graphify MCP
-    # servers, so the gateway gets graph tools without a shell on heimdall.
+    # hermes on yggdrasil: this key can only start the graphify mcp servers, no shell on heimdall
     ''restrict,command="${pkgs.writeShellScript "graphify-mcp-only" ''
       for g in vault dotfiles; do
         if [ "$SSH_ORIGINAL_COMMAND" = "env HOME=/var/lib/huginn /var/lib/huginn/.local/bin/graphify-mcp /var/lib/huginn/graphs/$g/graph.json" ]; then

@@ -1,8 +1,7 @@
 { config, pkgs, ... }:
 
 let
-  # SQLite must live on LOCAL disk — never on the NFS share. NFS file locking is
-  # unreliable enough to corrupt a SQLite DB, and this one holds the vault.
+  # sqlite stays on local disk, nfs locking can corrupt it
   vwData = "/var/lib/vaultwarden";
   vwBackups = "/mnt/nas/nix-services/vaultwarden/backups";
 in
@@ -16,20 +15,17 @@ in
     autoStart = true;
     ports = [ "127.0.0.1:8222:80" ];
 
-    # No ADMIN_TOKEN on purpose: leaving it unset disables /admin entirely,
-    # which removes an attack surface on the host holding every password and
-    # keeps configuration declarative here rather than in a web UI. If the
-    # admin panel is ever needed, add an argon2 hash via an environmentFiles
-    # entry — the `/vaultwarden hash` helper needs an interactive TTY.
+    # no ADMIN_TOKEN on purpose: /admin stays off and the config stays here.
+    # if i ever need it, put an argon2 hash in an environmentFiles entry (`/vaultwarden hash` needs a tty)
 
     environment = {
       DOMAIN = "https://vault.oryxserver.org";
 
-      # Flip to "false" and rebuild immediately after registering the first
-      # account — otherwise anyone reaching Traefik can create a vault here.
+      # set "false" and rebuild right after the first account is made,
+      # or anyone who reaches traefik can make a vault here
       SIGNUPS_ALLOWED = "true";
 
-      # Trim log noise; failed logins still surface.
+      # failed logins still show at warn
       LOG_LEVEL = "warn";
       EXTENDED_LOGGING = "true";
     };
@@ -37,9 +33,7 @@ in
     volumes = [ "${vwData}:/data" ];
   };
 
-  # ─── Daily backup to the NAS ───
-  # sqlite3 .backup takes a consistent snapshot of a live DB — a plain cp can
-  # copy a torn page mid-write and yield an unrestorable vault.
+  # daily backup to odyn with sqlite3 .backup: a plain cp of the live db can catch a torn page
   systemd.services.vaultwarden-backup = {
     description = "Back up the Vaultwarden vault to TrueNAS";
     path = [ pkgs.sqlite pkgs.coreutils pkgs.gzip pkgs.gnutar ];

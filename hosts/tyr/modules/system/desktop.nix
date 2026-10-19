@@ -1,9 +1,6 @@
 { config, pkgs, ... }:
-# tyr's desktop: oxwm served over RDP by xrdp (connect with Remmina).
-#
-# No display manager and no local X server — xrdp starts an Xorg session when
-# you connect and keeps it running after you disconnect, so agents carry on.
-# Unlike modules/system/remote.nix this leaves sshd alone (tyr is key-only).
+# oxwm over rdp with xrdp (i connect with remmina), no display manager or local x server.
+# the session keeps running after i disconnect, so agents carry on
 let
   xrdpOxwm = pkgs.writeShellScript "xrdp-oxwm" ''
     export XDG_SESSION_TYPE=x11
@@ -27,6 +24,6 @@ in
     defaultWindowManager = "${xrdpOxwm}";
   };
 
-  # No GPU in the VM: Mesa llvmpipe so GL clients (alacritty) can start.
+  # no gpu in the vm: mesa llvmpipe so gl apps like alacritty can start
   hardware.graphics.enable = true;
 }

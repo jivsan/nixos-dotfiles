@@ -16,12 +16,10 @@
       enabledCollectors = [ "systemd" "processes" ];
     };
     scrapeConfigs = [
-      # === Self ===
       {
         job_name = "prometheus";
         static_configs = [{ targets = [ "localhost:9090" ]; }];
       }
-      # === node_exporter on every host ===
       {
         job_name = "node";
         static_configs = [
@@ -31,27 +29,24 @@
           { targets = [ "10.0.20.18:9100" ];     labels = { host = "mimir"; }; }
         ];
       }
-      # === ai-gateway (ai-gateway.nix): requests, tokens, latency per model ===
       {
         job_name = "ai-gateway";
         static_configs = [{ targets = [ "localhost:4000" ]; }];
       }
-      # === mimir's GPU via nvidia-smi (hosts/mimir/modules/system/exporters.nix) ===
+      # hosts/mimir/modules/system/gpu-exporter.nix
       {
         job_name = "nvidia-gpu";
         static_configs = [{ targets = [ "10.0.20.18:9835" ]; labels = { host = "mimir"; }; }];
       }
-      # === Postgres exporters ===
       {
         job_name = "postgres-immich";
         static_configs = [{ targets = [ "localhost:9187" ]; labels.db = "immich"; }];
       }
-      # === Traefik built-in metrics ===
       {
         job_name = "traefik";
         static_configs = [{ targets = [ "localhost:8082" ]; }];
       }
-      # === pfSense via Telegraf ===
+      # telegraf on pfsense
       {
         job_name = "pfsense";
         static_configs = [{
@@ -62,7 +57,7 @@
           };
         }];
       }
-      # === Arista switch (bifrost) via local Telegraf SNMP poller ===
+      # bifrost, through the telegraf snmp poller in switch-snmp.nix
       {
         job_name = "switch";
         static_configs = [{
@@ -73,7 +68,6 @@
           };
         }];
       }
-      # === Blackbox: HTTPS endpoint health ===
       {
         job_name = "blackbox-https";
         metrics_path = "/probe";
@@ -95,5 +89,6 @@
       }
     ];
   };
+  # grafana's container reaches prometheus, loki and influxdb on the host over podman0
   networking.firewall.trustedInterfaces = [ "podman0" ];
 }

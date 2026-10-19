@@ -1,7 +1,7 @@
 { ... }:
 
 let
-  # Fleet neon accents (same family as mimir/tyr)
+  # neon accents, same as mimir and tyr
   pink = "38;2;255;79;163";   # #ff4fa3
   cyan = "38;2;45;226;230";   # #2de2e6
   dim  = "38;2;99;99;125";    # muted steel
@@ -14,8 +14,7 @@ in
       "$schema" = "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json";
 
       logo = {
-        # "NIXOS" slant lettering, pink → cyan gradient baked into the file
-        # (regenerate: figlet -f slant NIXOS + per-column truecolor interpolation)
+        # pink to cyan gradient baked into the file (figlet -f slant NIXOS, truecolour per column)
         type = "file-raw";
         source = "${./heimdall-logo.txt}";
         padding = { top = 1; right = 4; };
@@ -24,11 +23,11 @@ in
       display = {
         separator = "  ";
         color.keys = cyan;
-        percent.type = 9;   # colored % — green → yellow → red by usage
+        percent.type = 9;   # coloured %, green to red by usage
       };
 
       modules = [
-        # ── identity ──────────────────────────────────────────────
+        # identity
         { type = "title"; color = { user = pink; at = dim; host = cyan; }; }
         { type = "custom"; format = "{#${dim}}⟨ {#${pink}}heimdall{#${dim}} :: watcher of the bifrǫst — services node ⟩"; }
         { type = "separator"; string = "─"; }
@@ -40,7 +39,7 @@ in
         { type = "loadavg";  key = "󰓅 load";    keyColor = cyan; }
         "break"
 
-        # ── lab — what a services box cares about ─────────────────
+        # lab
         {
           type = "command";
           key = "󰜉 gen";
@@ -73,7 +72,7 @@ in
         }
         "break"
 
-        # ── hardware ──────────────────────────────────────────────
+        # hardware
         { type = "cpu";    key = "󰻠 cpu";    keyColor = pink;  format = "{name} ({cores-logical}t)"; }
         { type = "memory"; key = "󰑭 memory"; keyColor = cyan; }
         { type = "swap";   key = "󰓡 swap";   keyColor = pink; }
@@ -86,13 +85,13 @@ in
         }
         "break"
 
-        # ── network ───────────────────────────────────────────────
+        # network
         {
           type = "localip";
           key = "󰩟 network";
           keyColor = cyan;
           showPrefixLen = true;
-          namePrefix = "en";     # ens*/eno* only — hides lo, tailscale, podman veths
+          namePrefix = "en";     # only ens*/eno*, hides lo, tailscale and podman veths
         }
         {
           type = "command";

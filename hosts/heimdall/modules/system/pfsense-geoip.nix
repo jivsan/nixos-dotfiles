@@ -3,7 +3,7 @@ let
   pyEnv = pkgs.python3.withPackages (ps: [ ps.geoip2 ]);
 in
 {
-  # 1) Keep GeoLite2-City.mmdb fresh (license key is a host secret, never in the repo).
+  # weekly GeoLite2-City.mmdb download, maxmind license key in /var/lib/secrets/maxmind-license
   systemd.services.geolite-update = {
     description = "Download/refresh MaxMind GeoLite2-City database";
     path = [ pkgs.curl pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.findutils ];
@@ -26,7 +26,7 @@ in
     timerConfig = { OnBootSec = "2min"; OnCalendar = "weekly"; Persistent = true; };
   };
 
-  # 2) Receive pfSense firewall syslog, geolocate blocked inbound sources -> InfluxDB.
+  # pfsense firewall syslog in, blocked inbound sources geolocated into influxdb
   systemd.services.pfsense-geoip = {
     description = "pfSense firewall geo-locator (syslog -> InfluxDB)";
     after = [ "geolite-update.service" "podman-influxdb.service" "network.target" ];
@@ -36,11 +36,11 @@ in
       ExecStart = "${pyEnv}/bin/python3 ${./pfsense-geoip.py}";
       Restart = "always";
       RestartSec = "10";
-      DynamicUser = true;                 # unprivileged; 5514 is a high port
+      DynamicUser = true;                 # 5514 is above 1024, so no root needed
       ReadOnlyPaths = [ "/var/lib/GeoIP" ];
     };
   };
 
-  # pfSense sends firewall events here (Status → System Logs → Settings → Remote Logging)
+  # set on pfsense under status > system logs > settings > remote logging
   networking.firewall.allowedUDPPorts = [ 5514 ];
 }

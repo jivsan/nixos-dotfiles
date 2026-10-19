@@ -20,10 +20,10 @@ in
     ];
 
     ports = [
-      "0.0.0.0:8443:8443"        # Crafty web admin (HTTPS, self-signed)
-      "0.0.0.0:25565:25565/tcp"  # Minecraft Java
-      "0.0.0.0:19132:19132/udp"  # Minecraft Bedrock
-      "0.0.0.0:8123:8123/tcp"    # Dynmap (if you ever add it)
+      "0.0.0.0:8443:8443"        # crafty web admin (https, self-signed)
+      "0.0.0.0:25565:25565/tcp"  # minecraft java
+      "0.0.0.0:19132:19132/udp"  # minecraft bedrock
+      "0.0.0.0:8123:8123/tcp"    # dynmap, if i ever add it
     ];
   };
 

@@ -3,11 +3,10 @@
 let
   sureBase = "/var/lib/sure";
 
-  # Shared by sure-web and sure-worker — they run the same image.
   sureEnv = {
     SELF_HOSTED      = "true";
     RAILS_ENV        = "production";
-    RAILS_FORCE_SSL  = "false";   # Traefik on heimdall terminates TLS
+    RAILS_FORCE_SSL  = "false";   # traefik on heimdall does the tls
     RAILS_ASSUME_SSL = "true";
 
     DB_HOST       = "sure-db";
@@ -17,8 +16,7 @@ let
 
     REDIS_URL = "redis://sure-redis:6379/1";
 
-    # action_mailer's default_url_options reads this — without it, password
-    # reset and invitation emails render links to a bare host.
+    # without it, password reset and invite emails link to a bare host (action_mailer reads it)
     APP_DOMAIN = "sure.oryxserver.org";
 
     WEBAUTHN_RP_ID           = "sure.oryxserver.org";
@@ -70,7 +68,7 @@ in
     sure-web = {
       image = "ghcr.io/we-promise/sure:stable";
       autoStart = true;
-      ports = [ "10.0.20.20:3000:3000" ];   # LAN-bound; nftables restricts to heimdall
+      ports = [ "10.0.20.20:3000:3000" ];   # lan only; the nftables table below lets just heimdall in
       environmentFiles = [ "/var/lib/secrets/sure.env" ];
       environment = sureEnv;
       extraOptions = [ "--network=sure" ];
@@ -106,23 +104,15 @@ in
     requires = [ "create-sure-network.service" "podman-sure-db.service" "podman-sure-redis.service" ];
   };
 
-  # ─── Only heimdall's Traefik may reach the app port ───
-  # nftables (rather than the fleet-default iptables backend) is required for
-  # extraInputRules. Unlike the iptables path, netavark does NOT get its accept
-  # rules in ahead of nixos-fw's `policy drop`, so the podman bridge must be
-  # trusted explicitly — without it, container->aardvark-dns (:53 on the bridge
-  # gateway) is dropped and every container fails to resolve its peers.
+  # only heimdall's traefik may reach port 3000
+  # sure0 must be trusted: under nftables netavark's accept rules don't land ahead of nixos-fw's
+  # drop, so containers can't reach aardvark-dns (:53 on the bridge) to find each other
   networking.nftables.enable = true;
   networking.firewall.trustedInterfaces = [ "sure0" ];
 
-  # Restricting the published port is harder than it looks:
-  #   - it is DNAT'd by netavark in prerouting, so it never reaches INPUT;
-  #   - nixos-fw's forward-allow starts with `ct status dnat accept`
-  #     ("allow port forward"), and extraForwardRules can only append AFTER
-  #     that, so a drop there is never reached.
-  # So filter in a dedicated table at prerouting/raw (priority -300), which
-  # runs before dstnat (-100) — the destination is still 10.0.20.20:3000 here,
-  # and a drop in any table is terminal regardless of what nixos-fw accepts.
+  # the published port can't be dropped in input (netavark dnats it in prerouting) or in
+  # extraForwardRules (nixos-fw accepts dnat'd traffic first), so it's dropped in its own table
+  # at prerouting priority raw, before dstnat, while the destination is still 10.0.20.20:3000
   networking.nftables.tables.sure-isolation = {
     family = "ip";
     content = ''

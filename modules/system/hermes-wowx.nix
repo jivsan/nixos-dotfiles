@@ -1,9 +1,7 @@
 { ... }:
 
-# odyn dataset vault/hermes-wowx (NFS share 13, every client mapped to the NAS user
-# christina, uid 3002): WoW models exported by wowx and their Upscayl upscales. Mounted
-# at the same path on mjolnir, where wowx and Upscayl run, and on yggdrasil, where hermes
-# reads and writes them, so a path one of them reports works on the other.
+# wow models from wowx and their upscayl upscales, on odyn. same path on mjolnir (wowx and
+# upscayl run there) and yggdrasil (hermes uses them), so a path one reports works on the other
 {
   fileSystems."/mnt/hermes-wowx" = {
     device = "10.0.20.6:/mnt/vault/hermes-wowx";
@@ -18,9 +16,8 @@
       "wsize=1048576"
       "x-systemd.automount"
       "x-systemd.idle-timeout=600"
-      # No x-gvfs-show: Files would mount it as her user and NixOS has no setuid
-      # mount.nfs ("user" NFS mounts not supported). It is a bookmark in
-      # ~/.config/gtk-3.0/bookmarks instead; opening that wakes the automount.
+      # no x-gvfs-show: files would mount it as my user, and nixos has no setuid mount.nfs.
+      # it's a bookmark in ~/.config/gtk-3.0/bookmarks instead, opening it wakes the automount
     ];
   };
 }

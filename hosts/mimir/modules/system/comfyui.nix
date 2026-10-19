@@ -1,26 +1,17 @@
 { ... }:
 let
-  # Keep in sync with comfyui/Containerfile + comfyui/build.sh.
+  # keep in sync with comfyui/Containerfile + comfyui/build.sh
   version = "v0.28.2";
 in
 {
-  # ComfyUI has no first-class NixOS module, so run it as a podman container
-  # with GPU passthrough (CDI, see nvidia.nix). The image is built locally on
-  # mimir from ./comfyui/Containerfile — pinned by construction, nothing is
-  # pulled at runtime:   cd comfyui && ./build.sh
-  #
-  # Models + outputs live on odyn in the dataset vault/comfyui, shared with
-  # mjolnir so both hosts see one catalog — drop a checkpoint once and it shows
-  # up on both. This replaced the local ZFS scratch pool when those SSDs came
-  # out of mimir; /scratch no longer exists as a mount.
-  #
-  # The bot on this host and humans on http://10.0.20.18:8188 share this
-  # instance (and its queue).
+  # comfyui as a podman container on the card (cdi, see nvidia.nix). the image is built
+  # here from ./comfyui/Containerfile, nothing is pulled:  cd comfyui && ./build.sh
+  # models and output are on odyn (vault/comfyui), shared with mjolnir: one catalog for both
 
   boot.supportedFilesystems = [ "nfs" ];
 
-  # No x-systemd.automount: podman resolves bind-mount paths at container
-  # start and would otherwise bind an empty, un-triggered directory.
+  # no x-systemd.automount: podman resolves bind paths at container start and would
+  # bind the empty, untriggered dir
   fileSystems."/mnt/odyn/comfyui" = {
     device = "10.0.20.6:/mnt/vault/comfyui";
     fsType = "nfs";
@@ -37,8 +28,7 @@ in
     ];
   };
 
-  # Host-local state only. user/ holds a sqlite db and temp/ is hot scratch
-  # I/O — neither belongs on NFS, and both are per-host anyway.
+  # user/ has a sqlite db and temp/ is hot scratch, so both stay on local disk, not nfs
   systemd.tmpfiles.rules = [
     "d /var/lib/comfyui       0755 root root -"
     "d /var/lib/comfyui/user  0755 root root -"
@@ -60,15 +50,14 @@ in
       "/var/lib/comfyui/temp:/app/ComfyUI/temp"
     ];
 
-    # GPU via CDI — requires hardware.nvidia-container-toolkit (nvidia.nix)
+    # gpu via cdi, needs hardware.nvidia-container-toolkit (nvidia.nix)
     extraOptions = [ "--device=nvidia.com/gpu=all" "--pull=never" ];
   };
 
-  # Refuse to start against a missing NFS mount rather than silently serving an
-  # empty model library. NOTE: this makes ComfyUI *and* the Discord bot depend
-  # on odyn being up.
+  # no start without the odyn mount, or it serves an empty model library. so comfyui
+  # (and the discord bot, when it's on) needs odyn up
   systemd.services.podman-comfyui.unitConfig.RequiresMountsFor = "/mnt/odyn/comfyui";
 
-  # reachable from the storage VLAN (mjolnir browses the web UI here)
+  # web ui, mjolnir opens it at http://10.0.20.18:8188
   networking.firewall.allowedTCPPorts = [ 8188 ];
 }

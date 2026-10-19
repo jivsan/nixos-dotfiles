@@ -1,12 +1,8 @@
 { ... }:
 {
-  # Poll bifrost (Arista DCS-7050TX-48) over SNMP v2c and expose the interface
-  # counters as Prometheus metrics on 127.0.0.1:9274. Prometheus scrapes that
-  # (see prometheus.nix, job "switch"); Grafana graphs it (switch-dashboard.json).
-  #
-  # The RO community lives in /var/lib/secrets/telegraf.env as:
-  #     SNMP_COMMUNITY=ro-xxxxxxxx
-  # and is enabled on the switch with `snmp-server community <same> ro SNMP-RO`.
+  # telegraf polls bifrost's interface counters over snmp v2c for prometheus (job "switch")
+  # needs SNMP_COMMUNITY=ro-... in /var/lib/secrets/telegraf.env,
+  # the same community set on the switch: snmp-server community <same> ro SNMP-RO
   services.telegraf = {
     enable = true;
     environmentFiles = [ "/var/lib/secrets/telegraf.env" ];
@@ -25,13 +21,12 @@
         retries   = 1;
         name      = "snmp";
 
-        # Device identity (numeric OIDs + explicit names → no MIBs needed)
+        # numeric oids with names, so no mibs are needed
         field = [
           { name = "sysName";   oid = "1.3.6.1.2.1.1.5.0"; is_tag = true; }
           { name = "sysUpTime"; oid = "1.3.6.1.2.1.1.3.0"; }
         ];
 
-        # Per-interface counters (IF-MIB ifXTable / ifTable)
         table = [{
           name = "interface";
           inherit_tags = [ "sysName" ];
@@ -52,7 +47,7 @@
       }];
 
       outputs.prometheus_client = [{
-        listen         = "127.0.0.1:9274";   # loopback — Prometheus is on the same host
+        listen         = "127.0.0.1:9274";
         metric_version = 2;
       }];
     };

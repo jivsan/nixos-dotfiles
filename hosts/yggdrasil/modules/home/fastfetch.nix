@@ -24,11 +24,11 @@ in
       display = {
         separator = "  ";
         color.keys = cyan;
-        percent.type = 9;   # colored % — green → yellow → red by usage
+        percent.type = 9;   # % in green → yellow → red by usage
       };
 
       modules = [
-        # ── identity ──────────────────────────────────────────────
+        # identity
         { type = "title"; color = { user = pink; at = dim; host = cyan; }; }
         { type = "custom"; format = "{#${dim}}⟨ {#${pink}}yggdrasil{#${dim}} :: hermes and the fleet, outside hella ⟩"; }
         { type = "separator"; string = "─"; }
@@ -40,7 +40,7 @@ in
         { type = "loadavg";  key = "󰓅 load";    keyColor = cyan; }
         "break"
 
-        # ── deploy state ─────────────────────
+        # deploy state
         {
           type = "command";
           key = "󰜉 gen";
@@ -87,13 +87,13 @@ in
         }
         "break"
 
-        # ── hardware ──────────────────────────────────────────────
+        # hardware
         { type = "cpu";    key = "󰻠 cpu";    keyColor = pink;  format = "{name} ({cores-logical}t)"; }
         { type = "memory"; key = "󰑭 memory"; keyColor = cyan; }
         { type = "disk";   key = "󰋊 disk";   keyColor = pink;  folders = "/"; }
         "break"
 
-        # ── network ───────────────────────────────────────────────
+        # network
         {
           type = "localip";
           key = "󰩟 network";

@@ -8,10 +8,9 @@ let
   ]);
 in
 {
-  # Discord image bot — talks to the ComfyUI container on localhost:8188.
-  # Code is rsynced from mjolnir by the repo's deploy.sh (git is the source
-  # of truth; /var/lib/discordbot/app is just the deployment target).
-  # Secrets: /var/lib/discordbot/.env  (DISCORD_TOKEN, COMFYUI_URL) — never in git.
+  # discord image bot on the comfyui container (localhost:8188)
+  # the bot's deploy.sh on mjolnir rsyncs the code into /var/lib/discordbot/app
+  # needs DISCORD_TOKEN=... and COMFYUI_URL=... in /var/lib/discordbot/.env, never in git
 
   users.users.discordbot = {
     isSystemUser = true;
@@ -40,7 +39,7 @@ in
       Restart = "on-failure";
       RestartSec = 10;
 
-      # hardening — the bot needs nothing but its own state dir + network
+      # hardening: the bot needs nothing but its state dir and the network
       NoNewPrivileges = true;
       PrivateTmp = true;
       ProtectSystem = "strict";

@@ -10,7 +10,7 @@
           prober = "http";
           timeout = "5s";
           http = {
-            valid_status_codes = [];  # Defaults to 2xx
+            valid_status_codes = [];  # empty means any 2xx
             method = "GET";
             preferred_ip_protocol = "ip4";
             tls_config.insecure_skip_verify = false;

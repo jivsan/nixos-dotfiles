@@ -1,8 +1,7 @@
 { pkgs, lib, ... }:
 let
-  # Upstream Blender binaries wrapped for NixOS. This is mkBlender from
-  # edolstra/nix-warez (blender/flake.nix), carried here because upstream still
-  # uses the deprecated xorg.* package names and warned on every rebuild.
+  # mkBlender copied from edolstra/nix-warez (blender/flake.nix): upstream still uses the
+  # deprecated xorg.* names and warns on every rebuild. go back to upstream once that's fixed
   mkBlender = { pname, version, src }:
     with pkgs;
 
@@ -49,7 +48,7 @@ let
       meta.mainProgram = "blender";
     };
 
-  blenderVersion = "5.2.2";   # OctaneRender addon 31.10 needs Blender 5.2
+  blenderVersion = "5.2.2";   # octane addon 31.10 needs blender 5.2
 
   blender_5_2 = mkBlender {
     pname = "blender-bin";
@@ -60,12 +59,9 @@ let
     };
   };
 
-  # Carry a previous Blender version's user config into the installed one:
-  # legacy addons (scripts/addons), extensions (user_default), presets,
-  # startup.blend, userpref.blend (layout, keymap, enabled addons) and
-  # bookmarks. Run BEFORE the first launch of the new version, then dismiss its
-  # "load previous settings" splash. Default source is 4.5 — the config the
-  # Blender Octane Edition used, which holds the Octane startup scene.
+  # blender-migrate-config: copies an older blender's prefs, addons and startup.blend into this one.
+  # run it before the new version's first launch, then dismiss its "load previous settings" splash.
+  # default --from 4.5 is the octane edition's config, with my octane startup scene
   blender-migrate-config = pkgs.writeShellScriptBin "blender-migrate-config" ''
     set -euo pipefail
     PATH=${lib.makeBinPath (with pkgs; [ coreutils rsync ])}:$PATH

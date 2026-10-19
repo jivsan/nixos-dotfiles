@@ -11,7 +11,7 @@
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
 
-    # Requires /var/lib/secrets/sure.env (SECRET_KEY_BASE, POSTGRES_PASSWORD).
+    # needs SECRET_KEY_BASE=... and POSTGRES_PASSWORD=... in /var/lib/secrets/sure.env
     ./modules/system/sure.nix
   ];
 
@@ -24,7 +24,7 @@
     prefixLength = 24;
   }];
   networking.defaultGateway = "10.0.20.1";
-  networking.nameservers = [ "10.0.20.4" ];   # Pi-hole — so *.oryxserver.org local records resolve
+  networking.nameservers = [ "10.0.20.4" ];   # pi-hole, so *.oryxserver.org local records resolve
   networking.firewall.enable = true;
 
   services.qemuGuest.enable = true;

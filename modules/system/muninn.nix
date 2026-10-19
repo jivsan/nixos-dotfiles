@@ -1,11 +1,6 @@
 { pkgs, ... }:
-# ── muninn on mjolnir — link the desktop terminal to the knowledge base ──────
-# Mounts the vault (odyn NFS, VLAN 20) straight into ~/muninn so interactive
-# Claude Code here can READ your notes (recall) and WRITE new ones (capture),
-# plus a `capture` quick-note command that drops into _inbox and nudges huginn.
-#
-# Note: edits made here don't live-refresh the hosted Obsidian app (only
-# heimdall-side edits do) — huginn still files them and they appear on reload.
+# my vault at ~/muninn (nfs from odyn), plus `capture`, `ask` and the usage reports for the brain
+# notes written from here show up in the hosted obsidian only after a reload
 let
   vault = "/home/christina/muninn";
 
@@ -29,11 +24,8 @@ let
     '';
   };
 
-  # ask: MiniMax (OpenRouter) Q&A over the muninn knowledge graph — NO Claude.
-  # Runs muninn-ask on heimdall via sudo systemd-run (loads the OpenRouter secret).
-  # Goes through the brain's bridge first (same front door as the dashboard:
-  # Jev sorts the request, the exchange is logged in the vault) and needs no
-  # SSH key. Falls back to the old SSH path if the bridge is not answering.
+  # ask: answers from my knowledge graph on minimax, never claude
+  # brain bridge first (logged in the vault), ssh to heimdall's muninn-ask if the bridge is down
   ask = pkgs.writeShellApplication {
     name = "ask";
     runtimeInputs = [ pkgs.openssh pkgs.curl pkgs.jq ];
@@ -52,10 +44,7 @@ let
         'sudo systemd-run --wait --pipe --quiet --uid=christina --gid=users -p EnvironmentFile=/var/lib/secrets/graphify-openrouter.env -p Environment=HOME=/var/lib/huginn /run/current-system/sw/bin/muninn-ask'
     '';
   };
-  # Reports Codex's 5-hour and weekly usage to the brain (Usage tab). Codex
-  # writes a rate-limit snapshot into its session log after every turn; this
-  # sends the newest one, stamped with when it was measured. Does nothing on a
-  # host where Codex has never run, and never fails the unit if the brain is down.
+  # codex's 5h and weekly usage for the brain's usage tab, from its newest session log
   codexUsage = pkgs.writeShellApplication {
     name = "muninn-codex-usage";
     runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.hostname ];
@@ -78,9 +67,8 @@ let
     '';
   };
 
-  # Claude Code status line that also reports the subscription's 5-hour and
-  # weekly usage to the brain (Usage tab). Claude Code only exposes these
-  # numbers to a status line command. Enable in ~/.claude/settings.json:
+  # claude's status line, it also sends the 5h and weekly usage to the brain's usage tab
+  # (claude only gives those numbers to a status line command). turn on in ~/.claude/settings.json:
   #   "statusLine": { "type": "command", "command": "muninn-usage-statusline" }
   usageStatusline = pkgs.writeShellApplication {
     name = "muninn-usage-statusline";
@@ -111,7 +99,7 @@ in
 {
   boot.supportedFilesystems = [ "nfs" ];
 
-  # Mount the muninn vault subpath directly, so ~/muninn IS the vault root.
+  # hermes-agent.nix on yggdrasil mounts the same export at /mnt/muninn with these options
   fileSystems.${vault} = {
     device = "10.0.20.6:/mnt/vault/obsidian/muninn";
     fsType = "nfs";

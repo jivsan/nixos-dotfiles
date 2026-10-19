@@ -1,21 +1,19 @@
-# modules/system/octane-shutdown.nix
-# At shutdown/reboot, SIGTERM Blender and OctaneServer and wait for them to exit,
-# so Octane logs its license out of OTOY's server. A hard power-off or SIGKILL
-# leaves the license bound to this machine until OTOY support frees it.
+# at shutdown, SIGTERM blender and OctaneServer and wait, so octane logs its license out.
+# a hard power-off or SIGKILL leaves it bound to mjolnir until otoy support frees it
 { config, pkgs, ... }:
 
 {
   systemd.services.octane-license-release = {
     description = "Gracefully stop Octane/Blender before shutdown to release license";
     wantedBy = [ "multi-user.target" ];
-    # Runs at shutdown/reboot, before network goes down
+    # ExecStop runs at shutdown, before the network goes down (the logout needs it)
     before = [ "shutdown.target" "reboot.target" "network.target" ];
     conflicts = [ "shutdown.target" "reboot.target" ];
 
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.coreutils}/bin/true";  # no-op on start
+      ExecStart = "${pkgs.coreutils}/bin/true";  # nothing on start, the work is in ExecStop
       ExecStop = pkgs.writeShellScript "octane-release" ''
         pg=${pkgs.procps}/bin/pgrep
         pk=${pkgs.procps}/bin/pkill

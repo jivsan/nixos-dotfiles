@@ -1,7 +1,6 @@
 { ... }:
 {
-  # Host numbers (CPU, memory, disks, systemd units) for heimdall's Prometheus.
-  # The GPU has its own exporter in gpu-exporter.nix.
+  # host numbers for heimdall's prometheus, the gpu has its own in gpu-exporter.nix
   services.prometheus.exporters.node = {
     enable = true;
     port = 9100;

@@ -18,7 +18,7 @@
     ../../modules/apps/codex.nix
     ../../modules/apps/herdr.nix
 
-    ./modules/system/desktop.nix           # oxwm over xrdp (Remmina)
+    ./modules/system/desktop.nix           # oxwm over xrdp (remmina)
   ];
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -30,7 +30,7 @@
     prefixLength = 24;
   }];
   networking.defaultGateway = "10.0.20.1";
-  networking.nameservers = [ "10.0.20.4" ];   # Pi-hole — so *.oryxserver.org local records resolve
+  networking.nameservers = [ "10.0.20.4" ];   # pi-hole, so *.oryxserver.org local records resolve
   networking.firewall.enable = true;
 
   services.qemuGuest.enable = true;

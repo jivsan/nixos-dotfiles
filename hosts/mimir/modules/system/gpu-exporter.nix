@@ -1,14 +1,8 @@
 { config, pkgs, ... }:
 {
-  # GPU numbers (utilisation, VRAM, temperature, power, fan) for heimdall's
-  # Prometheus, on :9835. It runs nvidia-smi on every scrape, every 15 s.
-  #
-  # Import this only while a card the driver supports is installed. With the
-  # GTX 1070 and the open kernel module (2026-10-06), each nvidia-smi made the
-  # kernel load the driver, fail to bind the card and unload it again, five
-  # times per scrape: the card's fans ramped up and down all day. Back on since
-  # 2026-10-19: the 580 legacy driver binds the 1070, and nvidia-persistenced
-  # (nvidia.nix) keeps the card set up between scrapes.
+  # gpu numbers for heimdall's prometheus on :9835, it runs nvidia-smi on every 15 s scrape
+  # only import it while the driver binds the card: if it can't, every nvidia-smi loads and
+  # unloads the driver and the fans ramp up and down all day
   systemd.services.nvidia-gpu-exporter = {
     description = "Prometheus exporter for nvidia-smi";
     after = [ "network.target" ];

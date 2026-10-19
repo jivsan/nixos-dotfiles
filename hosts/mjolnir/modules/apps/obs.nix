@@ -1,11 +1,6 @@
 { pkgs, ... }:
-# ── OBS Studio on mjolnir — record straight to odyn over the 10GbE leg ──────
-# Recordings land in ~/OBS-recordings, which is the odyn NFS dataset
-# vault/OBS-recordings (recordsize=1M, mapall→christina, export scoped to
-# VLAN 20). Even 4K60 NVENC (~100 Mbit/s) is nothing next to 10GbE, so no
-# local staging is needed. In OBS: Settings → Output → Recording Path
-# = ~/OBS-recordings, container MKV (remux to mp4 after — survives crashes
-# and mount hiccups mid-recording, unlike mp4).
+# obs records straight to odyn: ~/OBS-recordings is the dataset vault/OBS-recordings.
+# in obs: recording path ~/OBS-recordings, mkv (survives a crash or mount hiccup), remux to mp4 after
 {
   programs.obs-studio.enable = true;
 
@@ -24,7 +19,7 @@
       "x-systemd.idle-timeout=600"
       "x-systemd.mount-timeout=30"
       "retry=2"
-      "x-gvfs-hide"   # still mounted for OBS, just not in the Files sidebar
+      "x-gvfs-hide"   # not in the files sidebar, obs still sees it
     ];
   };
 }

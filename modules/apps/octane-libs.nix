@@ -1,25 +1,20 @@
-# modules/apps/octane-libs.nix
-# Runtime libraries OTOY's Linux binaries expect (OctaneServer, octane_node,
-# octane_daemon, the Standalone). Shared by octane.nix (mjolnir) and
-# octane-node.nix (mimir) so both hosts wrap the binaries the same way.
-#
-# The driver must come from config.hardware.nvidia.package: pinning a fixed
-# nvidia_x11 here caused a driver/library version mismatch at runtime (see the
-# vault note "mjolnir kernel 7.2 NVIDIA fix via nixpkgs-unstable").
+# libraries otoy's linux binaries need, shared by octane.nix (mjolnir) and octane-node.nix (mimir)
+# the driver has to be config.hardware.nvidia.package: a pinned nvidia_x11 here gave a
+# driver/library version mismatch at runtime
 { config }:
 pkgs: with pkgs; [
-  # NVIDIA / CUDA (Octane bundles its own CUDA 12 + cuDNN 9 runtime in lib/)
+  # nvidia / cuda (octane brings its own cuda 12 + cudnn 9 runtime in lib/)
   config.hardware.nvidia.package
   cudaPackages.cudatoolkit
   cudaPackages.cuda_cudart
-  # Graphics
+  # graphics
   libGL
   libGLU
   vulkan-loader
   vulkan-headers
   libdrm
   mesa
-  # X11 (needed even for the headless node: the binaries link against it)
+  # x11, the headless node needs it too: the binaries link against it
   libx11
   libxi
   libxcursor
@@ -36,7 +31,7 @@ pkgs: with pkgs; [
   libsm
   libice
   libxkbcommon
-  # CEF (the sign-in window in OctaneServer / Standalone is Chromium)
+  # cef: the sign-in window in OctaneServer and the Standalone is chromium
   nss
   nspr
   atk
@@ -49,7 +44,7 @@ pkgs: with pkgs; [
   gtk3
   alsa-lib
   systemd
-  # System libs
+  # system libs
   zlib
   stdenv.cc.cc.lib
   glibc

@@ -1,7 +1,5 @@
 { pkgs, inputs, ... }:
-# Reusable Hyprland *session* enablement. Importing this only makes Hyprland
-# available as a login option (ly lists it next to oxwm) — it does not change
-# or disable your X11/oxwm session in any way. Safe to import on any host.
+# hyprland as a login option in ly next to oxwm, the x11/oxwm session stays as it is
 {
   programs.hyprland = {
     enable = true;
@@ -9,16 +7,15 @@
     portalPackage = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.xdg-desktop-portal-hyprland;
   };
 
-  # Lock screen + PAM so it can authenticate.
+  # hyprlock needs its own pam service to unlock
   programs.hyprlock.enable = true;
   security.pam.services.hyprlock = { };
 
-  # hyprexpo plugin .so, built against the pinned Hyprland for ABI match.
-  # (Only loaded if a session's hyprland.lua actually calls `hyprctl plugin load`.)
- # environment.sessionVariables.HYPREXPO_PLUGIN =
- #   "${inputs.hyprland-plugins.packages.${pkgs.stdenv.hostPlatform.system}.hyprexpo}/lib/libhyprexpo.so";
+  # hyprexpo, off: only used if hyprland.lua runs `hyprctl plugin load`
+  # environment.sessionVariables.HYPREXPO_PLUGIN =
+  #   "${inputs.hyprland-plugins.packages.${pkgs.stdenv.hostPlatform.system}.hyprexpo}/lib/libhyprexpo.so";
 
-  # Prebuilt Hyprland binaries instead of compiling.
+  # hyprland's cache, so the flake's hyprland isn't compiled here
   nix.settings = {
     extra-substituters = [ "https://hyprland.cachix.org" ];
     extra-trusted-public-keys = [

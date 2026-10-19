@@ -4,9 +4,7 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # GSP firmware left ENABLED. NVreg_EnableGpuFirmware=0 was inert under the open
-  # kernel module but takes effect under the proprietary one, disabling the GPU
-  # System Processor - which handles context scheduling, the subsystem raising
-  # Xid 109 CTX SWITCH TIMEOUT. Removed while chasing those GPU hangs.
+  # don't add NVreg_EnableGpuFirmware=0 back: with the proprietary driver it turns off
+  # the gsp, which does context scheduling (the part raising xid 109 ctx switch timeouts)
   boot.kernelParams = [ ];
 }

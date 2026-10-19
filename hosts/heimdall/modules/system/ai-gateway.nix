@@ -1,21 +1,12 @@
 { pkgs, lib, ... }:
-# ── ai-gateway — one OpenAI-style endpoint for the models, with metrics ───────
-# Clients call http://10.0.20.17:4000/v1 and name a model; the gateway forwards
-# to the server that has it and measures the request (tokens, time to first
-# token, queueing, finish reason). Prometheus scrapes :4000/metrics and Grafana
-# shows it on the "AI gateway" dashboard. Runbook: docs/misc/ai-gateway.md.
-#
-# Nothing is pointed at it by this module: huginn, the bridge and hermes keep
-# calling what they call today until their own config is changed.
+# one openai-style endpoint for my models at http://10.0.20.17:4000/v1, with metrics
+# for the "AI gateway" grafana dashboard. runbook: docs/misc/ai-gateway.md
 let
   port = 4000;
   mimir = "10.0.20.18";
 
-  # The local chat models (llama-server, hosts/mimir/modules/system/llm.nix). Off since
-  # 2026-10-19: the RTX 5070 Ti they were picked for went into mjolnir, and mimir's 8 GB
-  # card is shared with her Octane render node. Nothing ever called them, and the
-  # dashboard showed the never-started server as down. true again once llm.nix runs on
-  # a card that holds them.
+  # mimir's local chat models (hosts/mimir/modules/system/llm.nix), off: its 8 GB card
+  # is shared with octane. true again once llm.nix runs on a card that holds them
   localChat = false;
 
   python = pkgs.python3.withPackages (ps: [ ps.aiohttp ps.prometheus-client ]);
@@ -23,20 +14,16 @@ let
   config = pkgs.writeText "ai-gateway.json" (builtins.toJSON {
     listen = { host = "0.0.0.0"; inherit port; };
 
-    # One line per request also goes to Loki (loki.nix), which is what the
-    # dashboard's Request ID box searches. No prompt or answer text is logged.
+    # one line per request, for the dashboard's request id box; no prompt or answer text
     loki_url = "http://127.0.0.1:3100/loki/api/v1/push";
 
-    # Callers may name themselves in the URL, http://…:4000/client/<name>/v1,
-    # and the dashboard then splits requests, tokens and cost by that name.
-    # huginn.nix and brain.nix point their MiniMax calls at the first two.
+    # callers can name themselves as http://10.0.20.17:4000/client/<name>/v1 and the dashboard
+    # splits requests, tokens and cost by name. huginn.nix and brain.nix use the first two
     clients = [ "huginn" "bridge" "hermes" "mjolnir" ];
 
     targets = lib.optionalAttrs localChat {
-      # llama-server on mimir (hosts/mimir/modules/system/llm.nix). The 16 GB
-      # card holds one chat model at a time, and llama-server kills the loaded
-      # model mid-answer when the other one is asked for. `exclusive` makes the
-      # gateway hold that request back until the running ones are done.
+      # one chat model fits on the card at a time, and llama-server kills the loaded one
+      # mid-answer when the other is asked for. exclusive holds that request until the rest finish
       mimir-chat = {
         base_url = "http://${mimir}:8080/v1";
         health = "http://${mimir}:8080/health";
@@ -44,22 +31,19 @@ let
         exclusive = true;
       };
     } // {
-      # The key's variable name in graphify-openrouter.env. The key itself is
-      # only ever in /var/lib/secrets, never in this repo.
+      # key is OPENAI_API_KEY=... in /var/lib/secrets/graphify-openrouter.env
       openrouter = {
         base_url = "https://openrouter.ai/api/v1";
         api_key_env = "OPENAI_API_KEY";
       };
 
-      # Not called through the gateway; listed so the dashboard's health row
-      # shows them next to the chat server.
+      # health only, not called through the gateway: they show in the dashboard's health row
       mimir-embed-notes.health = "http://${mimir}:8081/health";
       mimir-embed-query.health = "http://${mimir}:8082/health";
       mimir-voice.health = "http://${mimir}:8000/health";
     };
 
-    # Names here are what a client sends as "model". Local names must match the
-    # sections of the preset in mimir's llm.nix.
+    # what a client sends as "model"; local names must match the preset sections in mimir's llm.nix
     models = lib.optionalAttrs localChat {
       "qwen3.5-9b" = {
         target = "mimir-chat";
@@ -71,9 +55,8 @@ let
       "minimax/minimax-m3" = { target = "openrouter"; tier = "capable"; };
     };
 
-    # "auto": the local model first; MiniMax when the request is too long for
-    # it, or mimir is down or fails. Only callers on heimdall itself (or with a
-    # client key) are ever sent to MiniMax, since that one costs money.
+    # auto: local model first, minimax when the request is too long or mimir fails.
+    # only callers on heimdall or with a client key ever get minimax, it costs money
     routes.auto.models = lib.optional localChat "qwen3.5-9b" ++ [ "minimax/minimax-m3" ];
   });
 in
@@ -86,8 +69,8 @@ in
     environment.AIGW_CONFIG = "${config}";
     serviceConfig = {
       ExecStart = "${python}/bin/python3 ${../../ai-gateway/gateway.py}";
-      # Both optional ("-"): without the first, the openrouter target is off;
-      # the second may set AIGW_CLIENT_KEYS=key1,key2 to let other hosts use it.
+      # both optional: without the first the openrouter target is off;
+      # the second can set AIGW_CLIENT_KEYS=key1,key2 so other hosts may use the gateway
       EnvironmentFile = [
         "-/var/lib/secrets/graphify-openrouter.env"
         "-/var/lib/secrets/ai-gateway.env"
@@ -102,6 +85,6 @@ in
     };
   };
 
-  # LAN only (ens18): not the VPN or Tailscale interfaces.
+  # lan only (ens18), not tailscale or awg0
   networking.firewall.interfaces.ens18.allowedTCPPorts = [ port ];
 }

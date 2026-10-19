@@ -1,10 +1,4 @@
-# modules/scrutiny.nix
-#
-# Scrutiny hub deployment (web UI + InfluxDB) on NixOS via podman.
-# The collector runs separately on TrueNAS (10.0.20.6) and pushes
-# SMART data to this host on port 8080.
-#
-# Web UI:  http://10.0.20.17:8080
+# scrutiny hub (web ui + its own influxdb); the collector on odyn pushes smart data to :8080
 
 { config, pkgs, lib, ... }:
 
@@ -14,21 +8,16 @@ let
   stateDir = "/var/lib/scrutiny";
 in
 {
-  ############################################################
-  # Podman / OCI backend
-  ############################################################
+  # podman settings for the whole host live here, not only scrutiny's
   virtualisation = {
     podman = {
       enable = true;
       defaultNetwork.settings.dns_enabled = true;
-      dockerCompat = true;   # `docker` alias; was set by the removed nexterm.nix
+      dockerCompat = true;   # `docker` alias
     };
     oci-containers.backend = "podman";
   };
 
-  ############################################################
-  # Dedicated podman network so web ↔ influxdb resolve by name
-  ############################################################
   systemd.services.podman-network-scrutiny = {
     description = "Create scrutiny podman network";
     after = [ "podman.service" ];
@@ -44,23 +33,15 @@ in
     '';
   };
 
-  ############################################################
-  # Persistent state directories
-  ############################################################
   systemd.tmpfiles.rules = [
     "d ${stateDir}             0755 root root -"
     "d ${stateDir}/config      0755 root root -"
     "d ${stateDir}/influxdb2   0755 root root -"
   ];
 
-  ############################################################
-  # Containers
-  ############################################################
   virtualisation.oci-containers.containers = {
 
-    # InfluxDB 2.x — backing store for SMART metrics.
-    # Not exposed on the host; only scrutiny-web talks to it
-    # over the internal scrutiny-net bridge.
+    # influxdb 2, separate from influxdb.nix; no host port, only scrutiny-web reaches it
     scrutiny-influxdb = {
       image = "influxdb:${influxdbVersion}";
       autoStart = true;
@@ -72,7 +53,6 @@ in
       ];
     };
 
-    # Scrutiny web UI + API — receives pushes from remote collectors.
     scrutiny-web = {
       image = "ghcr.io/analogj/scrutiny:${scrutinyVersion}-web";
       autoStart = true;
@@ -93,9 +73,6 @@ in
     };
   };
 
-  ############################################################
-  # Make scrutiny-web wait for the network unit
-  ############################################################
   systemd.services.podman-scrutiny-influxdb = {
     after = [ "podman-network-scrutiny.service" ];
     requires = [ "podman-network-scrutiny.service" ];
@@ -105,8 +82,6 @@ in
     requires = [ "podman-network-scrutiny.service" ];
   };
 
-  ############################################################
-  # Firewall — allow the TrueNAS collector at 10.0.20.6
-  ############################################################
+  # odyn's collector pushes here
   networking.firewall.allowedTCPPorts = [ 8080 ];
 }

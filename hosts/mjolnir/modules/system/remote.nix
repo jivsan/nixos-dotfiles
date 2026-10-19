@@ -1,7 +1,6 @@
 { config, pkgs, ... }:
 
-# mjolnir's sshd. Key-only, no root login, no remote desktop: mjolnir is not
-# accessed remotely (tyr is the RDP workstation; see hosts/tyr/modules/system/desktop.nix).
+# key-only sshd, no remote desktop here (tyr is my rdp box)
 {
   services.openssh = {
     enable = true;

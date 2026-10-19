@@ -4,7 +4,7 @@
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
   nix.settings.auto-optimise-store = true;
 
-  # Fleet default; a host can override in its own default.nix (e.g. mimir → 26.05).
+  # fleet default, hosts installed on a newer release set their own in default.nix
   system.stateVersion = lib.mkDefault "25.11";
 
   nix.gc = {

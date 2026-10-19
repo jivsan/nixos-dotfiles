@@ -1,7 +1,7 @@
 { ... }:
 
 let
-  # Fleet neon accents (same family as mimir), girl-approved: pink hair, cyan braids
+  # fleet neon colours, matching tyr-chan's pink hair and cyan braids
   pink = "38;2;255;79;163";   # #ff4fa3
   cyan = "38;2;45;226;230";   # #2de2e6
   dim  = "38;2;99;99;125";    # muted steel
@@ -14,7 +14,7 @@ in
       "$schema" = "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json";
 
       logo = {
-        # chafa-rendered anime girl (half-block ANSI), colors baked into the file
+        # tyr-chan, rendered with chafa (half-block ansi), colours baked into the file
         type = "file-raw";
         source = "${./tyr-chan.txt}";
         padding = { top = 1; right = 4; };
@@ -23,11 +23,11 @@ in
       display = {
         separator = "  ";
         color.keys = cyan;
-        percent.type = 9;   # colored % — green → yellow → red by usage
+        percent.type = 9;   # % in green → yellow → red by usage
       };
 
       modules = [
-        # ── identity ──────────────────────────────────────────────
+        # identity
         { type = "title"; color = { user = pink; at = dim; host = cyan; }; }
         { type = "custom"; format = "{#${dim}}⟨ {#${pink}}tyr{#${dim}} :: agent workstation ⟩"; }
         { type = "separator"; string = "─"; }
@@ -39,7 +39,7 @@ in
         { type = "loadavg";  key = "󰓅 load";    keyColor = cyan; }
         "break"
 
-        # ── lab — what a test box cares about ─────────────────────
+        # deploy state
         {
           type = "command";
           key = "󰜉 gen";
@@ -66,13 +66,13 @@ in
         }
         "break"
 
-        # ── hardware ──────────────────────────────────────────────
+        # hardware
         { type = "cpu";    key = "󰻠 cpu";    keyColor = pink;  format = "{name} ({cores-logical}t)"; }
         { type = "memory"; key = "󰑭 memory"; keyColor = cyan; }
         { type = "disk";   key = "󰋊 disk";   keyColor = pink;  folders = "/"; }
         "break"
 
-        # ── network ───────────────────────────────────────────────
+        # network
         {
           type = "localip";
           key = "󰩟 network";

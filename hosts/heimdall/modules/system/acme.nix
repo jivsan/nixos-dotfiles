@@ -14,7 +14,7 @@
       extraDomainNames = [ "*.oryxserver.org" ];
       group = "traefik";
 
-      # Set environment file directly on the cert (more reliable than defaults)
+      # cloudflare dns token; set on the cert, not in defaults, that's more reliable
       environmentFile = "/var/lib/secrets/cloudflare-dns-token";
     };
   };

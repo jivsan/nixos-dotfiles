@@ -1,35 +1,13 @@
-# modules/apps/octane.nix — OctaneRender on the workstation (mjolnir)
-#
-# Since OctaneBlender 31.x the workflow is: vanilla Blender (modules/apps/blender.nix)
-# + the OctaneRender Blender *addon* zip + a separate OctaneServer process that
-# holds the OTOY sign-in and does the rendering. There is no "Blender Octane
-# Edition" binary any more. Both downloads need the OTOY account:
-#   https://render.otoy.com/forum/viewtopic.php?t=85781   (addon 31.10 + server)
-#
-# Install / update (never with the server running — see octane-stop):
-#   octane-stop
-#   sudo octane-install ~/Downloads/OctaneStudio_for_BlenderOctaneAddon_Linux_31.10-stable.zip \
-#                       ~/Downloads/octane_blender_addon-31.10-stable.zip
-# Then enable the "OctaneRender" addon once in Blender > Preferences > Add-ons.
-#
-# License safety: OctaneServer releases its license on SIGTERM ("Caught signal,
-# please wait for license logout"). SIGKILL does not, and the license then stays
-# bound to this machine until OTOY frees it. Use `octane-stop`, never `pkill -9`.
-# Before moving to a new OctaneServer version, sign out in the old one first
-# (Account menu > Sign Out), which releases every license bound to this machine.
+# octane: vanilla blender + the octane addon + OctaneServer, which holds the otoy sign-in and renders
+# stop the server only with octane-stop: SIGTERM logs the license out, kill -9 leaves it
+# bound to mjolnir until otoy frees it. sign out in the old server before upgrading it
 { pkgs, config, lib, ... }:
 let
   octaneBase = "/opt/octane";
   octaneLibs = import ../../../../modules/apps/octane-libs.nix { inherit config; };
 
-  # The 31.x server zip is flat (liboctane.so, libcef.so next to the binary) and
-  # the binary's RUNPATH points at OTOY's build tree, so add the install dir
-  # (and lib/, the pre-31 layout) to the library path ourselves.
-  #
-  # Octane keeps third-party downloads (cuDNN, ...) under /etc/OctaneRender.
-  # The FHS sandbox builds its own /etc, so the host's is invisible, and the
-  # real one is root-owned anyway. Bind a user-writable dir there instead so the
-  # in-app "Download" button works and the files persist across rebuilds.
+  # the server's RUNPATH points at otoy's build tree, so the run script sets LD_LIBRARY_PATH.
+  # /etc/OctaneRender is bound to a dir i can write, so the in-app cuDNN download works and stays
   octane-server = pkgs.buildFHSEnv {
     name = "octane-server";
     targetPkgs = octaneLibs;
@@ -49,7 +27,6 @@ let
     '';
   };
 
-  # Stop OctaneServer gracefully and wait for its license logout to finish.
   octane-stop = pkgs.writeShellScriptBin "octane-stop" ''
     pg=${pkgs.procps}/bin/pgrep
     if ! $pg -x OctaneServer >/dev/null; then
@@ -67,7 +44,6 @@ let
     exit 1
   '';
 
-  # Install or update OctaneServer and the Blender addon from the OTOY zips.
   octane-install = pkgs.writeShellScriptBin "octane-install" ''
     set -euo pipefail
     PATH=${lib.makeBinPath (with pkgs; [ coreutils findutils rsync unzip procps gnugrep gawk ])}:$PATH
@@ -172,7 +148,7 @@ in
     "d ${octaneBase}         0755 root root -"
     "d ${octaneBase}/server  0755 root root -"
     "d ${octaneBase}/addon   0755 root root -"
-    # appears as /etc/OctaneRender inside the sandbox; Octane writes cuDNN etc. here
+    # /etc/OctaneRender inside the sandbox
     "d ${octaneBase}/etc              0755 christina users -"
     "d ${octaneBase}/etc/thirdparty   0755 christina users -"
   ];

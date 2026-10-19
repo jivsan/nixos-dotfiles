@@ -1,11 +1,8 @@
 { pkgs, ... }:
 
-# `blender-config-to-mimir`: copies her Blender 5.2 config (add-ons, extensions,
-# preferences) to mimir, the agents' Blender test node, so a check there opens her files
-# like her own Blender does. Octane and the Blender MCP extension stay behind: the one
-# Octane licence seat is hers on mjolnir, and the MCP server belongs to her live Blender.
-# Run again after installing or updating an add-on. Deletes nothing on mimir but an
-# Octane add-on link, if one is there.
+# `blender-config-to-mimir`: copies my blender 5.2 config to mimir, the agents' test node, so checks
+# there open my files like my blender does. octane (one licence seat, here) and the mcp
+# extension (for my live blender) stay behind. run again after adding or updating an add-on
 let
   blender-config-to-mimir = pkgs.writeShellApplication {
     name = "blender-config-to-mimir";

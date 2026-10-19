@@ -1,11 +1,7 @@
 { pkgs, ... }:
 {
-  # Keep ~/nixos-dotfiles in sync with GitHub — PULL ONLY, never rebuilds.
-  # Rebuilding stays a human decision (nixos-rebuild switch by hand).
-  #
-  # --ff-only: refuses to merge/rebase if the local clone has diverged
-  # (stray local edits), so it can never eat uncommitted work — the unit
-  # just fails visibly instead (shows up in fastfetch's "units" line).
+  # pulls ~/nixos-dotfiles from github, never rebuilds: i rebuild by hand
+  # --ff-only: a clone with local edits fails the unit (fastfetch's units line) instead of losing them
   systemd.services.dotfiles-pull = {
     description = "Pull nixos-dotfiles from GitHub (no rebuild)";
     after = [ "network-online.target" ];
@@ -21,8 +17,8 @@
     wantedBy = [ "timers.target" ];
     timerConfig = {
       OnBootSec = "2m";
-      OnUnitActiveSec = "2m";        # poll every 2 min — a no-change fetch is a few hundred bytes
-      RandomizedDelaySec = "30s";    # hosts don't all hit GitHub in the same second
+      OnUnitActiveSec = "2m";        # a fetch with no changes is a few hundred bytes
+      RandomizedDelaySec = "30s";    # so the hosts don't all hit github in the same second
     };
   };
 }

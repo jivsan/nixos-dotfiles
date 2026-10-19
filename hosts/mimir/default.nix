@@ -3,11 +3,11 @@
   imports = [
     ./hardware-configuration.nix
 
-    # ── shared fleet modules (same as heimdall) ──
+    # shared fleet modules
     ../../modules/system/boot.nix
     ../../modules/system/locale.nix
     ../../modules/system/nix.nix
-    ../../modules/system/users.nix       # christina + SSH key
+    ../../modules/system/users.nix
     ../../modules/system/neovim.nix
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
@@ -15,21 +15,19 @@
     ../../modules/system/muninn.nix
     ../../modules/system/studio.nix      # /mnt/studio + /mnt/studio-cache on odyn, /mnt/data_ssd/<folder> links
 
-    # ── mimir-local: AI / GPU stack ──
+    # mimir's own: ai / gpu stack
     ./modules/system/nvidia.nix
-#   ./modules/system/storage.nix        # ZFS `scratch` pool — SSDs physically removed
-                                         # 2026-07; models live on odyn now. Kept (not
-                                         # deleted) for the pinned hostId + brunnr plan.
+#   ./modules/system/storage.nix        # zfs scratch pool, the ssds are out. kept for the pinned hostId + brunnr plan
     ./modules/system/immich-ml.nix
-    ./modules/system/comfyui.nix          # models/output on odyn NFS (scratch SSDs are gone)
-    ./modules/system/voice.nix            # Whisper + Kokoro for the muninn brain (heimdall's bridge)
+    ./modules/system/comfyui.nix
+    ./modules/system/voice.nix            # whisper + kokoro for heimdall's brain bridge
     ./modules/system/embeddings.nix       # Qwen3-Embedding-4B for vault search and placement (heimdall)
-    ./modules/system/exporters.nix        # host numbers for heimdall's Prometheus
-    ./modules/system/gpu-exporter.nix     # GPU numbers for heimdall's Prometheus (polls nvidia-smi; see the file)
-#   ./modules/system/llm.nix              # chat models behind heimdall's ai-gateway — needs a 16 GB card (see the file)
-    ./modules/system/octane-node.nix    # OctaneRender render node for mjolnir, on the RTX 4060 Ti (8 GB)
-    ./modules/system/test-node.nix        # the agents' Blender test node (`blender-job`, run by `mimir-blender`)
-#    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
+    ./modules/system/exporters.nix        # host numbers for heimdall's prometheus
+    ./modules/system/gpu-exporter.nix     # gpu numbers for heimdall's prometheus
+#   ./modules/system/llm.nix              # chat models for heimdall's ai-gateway, needs a 16 gb card
+    ./modules/system/octane-node.nix    # octane render node for mjolnir
+    ./modules/system/test-node.nix        # the agents' blender test node (mimir-blender runs blender-job here)
+#    ./modules/system/discordbot.nix      # off until /var/lib/discordbot/.env exists
   ];
 
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
@@ -37,15 +35,13 @@
   networking.hostName = "mimir";
   networking.useDHCP = false;
 
-  # ⚠️ Confirm the real NIC name on the box after install (`ip -br link`).
-  # Bare metal is usually enpXsY / enoX — NOT ens18 like the Proxmox VMs.
-  # Update this attribute name before the first `nixos-rebuild switch`.
+  # bare metal nic name (ip -br link), not ens18 like the proxmox vms
   networking.interfaces.enp5s0.ipv4.addresses = [{
     address = "10.0.20.18";
     prefixLength = 24;
   }];
   networking.defaultGateway = "10.0.20.1";
-  networking.nameservers = [ "10.0.20.4" ];   # Pi-hole — resolves *.oryxserver.org locally
+  networking.nameservers = [ "10.0.20.4" ];   # pi-hole, resolves *.oryxserver.org locally
   networking.firewall.enable = true;
 
   services.openssh = {
@@ -60,5 +56,5 @@
     git curl wget htop tree jq
   ];
 
-  system.stateVersion = "26.05";   # fresh install on the latest release
+  system.stateVersion = "26.05";
 }
