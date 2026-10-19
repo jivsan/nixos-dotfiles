@@ -39,7 +39,9 @@ let
   };
 in
 {
-  fileSystems."/mnt/studio" = share "studio" [ "x-gvfs-show" "x-gvfs-name=studio" ];
+  # In the Files sidebar as a bookmark (~/.config/gtk-3.0/bookmarks on mjolnir), not
+  # x-gvfs-show: Files would try to mount the NFS share as her user, which NixOS refuses.
+  fileSystems."/mnt/studio" = share "studio" [ ];
   fileSystems."/mnt/studio-cache" = share "studio-cache" [ ];
 
   # The old paths keep working: .blend files, scripts and notes point at

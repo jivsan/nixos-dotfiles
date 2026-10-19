@@ -18,9 +18,9 @@
       "wsize=1048576"
       "x-systemd.automount"
       "x-systemd.idle-timeout=600"
-      # In the Files (Nautilus) sidebar on mjolnir; outside ~ it is only listed when asked.
-      "x-gvfs-show"
-      "x-gvfs-name=hermes-wowx"
+      # No x-gvfs-show: Files would mount it as her user and NixOS has no setuid
+      # mount.nfs ("user" NFS mounts not supported). It is a bookmark in
+      # ~/.config/gtk-3.0/bookmarks instead; opening that wakes the automount.
     ];
   };
 }
