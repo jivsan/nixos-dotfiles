@@ -16,6 +16,10 @@
     ../../modules/system/dotfiles-pull.nix
     ../../modules/system/muninn.nix
     ../../modules/system/hermes-wowx.nix
+    ../../modules/system/studio.nix
+    ../../modules/apps/mimir-blender.nix
+    ../../modules/apps/unfree.nix          # claude-code is unfree
+    ../../modules/apps/claude-code.nix
     ../../modules/apps/herdr.nix
 
     ./modules/system/hermes-agent.nix

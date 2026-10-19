@@ -6,4 +6,7 @@
     ../../home.nix
     ./modules/home/hyprland.nix
   ];
+
+  # Her herdr session on yggdrasil (Claude Code, hermes, panes on mimir), from here.
+  programs.bash.shellAliases.ygg = "herdr --remote christina@10.0.20.21";
 }

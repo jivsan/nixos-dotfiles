@@ -34,6 +34,9 @@
     ../../modules/apps/comfyui.nix         # ComfyUI (podman + CDI), models on odyn over 10GbE
     ./modules/yggdrasil-link.nix           # hermes on yggdrasil: Blender + wowx MCP over SSH, `claude-to-yggdrasil`
     ../../modules/system/hermes-wowx.nix   # /mnt/hermes-wowx on odyn: WoW exports + upscales, shared with yggdrasil
+    ../../modules/system/studio.nix        # /mnt/studio on odyn: all Blender files and projects (3DBLENDER moved there)
+    ../../modules/apps/mimir-blender.nix   # `mimir-blender`: agents run their Blender checks on mimir, not here
+    ./modules/mimir-test-node.nix          # `blender-config-to-mimir`: her add-ons for mimir's Blender, without Octane
   ];
 
   networking.hostName = "mjolnir";

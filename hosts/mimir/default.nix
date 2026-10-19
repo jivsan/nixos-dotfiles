@@ -12,6 +12,7 @@
     ../../modules/system/dotfiles-pull.nix
     ../../modules/apps/herdr.nix
     ../../modules/system/muninn.nix
+    ../../modules/system/studio.nix      # /mnt/studio + /mnt/studio-cache on odyn, /mnt/data_ssd/<folder> links
 
     # ── mimir-local: AI / GPU stack ──
     ./modules/system/nvidia.nix
@@ -26,6 +27,7 @@
 #   ./modules/system/gpu-exporter.nix     # GPU numbers — needs the RTX 5070 Ti (polls nvidia-smi; see the file)
 #   ./modules/system/llm.nix              # chat models behind heimdall's ai-gateway — needs the RTX 5070 Ti
     ../../modules/apps/octane-node.nix    # OctaneRender render node for mjolnir (needs the RTX 5070 Ti)
+    ./modules/system/test-node.nix        # the agents' Blender test node (`blender-job`, run by `mimir-blender`)
 #    ./modules/system/discordbot.nix      # needs /var/lib/discordbot/.env — currently missing
   ];
 
