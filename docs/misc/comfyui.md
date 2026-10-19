@@ -99,10 +99,10 @@ plus `version` in `comfyui.nix` and `VERSION` in `build.sh` (all three must matc
 then on the host:
 ```
 cd ~/nixos-dotfiles && git pull
-cd <host>/modules/system/comfyui && ./build.sh     # image MUST exist before the switch:
+cd <comfyui folder below> && ./build.sh            # image MUST exist before the switch:
 sudo nixos-rebuild switch --flake ~/nixos-dotfiles#<host>   # --pull=never + autoStart
 ```
-mjolnir's copy lives at `modules/apps/comfyui/`; mimir's at
+mjolnir's copy lives at `hosts/mjolnir/modules/apps/comfyui/`; mimir's at
 `hosts/mimir/modules/system/comfyui/`. **Do not copy one Containerfile over the other** —
 they differ in how the container is set up.
 

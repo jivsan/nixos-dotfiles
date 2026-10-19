@@ -1,6 +1,6 @@
 # OctaneRender — workstation (mjolnir) + render node (mimir)
 
-Config: `modules/apps/octane.nix` (mjolnir), `modules/apps/octane-node.nix` (mimir),
+Config: `hosts/mjolnir/modules/apps/octane.nix` (mjolnir), `hosts/mimir/modules/system/octane-node.nix` (mimir),
 shared libs in `modules/apps/octane-libs.nix`, Blender in `modules/apps/blender.nix`.
 
 ## How it fits together (since OctaneBlender 31.x)
@@ -108,7 +108,7 @@ octane-standalone --no-opengl         # sign in, File > Quit (clean exit keeps t
 
 Then on mjolnir, OctaneServer ▸ Network preferences: enable network rendering,
 daemon port 48000, add `10.0.20.18` to the daemon list. The master port 1047 and
-48000 are open on mjolnir (`modules/system/networking.nix`); 48000 is open on mimir.
+48000 are open on mjolnir (`hosts/mjolnir/modules/system/networking.nix`); 48000 is open on mimir.
 
 How the two find each other (measured 2026-10-13 with tcpdump on mimir):
 OctaneServer sends a UDP broadcast to `10.0.20.255:48000` every 5 s. The daemon
