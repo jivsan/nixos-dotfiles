@@ -293,7 +293,7 @@
               "10.0.50.10/32"    # my phone (static lease on the iot vlan), just this one host
               "100.64.0.0/10"
               "127.0.0.1/32"
-              "10.88.0.0/16"     # podman's network here: homarr checks the sites by their https names
+              "10.88.200.10/32"  # homarr's container (homarr.nix), it checks the sites by their https names
             ];
           };
 

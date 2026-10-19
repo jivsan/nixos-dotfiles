@@ -16,6 +16,8 @@ in
     image = "ghcr.io/homarr-labs/homarr:latest";
     autoStart = true;
     ports = [ "127.0.0.1:7575:7575" ];
+    # fixed address: traefik's lan-only lets this one container in, not all of podman's network
+    extraOptions = [ "--ip=10.88.200.10" ];
 
     # SECRET_ENCRYPTION_KEY=<64 hex chars> (openssl rand -hex 32); it encrypts the
     # integration passwords and api keys in the db, lose or change it and they're unreadable
