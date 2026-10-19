@@ -21,9 +21,9 @@ in
     environment = {
       DOMAIN = "https://vault.oryxserver.org";
 
-      # open until my account is made, then back to "false". after that, invite people
-      # from an organisation, or set "true" for a minute
-      SIGNUPS_ALLOWED = "true";
+      # my account is made, so no new sign-ups. to add someone, invite them from an
+      # organisation, or set "true" for a minute
+      SIGNUPS_ALLOWED = "false";
 
       # failed logins still show at warn
       LOG_LEVEL = "warn";
