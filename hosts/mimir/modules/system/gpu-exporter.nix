@@ -6,7 +6,9 @@
   # Import this only while a card the driver supports is installed. With the
   # GTX 1070 and the open kernel module (2026-10-06), each nvidia-smi made the
   # kernel load the driver, fail to bind the card and unload it again, five
-  # times per scrape: the card's fans ramped up and down all day.
+  # times per scrape: the card's fans ramped up and down all day. Back on since
+  # 2026-10-19: the 580 legacy driver binds the 1070, and nvidia-persistenced
+  # (nvidia.nix) keeps the card set up between scrapes.
   systemd.services.nvidia-gpu-exporter = {
     description = "Prometheus exporter for nvidia-smi";
     after = [ "network.target" ];

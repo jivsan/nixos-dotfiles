@@ -14,6 +14,9 @@
     open = false;
     nvidiaSettings = false; # headless — no settings GUI
     package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
+    # Keeps the card set up while nothing uses it, so the GPU exporter's nvidia-smi
+    # every 15 s only reads numbers instead of waking the card (and its fans).
+    nvidiaPersistenced = true;
   };
 
   # Userspace GL/compute libraries (CUDA + containers need these)
