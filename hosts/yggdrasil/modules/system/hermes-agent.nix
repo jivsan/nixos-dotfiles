@@ -20,12 +20,27 @@ in
   services.hermes-agent = {
     enable = true;
     addToSystemPackages = true;
-    # kimi k3 on openrouter (OPENROUTER_API_KEY=... in /etc/hermes/env), sail research only: cheapest k3 output.
-    # the codex login is still in auth.json, so provider "openai-codex" + "gpt-6-astra" switches back
-    settings.model = {
-      provider = "openrouter";
-      default = "moonshotai/kimi-k3";
+    # kimi k3 on my kimi pro plan (KIMI_API_KEY=sk-kimi-... in /etc/hermes/env), on the overseas
+    # endpoint (api.kimi.ai; api.kimi.com is the china one). pro serves k3 with 1m context and images
+    settings.providers.kimi-plan = {
+      api = "https://api.kimi.ai/coding/v1";
+      key_env = "KIMI_API_KEY";
+      transport = "chat_completions";
+      models.k3 = { context_length = 1048576; supports_vision = true; };
     };
+    settings.model = {
+      provider = "custom:kimi-plan";
+      default = "k3";
+      context_length = 1048576;
+      supports_vision = true;
+      # hermes knows kimi only by api.kimi.com, so its kimi tool-call fix is switched on by hand
+      reasoning_echo = true;
+    };
+    # when the plan fails (5-hour limit, monthly total, outage) the turn moves to kimi k3 on openrouter
+    # (OPENROUTER_API_KEY=... in /etc/hermes/env), sail research only: cheapest k3 output, also 1m context.
+    # the next message tries the plan again first. the codex login is still in auth.json, so provider
+    # "openai-codex" + "gpt-6-astra" switches back to codex
+    settings.fallback_providers = [ { provider = "openrouter"; model = "moonshotai/kimi-k3"; } ];
     settings.provider_routing.only = [ "sail-research/fp4" ];
     # tool_search off: through its bridge kimi dropped the arguments (graphify's `question`),
     # so mcp tools with arguments never ran. called directly they work
