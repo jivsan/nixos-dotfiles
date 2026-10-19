@@ -40,7 +40,7 @@
         job_name = "nvidia-gpu";
         static_configs = [
           { targets = [ "10.0.20.18:9835" ];  labels = { host = "mimir"; }; }
-          { targets = [ "10.0.20.100:9835" ]; labels = { host = "mjolnir"; }; }   # hosts/mjolnir/modules/exporters.nix
+          { targets = [ "10.0.20.100:9835" ]; labels = { host = "mjolnir"; }; }   # hosts/mjolnir/modules/system/exporters.nix
         ];
       }
       {

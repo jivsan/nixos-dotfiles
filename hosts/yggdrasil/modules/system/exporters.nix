@@ -1,13 +1,12 @@
 { ... }:
 {
-  # Host numbers (CPU, memory, disks, systemd units) for heimdall's Prometheus;
-  # they feed yggdrasil's card on the Homarr dashboard and Grafana.
+  # host numbers for heimdall's prometheus: yggdrasil's card in homarr and grafana
   services.prometheus.exporters.node = {
     enable = true;
     port = 9100;
     enabledCollectors = [ "systemd" ];
   };
 
-  # reachable from heimdall over VLAN 20
+  # heimdall scrapes it over vlan 20
   networking.firewall.allowedTCPPorts = [ 9100 ];
 }

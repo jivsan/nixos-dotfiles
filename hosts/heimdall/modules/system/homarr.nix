@@ -28,9 +28,8 @@ in
 
     volumes = [
       "${homarrData}:/appdata"
-      # podman's Docker-compatible API (podman.socket), where Homarr looks for
-      # Docker: lists and starts/stops heimdall's containers. Full control over
-      # every container here, so Homarr stays behind Traefik's lan-only.
+      # podman's docker api, so homarr can list and start/stop the containers here.
+      # that's full control over every container, so homarr stays behind lan-only
       "/run/podman/podman.sock:/var/run/docker.sock"
     ];
   };

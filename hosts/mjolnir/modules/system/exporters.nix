@@ -1,16 +1,14 @@
 { config, pkgs, ... }:
 {
-  # Host and GPU numbers for heimdall's Prometheus, the same pair mimir runs
-  # (hosts/mimir/modules/system/exporters.nix + gpu-exporter.nix). They feed
-  # mjolnir's card on the Homarr dashboard and Grafana.
+  # host and gpu numbers for heimdall's prometheus (mjolnir's card in homarr and grafana),
+  # the same pair mimir runs
   services.prometheus.exporters.node = {
     enable = true;
     port = 9100;
     enabledCollectors = [ "systemd" ];
   };
 
-  # RTX 5070 Ti: utilisation, VRAM, temperature, power, fan. Runs nvidia-smi on
-  # every scrape (every 15 s); a full card is what hangs Octane test renders.
+  # runs nvidia-smi on every scrape (15 s). vram matters: a full card hangs octane test renders
   systemd.services.nvidia-gpu-exporter = {
     description = "Prometheus exporter for nvidia-smi";
     after = [ "network.target" ];
@@ -25,6 +23,6 @@
     };
   };
 
-  # reachable from heimdall over VLAN 20
+  # heimdall scrapes these over vlan 20
   networking.firewall.allowedTCPPorts = [ 9100 9835 ];
 }

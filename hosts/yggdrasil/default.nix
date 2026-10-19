@@ -22,7 +22,7 @@
     ../../modules/apps/herdr.nix
 
     ./modules/system/hermes-agent.nix
-    ./modules/system/exporters.nix          # node numbers for heimdall's Prometheus (Homarr host card)
+    ./modules/system/exporters.nix          # node numbers for heimdall's prometheus (homarr host card)
   ];
 
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
