@@ -30,3 +30,9 @@ cloudflare-dns-token
 # Local-only overrides
 local.nix
 *.local.nix
+
+# Python cache and leftover backup / patch files
+__pycache__/
+*.pyc
+*.bak
+*.orig

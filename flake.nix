@@ -32,10 +32,9 @@
     };
     hermes-agent.url = "github:NousResearch/hermes-agent";
   };
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, oxwm, claude-code, ... }@inputs:
+  outputs = { nixpkgs, nixpkgs-unstable, home-manager, claude-code, ... }@inputs:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
       mkHost = hostPath: homeFile: nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
@@ -63,19 +62,6 @@
       };
     in
     {
-      devShells.${system}.suckless = pkgs.mkShell {
-        packages = with pkgs; [
-          pkg-config
-          libx11
-          libxft
-          libxinerama
-          fontconfig
-          freetype
-          harfbuzz
-          gcc
-          gnumake
-        ];
-      };
       nixosConfigurations = {
         mjolnir  = mkHost ./hosts/mjolnir/default.nix  ./hosts/mjolnir/home.nix;
         heimdall = mkHost ./hosts/heimdall/default.nix ./hosts/heimdall/home.nix;
