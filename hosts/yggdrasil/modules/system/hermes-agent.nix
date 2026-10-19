@@ -2,7 +2,7 @@
 let
   # one key for every mcp server over ssh, for the gateway (hermes) and my cli alike.
   # root:hermes 0640 works for both: ssh only checks the permissions of keys the caller owns.
-  # its public half is allowed on heimdall for graphify only, on mjolnir for blender and wowx only
+  # its public half is allowed on heimdall for graphify only, on mjolnir for blender, wowx and dotfiles only
   mcpKey = "/var/lib/hermes-ssh/id_ed25519";
   ssh = [ "-o" "BatchMode=yes" "-o" "ConnectTimeout=10" "-o" "IdentitiesOnly=yes" "-i" mcpKey ];
   graphify = graph: {
@@ -62,6 +62,16 @@ in
         command = "ssh";
         args = ssh ++ [ "christina@10.0.20.100" "wowx" ];
         timeout = 300;
+      };
+      # my nixos-dotfiles on mjolnir: files and git in hermes' own worktree there
+      # (~/nixos-dotfiles-hermes, branch hermes), no shell and no push. i merge what i want
+      dotfiles = {
+        command = "ssh";
+        args = ssh ++ [ "christina@10.0.20.100" "dotfiles" ];
+      };
+      dotfiles-git = {
+        command = "ssh";
+        args = ssh ++ [ "christina@10.0.20.100" "dotfiles-git" ];
       };
       # homarr's mcp server: boards, apps, widgets, integrations.
       # HOMARR_API_KEY (a homarr api key, acts as me) is in /etc/hermes/env,

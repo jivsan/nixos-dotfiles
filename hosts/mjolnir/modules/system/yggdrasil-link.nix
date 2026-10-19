@@ -3,16 +3,32 @@
 # hermes on yggdrasil reaches mjolnir two ways: mcp servers over ssh with a key that starts
 # nothing else, and claude's skills, notes and context pushed from here with `claude-to-yggdrasil`
 let
+  repo = "/home/christina/nixos-dotfiles";
+  # hermes' own worktree of my repo, branch `hermes`: its edits never touch my working tree,
+  # and i merge what i want into main
+  hermesTree = "/home/christina/nixos-dotfiles-hermes";
   # the word hermes sends picks the server. blender: the same blender lab mcp claude runs,
   # it needs my blender open (extension on localhost:9876). wowx: ~/projects/testwowexportai/mcp.js,
-  # its native module is built for this node, the one in my profile
+  # its native module is built for this node, the one in my profile. dotfiles and dotfiles-git:
+  # files and git in hermes' worktree, no shell and no push
   yggdrasilMcp = pkgs.writeShellScript "yggdrasil-mcp" ''
     export PATH=${lib.makeBinPath [ pkgs.uv pkgs.git pkgs.nodejs pkgs.imagemagick ]}:$PATH
+    # stdout is the mcp channel, so git's output goes to stderr
+    worktree() {
+      [ -d ${hermesTree} ] && return
+      if git -C ${repo} rev-parse -q --verify refs/heads/hermes >/dev/null; then
+        git -C ${repo} worktree add ${hermesTree} hermes >&2
+      else
+        git -C ${repo} worktree add -b hermes ${hermesTree} main >&2
+      fi
+    }
     case "''${SSH_ORIGINAL_COMMAND:-blender}" in
       blender) exec uvx --from "git+https://projects.blender.org/lab/blender_mcp.git#subdirectory=mcp" blender-mcp ;;
       wowx) cd /home/christina/projects/testwowexportai && exec node mcp.js ;;
+      dotfiles) worktree || exit 1; exec ${pkgs.mcp-server-filesystem}/bin/mcp-server-filesystem ${hermesTree} ;;
+      dotfiles-git) worktree || exit 1; exec ${pkgs.mcp-server-git}/bin/mcp-server-git --repository ${hermesTree} ;;
     esac
-    echo "this key only starts the blender or wowx MCP servers" >&2
+    echo "this key only starts the blender, wowx, dotfiles or dotfiles-git MCP servers" >&2
     exit 1
   '';
 in
