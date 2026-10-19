@@ -27,6 +27,8 @@
           { targets = [ "10.0.20.10:9100" ];     labels = { host = "hella"; }; }
           { targets = [ "10.0.20.6:9100" ];      labels = { host = "truenas"; }; }
           { targets = [ "10.0.20.18:9100" ];     labels = { host = "mimir"; }; }
+          { targets = [ "10.0.20.100:9100" ];    labels = { host = "mjolnir"; }; }
+          { targets = [ "10.0.20.21:9100" ];     labels = { host = "yggdrasil"; }; }
         ];
       }
       {
@@ -36,7 +38,10 @@
       # hosts/mimir/modules/system/gpu-exporter.nix
       {
         job_name = "nvidia-gpu";
-        static_configs = [{ targets = [ "10.0.20.18:9835" ]; labels = { host = "mimir"; }; }];
+        static_configs = [
+          { targets = [ "10.0.20.18:9835" ];  labels = { host = "mimir"; }; }
+          { targets = [ "10.0.20.100:9835" ]; labels = { host = "mjolnir"; }; }   # hosts/mjolnir/modules/exporters.nix
+        ];
       }
       {
         job_name = "postgres-immich";
