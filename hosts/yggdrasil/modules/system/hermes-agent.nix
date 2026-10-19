@@ -42,9 +42,14 @@ in
     # "openai-codex" + "gpt-6-astra" switches back to codex
     settings.fallback_providers = [ { provider = "openrouter"; model = "moonshotai/kimi-k3"; } ];
     settings.provider_routing.only = [ "sail-research/fp4" ];
-    # tool_search off: through its bridge kimi dropped the arguments (graphify's `question`),
-    # so mcp tools with arguments never ran. called directly they work
-    settings.tools.tool_search.enabled = "off";
+    # tool_search on again (2026-10-20, now on the kimi plan): mcp tools are loaded only when needed
+    # instead of sending all ~240 tool descriptions with every call (homarr alone was 41% of each one).
+    # it was off because kimi through openrouter/sail dropped the arguments in its bridge (graphify's
+    # `question`); if that comes back, "off" again
+    settings.tools.tool_search.enabled = "on";
+    # never called since 2026-10-03, ~2,900 tokens per call: scheduled jobs, past-session search,
+    # text to speech. browser and web search stay
+    settings.agent.disabled_toolsets = [ "cronjob" "session_search" "tts" ];
     # kimi still reasons, it's just not printed: every reasoning line redrew the cli's status bar
     # and it flickered badly over ssh. `/reasoning show` brings it back for one session
     settings.display.show_reasoning = false;
