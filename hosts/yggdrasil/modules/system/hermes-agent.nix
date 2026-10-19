@@ -87,7 +87,9 @@ in
   fileSystems."/mnt/muninn" = {
     inherit (config.fileSystems."/home/christina/muninn") device fsType options;
   };
-  systemd.services.hermes-agent.serviceConfig.ReadWritePaths = [ "-/mnt/muninn" "-/mnt/hermes-wowx" ];
+  # /mnt/studio-cache: `mimir-blender` makes its job folders there (skill mimir-test-node).
+  systemd.services.hermes-agent.serviceConfig.ReadWritePaths =
+    [ "-/mnt/muninn" "-/mnt/hermes-wowx" "-/mnt/studio-cache" ];
 
   networking.firewall.allowedTCPPorts = [ 8642 ];
 
