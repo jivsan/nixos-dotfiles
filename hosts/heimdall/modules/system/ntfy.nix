@@ -54,11 +54,26 @@
       {{- if contains "New alert" .text }}4{{ else }}2{{ end }}
   '';
 
-  # tailscale0 is a trusted interface, so without this every tailnet device could reach :2586 and skip
-  # traefik. only home assistant may (it can't resolve the https name); ipv6 not at all
+  # who reaches :2586 directly: heimdall itself (lo: traefik, alertmanager, huginn), my containers
+  # (podman0: grafana) and home assistant over tailscale (it can't resolve the https name). tailscale's
+  # own ts-input chain accepts tailnet traffic before nixos-fw runs, so this sits in the raw table
+  # like influxdb.nix. everyone else goes through traefik
   networking.firewall.extraCommands = ''
-    iptables -I nixos-fw -i tailscale0 -p tcp --dport 2586 ! -s 100.127.147.56 -j nixos-fw-refuse
-    ip6tables -I nixos-fw -i tailscale0 -p tcp --dport 2586 -j nixos-fw-refuse
+    iptables -t raw -N ntfy-only 2>/dev/null || iptables -t raw -F ntfy-only
+    iptables -t raw -A ntfy-only -i lo -j RETURN
+    iptables -t raw -A ntfy-only -i podman0 -j RETURN
+    iptables -t raw -A ntfy-only -i tailscale0 -s 100.127.147.56 -j RETURN
+    iptables -t raw -A ntfy-only -j DROP
+    iptables -t raw -C PREROUTING -p tcp --dport 2586 -j ntfy-only 2>/dev/null \
+      || iptables -t raw -A PREROUTING -p tcp --dport 2586 -j ntfy-only
+    ip6tables -t raw -C PREROUTING -p tcp --dport 2586 ! -i lo -j DROP 2>/dev/null \
+      || ip6tables -t raw -A PREROUTING -p tcp --dport 2586 ! -i lo -j DROP
+  '';
+  networking.firewall.extraStopCommands = ''
+    iptables -t raw -D PREROUTING -p tcp --dport 2586 -j ntfy-only 2>/dev/null || true
+    iptables -t raw -F ntfy-only 2>/dev/null || true
+    iptables -t raw -X ntfy-only 2>/dev/null || true
+    ip6tables -t raw -D PREROUTING -p tcp --dport 2586 ! -i lo -j DROP 2>/dev/null || true
   '';
 
   # topics: alerts (something is wrong), backups, renders, updates, home
