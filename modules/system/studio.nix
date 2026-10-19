@@ -2,13 +2,22 @@
 
 # odyn datasets vault/studio and vault/studio-cache (NFS shares 14 and 15, every client
 # mapped to the NAS user christina, uid 3002). The studio holds all Blender files and
-# projects: 3DBLENDER and the DAZ content folders, moved off mjolnir's data SSD in
-# 2026-10. It has hourly (2 days), daily (30 days) and weekly (12 weeks) snapshots, so
-# older versions of a file are under /mnt/studio/.zfs/snapshot/. The cache is for sim
-# caches and job scratch (mimir-blender's job folders) and has none. Same paths on
-# mjolnir, mimir and yggdrasil.
+# projects: 3DBLENDER and the other folders she uses for Blender, moved off mjolnir's
+# data SSD in 2026-10. It has hourly (2 days), daily (30 days) and weekly (12 weeks)
+# snapshots, so older versions of a file are under /mnt/studio/.zfs/snapshot/. The cache
+# is for sim caches and job scratch (mimir-blender's job folders) and has none. Same
+# paths on mjolnir, mimir and yggdrasil.
 let
-  moved = [ "3DBLENDER" "My Third Party Content" "TIL DAZ LEGG TIL" "Daz3DCentral" ];
+  # Everything she uses for Blender (her list, 2026-10-19). DF BETA (WoW) and the rest of
+  # the data SSD stay on mjolnir.
+  moved = [
+    "3DBLENDER"
+    "Fluid_Painter_v0.07.1"
+    "My Third Party Content"
+    "refsart"
+    "TIL DAZ LEGG TIL"
+    "Sanctus Libary"
+  ];
 
   share = name: extra: {
     device = "10.0.20.6:/mnt/vault/${name}";
