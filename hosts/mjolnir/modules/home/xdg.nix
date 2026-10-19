@@ -1,19 +1,8 @@
 { config, ... }:
-
-let
-  dotfiles = "${config.home.homeDirectory}/nixos-dotfiles/config";
-  createSymlink = path: config.lib.file.mkOutOfStoreSymlink path;
-  configs = {
-    qtile = "qtile";
-    rofi = "rofi";
-    nvim = "nvim";
-  };
-in
 {
-  xdg.configFile = builtins.mapAttrs
-    (_: subpath: {
-      source = createSymlink "${dotfiles}/${subpath}";
-      recursive = true;
-    })
-    configs;
+  # live link to my nvim config in the repo, so edits apply without a rebuild
+  xdg.configFile.nvim = {
+    source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nixos-dotfiles/config/nvim";
+    recursive = true;
+  };
 }
