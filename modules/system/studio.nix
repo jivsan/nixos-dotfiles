@@ -39,8 +39,13 @@ in
   # /mnt/data_ssd/<folder>. On mjolnir those links sit on the data SSD itself (made by
   # hand when the folders moved), so they are only declared on hosts without that disk.
   # Plain L never replaces a file or folder that is already there.
-  systemd.tmpfiles.rules = lib.mkIf (!(config.fileSystems ? "/mnt/data_ssd")) (
-    [ "d /mnt/data_ssd 0755 root root -" ]
-    ++ map (d: ''L "/mnt/data_ssd/${d}" - - - - /mnt/studio/${d}'') moved
-  );
+  systemd.tmpfiles.rules = lib.mkMerge [
+    (lib.mkIf (!(config.fileSystems ? "/mnt/data_ssd")) (
+      [ "d /mnt/data_ssd 0755 root root -" ]
+      ++ map (d: ''L "/mnt/data_ssd/${d}" - - - - /mnt/studio/${d}'') moved
+    ))
+    # Her Blender preferences keep four asset libraries (Fia base/extra, Sanctus,
+    # Strandkit) under /mnt/data-ssd/3DBLENDER, with a dash; this makes them resolve.
+    [ "L /mnt/data-ssd - - - - /mnt/data_ssd" ]
+  ];
 }
