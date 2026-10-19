@@ -19,9 +19,9 @@ own little box, so my agents keep running even when hella is down.
 
 | host        | ip            | what it does                                                                   | desktop                                                 |
 |-------------|---------------|--------------------------------------------------------------------------------|---------------------------------------------------------|
-| `mjolnir`   | `10.0.20.100` | my workstation and daily driver (5900X, RTX 4060 Ti)                           | oxwm on X11 by default and Hyprland too, picked in `ly` |
-| `heimdall`  | `10.0.20.17`  | headless services vm with traefik, immich, paperless, vaultwarden, grafana and huginn | none                                             |
-| `mimir`     | `10.0.20.18`  | headless ai box (5950X, GTX 1070 until the RTX 5070 Ti is in) with comfyui and immich ml | none                                          |
+| `mjolnir`   | `10.0.20.100` | my workstation and daily driver (5900X, RTX 5070 Ti)                           | oxwm on X11 by default and Hyprland too, picked in `ly` |
+| `heimdall`  | `10.0.20.17`  | headless services vm with traefik, immich, paperless, vaultwarden, homarr, grafana and huginn | none                                     |
+| `mimir`     | `10.0.20.18`  | headless ai box (5950X, RTX 4060 Ti) with llm, comfyui and immich ml            | none                                                    |
 | `tyr`       | `10.0.20.19`  | agent workstation vm with claude code, codex and herdr, linked to the muninn vault | neon oxwm over xrdp, i connect from `mjolnir` with remmina |
 | `njord`     | `10.0.20.20`  | headless finance vm running [sure](https://github.com/we-promise/sure), walled off from everything else | none                    |
 | `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets | none |
@@ -92,19 +92,17 @@ or just pick an older generation at boot.
 
 ```
 flake.nix            # the entry point with the inputs, mkHost and all the hosts
-configuration.nix    # mjolnir's umbrella that imports the shared system modules
-home.nix             # shared home-manager imports
-hosts/               # one folder per host (default.nix, home.nix, hardware and host only modules)
-modules/system/      # shared os modules (boot, networking, nix, users, hyprland …)
-modules/home/        # shared home modules (git, neovim, shell, terminal …)
-modules/apps/        # workstation app bundles (blender, octane, gaming, nvidia …), octane runbook in docs/misc/octane.md
-config/              # program configs and suckless sources (nvim, rofi, dwm, st …)
+hosts/               # one folder per host: default.nix, home.nix, hardware and the modules only that host uses
+modules/system/      # os modules two or more hosts share (boot, nix, users, neovim, odyn mounts …)
+modules/home/        # home modules two or more hosts share (git, neovim, shell, terminal …)
+modules/apps/        # app modules two or more hosts share (blender, claude code, codex, herdr …)
+config/              # program configs (nvim, alacritty) and the st and dmenu sources
 network/             # the homelab network, arista eos config and pfsense runbook (not nixos)
-docs/                # documentation
+docs/                # documentation, runbooks for octane, comfyui and the ai gateway in docs/misc
 ```
 
-`mjolnir` pulls in everything through `configuration.nix`, the headless hosts only pick the shared modules they
-need. the full breakdown is in [`docs/nixos-structure.md`](docs/nixos-structure.md).
+every host is put together the same way: its own folder under `hosts/` plus the shared modules it picks.
+the full breakdown is in [`docs/nixos-structure.md`](docs/nixos-structure.md).
 
 ## highlights
 
@@ -118,7 +116,7 @@ and it hot reloads without a rebuild.
 `nixpkgs-unstable` instead of the pinned 26.05, because the 595 driver in 26.05 doesn't build against kernel 7.2
 anymore. right now that's kernel 7.2 with `nvidia-open` 610. everything else on the host still comes from 26.05.
 
-**self hosted stack on `heimdall`** with immich, paperless, vaultwarden and crafty behind traefik, watched by
+**self hosted stack on `heimdall`** with immich, paperless, vaultwarden, homarr and crafty behind traefik, watched by
 prometheus, loki and grafana.
 
 **[muninn](docs/muninn-agentic-os.md), my agentic os.** an obsidian vault on `odyn` is shared memory for me and my

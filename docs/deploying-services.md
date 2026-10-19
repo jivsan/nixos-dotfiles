@@ -1,6 +1,6 @@
 # Deploying services on heimdall
 
-How to add a new containerized service to heimdall using NixOS's `virtualisation.oci-containers` (podman). This is the same pattern used for immich, nextcloud, and crafty.
+How to add a new containerized service to heimdall using NixOS's `virtualisation.oci-containers` (podman). This is the same pattern used for immich, paperless, vaultwarden and crafty.
 
 ## Mental model
 
@@ -49,7 +49,7 @@ let
 in
 {
   # Pre-create directories with correct ownership.
-  # 999:999 is the typical UID:GID inside official postgres/redis/nextcloud images.
+  # 999:999 is the typical UID:GID inside official postgres/redis images.
   systemd.tmpfiles.rules = [
     "d /var/lib/myapp 0700 999 999 -"
   ];
@@ -345,7 +345,6 @@ Allocate **unique localhost ports** per service so multiple Postgres/Redis conta
 | Service | Postgres host port | Redis host port |
 |---|---|---|
 | immich | 5433 | 6379 |
-| nextcloud | 5434 | 6380 |
 | myapp | 5435 | 6381 |
 | (next service) | 5436 | 6382 |
 
@@ -530,7 +529,8 @@ Either is a future improvement. Plain files work fine for a homelab.
 | Service | Module | Pattern |
 |---|---|---|
 | immich | `hosts/heimdall/modules/system/immich.nix` | Multi-container (server + db + redis) on shared network, NFS data, Traefik HTTP |
-| nextcloud | `hosts/heimdall/modules/system/nextcloud.nix` | Multi-container, NFS for app + data, Traefik HTTP with custom middleware |
+| paperless | `hosts/heimdall/modules/system/paperless.nix` | Multi-container (web + db + redis) on its own podman network, NFS for documents, DB on local disk |
+| vaultwarden | `hosts/heimdall/modules/system/vaultwarden.nix` | Single container, SQLite on local disk, daily backup timer to the NAS |
 | crafty | `hosts/heimdall/modules/system/crafty.nix` | Single container, NFS data, mixed Traefik HTTPS + raw TCP/UDP ports |
 | odyn proxy | `hosts/heimdall/modules/system/traefik.nix` | No container — just a Traefik route to an external HTTPS backend |
 
