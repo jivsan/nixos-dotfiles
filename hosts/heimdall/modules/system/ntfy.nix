@@ -54,17 +54,34 @@
       {{- if contains "New alert" .text }}4{{ else }}2{{ end }}
   '';
 
+  # tailscale0 is a trusted interface, so without this every tailnet device could reach :2586 and skip
+  # traefik. only home assistant may (it can't resolve the https name); ipv6 not at all
+  networking.firewall.extraCommands = ''
+    iptables -I nixos-fw -i tailscale0 -p tcp --dport 2586 ! -s 100.127.147.56 -j nixos-fw-refuse
+    ip6tables -I nixos-fw -i tailscale0 -p tcp --dport 2586 -j nixos-fw-refuse
+  '';
+
   # topics: alerts (something is wrong), backups, renders, updates, home
   #
-  # /var/lib/secrets/ntfy.env (root, 0600). single quotes, the bcrypt hashes have $ in them:
+  # /var/lib/secrets/ntfy.env (root, 0600). single quotes, the bcrypt hashes have $ in them.
+  # every sender is its own user that can only write to its own topics, with its own token, so a
+  # leaked token can't read anything, can't post elsewhere, and can be revoked alone:
   #
-  #   NTFY_AUTH_USERS='christina:<hash>:admin,publisher:<hash>:user'
-  #   NTFY_AUTH_ACCESS='publisher:*:write-only'
-  #   NTFY_AUTH_TOKENS='publisher:tk_<29 chars>:fleet'
+  #   NTFY_AUTH_USERS='christina:<hash>:admin,publisher:<hash>:user,heimdall:<hash>:user,...'
+  #   NTFY_AUTH_ACCESS='publisher:*:write-only,heimdall:alerts:write-only,proxmox:backups:write-only,...'
+  #   NTFY_AUTH_TOKENS='publisher:tk_...:fleet,heimdall:tk_...:heimdall,proxmox:tk_...:hella,...'
   #
-  # hash: `ntfy user hash`, token: `ntfy token generate`. publisher can only send, so a leaked
-  # token can't read my notifications. users removed from here are deleted from user.db on restart.
-  # the same token is in /var/lib/secrets/ntfy-publish.env (NTFY_TOKEN=...) for the senders on heimdall
+  #   christina      admin, the phone and the web app
+  #   publisher      * (my own curl token, only in vaultwarden)
+  #   heimdall       alerts (alertmanager, grafana, scrutiny, huginn: /var/lib/secrets/ntfy-publish.env)
+  #   proxmox        backups, alerts, updates (tokens "hella" and "pbs", in their notification secrets)
+  #   truenas        alerts (odyn's slack-type alert service, basic auth in the url)
+  #   mjolnir        renders (~/.config/ntfy/token, the blender render hook)
+  #   homeassistant  home
+  #
+  # hash: `ntfy user hash`, token: `ntfy token generate`. sender passwords are random and never used.
+  # users removed from here are deleted from user.db on restart; a changed env file needs
+  # `systemctl restart ntfy-sh`.
   #
   # send:  curl -H "Authorization: Bearer tk_..." -d "render done" https://ntfy.oryxserver.org/renders
 }
