@@ -27,6 +27,12 @@ in
       TZ = config.time.timeZone;
     };
 
-    volumes = [ "${homarrData}:/appdata" ];
+    volumes = [
+      "${homarrData}:/appdata"
+      # podman's Docker-compatible API (podman.socket), where Homarr looks for
+      # Docker: lists and starts/stops heimdall's containers. Full control over
+      # every container here, so Homarr stays behind Traefik's lan-only.
+      "/run/podman/podman.sock:/var/run/docker.sock"
+    ];
   };
 }

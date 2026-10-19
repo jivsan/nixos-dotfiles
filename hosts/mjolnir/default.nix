@@ -38,6 +38,7 @@
     ../../modules/apps/mimir-blender.nix   # `mimir-blender`: agents run their Blender checks on mimir, not here
     ./modules/mimir-test-node.nix          # `blender-config-to-mimir`: her add-ons for mimir's Blender, without Octane
     ../../modules/system/agent-memory.nix  # /mnt/agent-memory on odyn: Claude's memory notes, shared with yggdrasil
+    ./modules/exporters.nix                # node + GPU numbers for heimdall's Prometheus (Homarr host card)
   ];
 
   networking.hostName = "mjolnir";

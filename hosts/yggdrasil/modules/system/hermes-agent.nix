@@ -75,6 +75,13 @@ in
         args = ssh ++ [ "christina@10.0.20.100" "wowx" ];
         timeout = 300;
       };
+      # Homarr's own MCP server on heimdall: boards, apps, widgets, integrations.
+      # HOMARR_API_KEY (a Homarr API key, acts as christina) is in /etc/hermes/env;
+      # hermes fills in ${VAR} itself, so the key never lands in this public repo.
+      homarr = {
+        url = "https://home.oryxserver.org/api/mcp";
+        headers.ApiKey = "\${HOMARR_API_KEY}";
+      };
     };
   };
 

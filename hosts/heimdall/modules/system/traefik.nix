@@ -314,6 +314,8 @@
                                  # single host, NOT the VLAN; IoT gear stays locked out
               "100.64.0.0/10"
               "127.0.0.1/32"
+              "10.88.0.0/16"     # podman's default network on heimdall: Homarr checks and
+                                 # reads the services through their real https names
             ];
           };
 
