@@ -37,6 +37,7 @@
     ../../modules/system/studio.nix        # /mnt/studio on odyn: all Blender files and projects (3DBLENDER moved there)
     ../../modules/apps/mimir-blender.nix   # `mimir-blender`: agents run their Blender checks on mimir, not here
     ./modules/mimir-test-node.nix          # `blender-config-to-mimir`: her add-ons for mimir's Blender, without Octane
+    ../../modules/system/agent-memory.nix  # /mnt/agent-memory on odyn: Claude's memory notes, shared with yggdrasil
   ];
 
   networking.hostName = "mjolnir";

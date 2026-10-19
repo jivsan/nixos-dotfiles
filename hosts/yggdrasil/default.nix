@@ -20,6 +20,7 @@
     ../../modules/apps/mimir-blender.nix
     ../../modules/apps/unfree.nix          # claude-code is unfree
     ../../modules/apps/claude-code.nix
+    ../../modules/system/agent-memory.nix   # Claude's memory notes, the same copy as on mjolnir
     ../../modules/apps/herdr.nix
 
     ./modules/system/hermes-agent.nix
