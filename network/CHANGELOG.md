@@ -5,6 +5,49 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-10-19 — SSH locked down: key-only, from mjolnir + yggdrasil only
+
+**Why:** the fleet security audit (2026-10-19) flagged bifrost's OpenSSH 7.8 banner as
+"known CVEs". Checked: the serious server-side OpenSSH flaws don't apply to 7.8
+(CVE-2018-15473 was fixed in 7.8; regreSSHion CVE-2024-6387 affects 8.5–9.7 only; Terrapin
+CVE-2023-48795 needs ChaCha20-Poly1305 or CBC, which the switch doesn't offer). The real
+issues: the switch is end of life (EOS 4.28 is the last train for the 7050X series, bug
+fixes ended 2025-03-20), so nothing new will be patched; and SSH accepted the admin
+password (keyboard-interactive) from any address. So the management side is narrowed.
+
+**Changed:** SSH only from mjolnir (10.0.20.100) and yggdrasil (10.0.20.21), via a standard
+ACL on the SSH service; public-key login only (the password still works on the serial
+console); `diffie-hellman-group14-sha1` and `hmac-sha1` removed. Applied in a config
+session with a 5-minute commit timer, tested (mjolnir key login works, yggdrasil is offered
+`publickey` only, mimir times out), then confirmed and `write memory`.
+
+**Unchanged:** SNMP stays v2c read-only, limited to heimdall by `SNMP-RO` (now listed in
+`bifrost-arista-core.cfg`, community left out).
+
+**Recovery:** if mjolnir's key is lost or both hosts are down, use the serial console
+(admin password), then add a host to `SSH-MGMT`.
+
+### Commands applied (EOS)
+```
+enable
+configure session harden-ssh
+ip access-list standard SSH-MGMT
+   10 permit host 10.0.20.100
+   20 permit host 10.0.20.21
+management ssh
+   ip access-group SSH-MGMT in
+   authentication protocol public-key
+   key-exchange curve25519-sha256@libssh.org ecdh-sha2-nistp521 ecdh-sha2-nistp384 ecdh-sha2-nistp256
+   mac hmac-sha2-512-etm@openssh.com hmac-sha2-256-etm@openssh.com hmac-sha2-512 hmac-sha2-256
+   exit
+commit timer 00:05:00
+! tested from a new session, then:
+configure session harden-ssh commit
+write memory
+```
+
+---
+
 ## 2026-10-18 — yggdrasil on Et12; admin key now mjolnir's; config file synced
 
 **Why:** yggdrasil (Lenovo ThinkCentre M93p) is the new always-on box outside hella that
