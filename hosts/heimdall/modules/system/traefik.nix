@@ -177,6 +177,14 @@
             middlewares = [ "lan-only" "pihole-admin" ];
           };
 
+          pfsense = {
+            rule = "Host(`pfsense.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "pfsense";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -293,6 +301,17 @@
               servers = [
                 { url = "http://10.0.20.4"; }
               ];
+            };
+          };
+
+          # pfsense web ui, self-signed cert; its hostname is pfsense.oryxserver.org,
+          # so its dns-rebind and referer checks accept this name
+          pfsense = {
+            loadBalancer = {
+              servers = [
+                { url = "https://10.0.20.1"; }
+              ];
+              serversTransport = "insecure";
             };
           };
         };
