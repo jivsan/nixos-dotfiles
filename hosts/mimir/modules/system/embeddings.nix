@@ -1,5 +1,10 @@
-{ config, pkgs, utils, ... }:
+{ config, lib, pkgs, utils, ... }:
 let
+  # cuda build for the 4060 ti only (sm_89), kernels for every card take ages to compile.
+  # a new card needs its own number here (5070 ti = 120)
+  llamaCuda = (pkgs.llama-cpp.override { cudaSupport = true; }).overrideAttrs (old: {
+    cmakeFlags = old.cmakeFlags ++ [ (lib.cmakeFeature "CMAKE_CUDA_ARCHITECTURES" "89") ];
+  });
   # pinned to a revision: another file gives vectors that don't compare with the stored
   # ones, and a new model name makes heimdall's embedder re-embed the whole vault
   model = pkgs.fetchurl {
@@ -30,21 +35,25 @@ let
   '';
 in
 {
-  # embeddings for vault search and note placement, only heimdall calls /v1/embeddings here
-  # on cpu: a question ~0.5 s, a 4,000-char note ~25 s. to put it on the card (8 gb, shared
-  # with comfyui and the octane node):
-  #   package = pkgs.llama-cpp.override { cudaSupport = true; };  extraFlags ++ [ "-ngl" "99" ]
+  # embeddings for vault search and note placement, only heimdall calls /v1/embeddings here.
+  # notes on the card: an 8,000-char note in 0.15 s (~50 s on the cpu), 6.8 gb while awake,
+  # 6 s to wake up. questions stay on the cpu (0.5 s, no vram)
   services.llama-cpp = {
     enable = true;
+    package = llamaCuda;
     inherit model;
     host = "0.0.0.0";
     port = notesPort;
-    extraFlags = common ++ window 8192 ++ [ "--threads" "16" ];   # the physical cores
+    extraFlags = common ++ window 8192 ++ [
+      "--threads" "16"                 # the physical cores, for whatever doesn't fit the card
+      # the card is shared with comfyui and the octane node: -ngl stays auto, so --fit only
+      # loads what fits (1 gb margin), and after 2 idle minutes it lets go of the card
+      "--sleep-idle-seconds" "120"
+    ];
   };
 
-  # second instance for questions only: llama-server runs all slots in one pass, so a
-  # question sent above waits for the note being embedded (17-30 s there, 0.5 s here).
-  # both map the same model file, so the weights are in memory once
+  # second instance for questions only, on the cpu build: llama-server runs all slots in
+  # one pass, so a question sent above would wait for the note being embedded
   systemd.services.llama-cpp-query = {
     description = "LLaMA C++ server: question embeddings for the muninn bridge";
     inherit (config.systemd.services.llama-cpp) after wantedBy;
@@ -53,7 +62,7 @@ in
       CacheDirectory = "llama-cpp-query";
       WorkingDirectory = "/var/lib/llama-cpp-query";
       Environment = [ "LLAMA_CACHE=/var/cache/llama-cpp-query" ];
-      ExecStart = "${config.services.llama-cpp.package}/bin/llama-server ${utils.escapeSystemdExecArgs queryFlags}";
+      ExecStart = "${pkgs.llama-cpp}/bin/llama-server ${utils.escapeSystemdExecArgs queryFlags}";
       ExecStartPost = warmUp;
     };
   };
