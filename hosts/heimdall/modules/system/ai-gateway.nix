@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 # ── ai-gateway — one OpenAI-style endpoint for the models, with metrics ───────
 # Clients call http://10.0.20.17:4000/v1 and name a model; the gateway forwards
 # to the server that has it and measures the request (tokens, time to first
@@ -10,6 +10,13 @@
 let
   port = 4000;
   mimir = "10.0.20.18";
+
+  # The local chat models (llama-server, hosts/mimir/modules/system/llm.nix). Off since
+  # 2026-10-19: the RTX 5070 Ti they were picked for went into mjolnir, and mimir's 8 GB
+  # card is shared with her Octane render node. Nothing ever called them, and the
+  # dashboard showed the never-started server as down. true again once llm.nix runs on
+  # a card that holds them.
+  localChat = false;
 
   python = pkgs.python3.withPackages (ps: [ ps.aiohttp ps.prometheus-client ]);
 
@@ -25,7 +32,7 @@ let
     # huginn.nix and brain.nix point their MiniMax calls at the first two.
     clients = [ "huginn" "bridge" "hermes" "mjolnir" ];
 
-    targets = {
+    targets = lib.optionalAttrs localChat {
       # llama-server on mimir (hosts/mimir/modules/system/llm.nix). The 16 GB
       # card holds one chat model at a time, and llama-server kills the loaded
       # model mid-answer when the other one is asked for. `exclusive` makes the
@@ -36,7 +43,7 @@ let
         max_concurrent = 2;   # the most `parallel` slots any model has in llm.nix
         exclusive = true;
       };
-
+    } // {
       # The key's variable name in graphify-openrouter.env. The key itself is
       # only ever in /var/lib/secrets, never in this repo.
       openrouter = {
@@ -53,20 +60,21 @@ let
 
     # Names here are what a client sends as "model". Local names must match the
     # sections of the preset in mimir's llm.nix.
-    models = {
+    models = lib.optionalAttrs localChat {
       "qwen3.5-9b" = {
         target = "mimir-chat";
         tier = "efficient";
         max_prompt_chars = 40000;   # about 12k tokens: fits its 16k-token slot with room for the answer
       };
       "qwen3.8-27b" = { target = "mimir-chat"; tier = "capable"; };
+    } // {
       "minimax/minimax-m3" = { target = "openrouter"; tier = "capable"; };
     };
 
     # "auto": the local model first; MiniMax when the request is too long for
     # it, or mimir is down or fails. Only callers on heimdall itself (or with a
     # client key) are ever sent to MiniMax, since that one costs money.
-    routes.auto.models = [ "qwen3.5-9b" "minimax/minimax-m3" ];
+    routes.auto.models = lib.optional localChat "qwen3.5-9b" ++ [ "minimax/minimax-m3" ];
   });
 in
 {
