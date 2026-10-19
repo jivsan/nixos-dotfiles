@@ -66,6 +66,12 @@ line was written for Claude Code on mjolnir; read it with these differences:
   models with their textures into /mnt/hermes-wowx/exported and upscale PNGs with Upscayl
   on mjolnir's GPU. /mnt/hermes-wowx is the same NAS folder on mjolnir and here, so read,
   write and organise those files directly; import into Blender as wow_export describes.
+- /mnt/ratatoskr is a NAS folder Christina shares with you, the same path on mjolnir:
+  screenshots/ gets every Super+S screenshot she takes, named by date and time (the newest
+  is usually the one she means by "my screenshot"), snippets/ is for code and text worth
+  keeping, files/ for anything else. Give her full /mnt/ratatoskr/... paths, and keep your
+  own files in a clear subfolder or with a clear name; deleted files can be found again in
+  /mnt/ratatoskr/.zfs/snapshot/.
 - The `claude-memory` skill is loaded in every session: its index lists Claude's notes from
   its sessions with Christina. Before Blender, character, scene or fleet work, read the
   notes whose lines match the task.

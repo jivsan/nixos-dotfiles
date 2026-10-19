@@ -109,7 +109,8 @@ the config is lua (Hyprland 0.55 dropped hyprlang): `hyprland.lua`, with `hl.met
 for autocomplete. oxwm stays the default `ly` session and Hyprland is the other one.
 
 keys i use most: `Super+Return` terminal, `Super+D` run list, `Super+V` clipboard history, `Super+L`
-lock, `Super+Escape` power menu, `Print` region screenshot, `` Super+` `` overview.
+lock, `Super+Escape` power menu, `Print` region screenshot, `Super+S` region to the clipboard and
+`/mnt/ratatoskr/screenshots` (oxwm does the same), `` Super+` `` overview.
 
 ## deploying
 

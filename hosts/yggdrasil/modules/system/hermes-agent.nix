@@ -92,9 +92,10 @@ in
   fileSystems."/mnt/muninn" = {
     inherit (config.fileSystems."/home/christina/muninn") device fsType options;
   };
-  # /mnt/studio-cache: `mimir-blender` makes its job folders there
+  # /mnt/studio-cache: `mimir-blender` makes its job folders there.
+  # /mnt/ratatoskr: screenshots, snippets and files between me and hermes (modules/system/ratatoskr.nix)
   systemd.services.hermes-agent.serviceConfig.ReadWritePaths =
-    [ "-/mnt/muninn" "-/mnt/hermes-wowx" "-/mnt/studio-cache" ];
+    [ "-/mnt/muninn" "-/mnt/hermes-wowx" "-/mnt/studio-cache" "-/mnt/ratatoskr" ];
 
   # gateway api: only the brain bridge on heimdall calls it (with the api key), so only heimdall gets in
   networking.firewall.extraCommands = ''
