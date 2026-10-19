@@ -13,6 +13,7 @@
     ../../modules/system/locale.nix
     ../../modules/system/nix.nix
     ../../modules/system/users.nix
+    ../../modules/system/neovim.nix
     ../../modules/system/dotfiles-pull.nix
     ../../modules/system/muninn.nix
     ../../modules/system/hermes-wowx.nix
@@ -66,7 +67,7 @@
   nix.settings.trusted-users = [ "root" "@wheel" ];
 
   environment.systemPackages = with pkgs; [
-    git vim curl wget btop tree jq rsync
+    git curl wget btop tree jq rsync
     python3   # for scripts hermes writes and runs from its terminal (the CLI's PATH)
   ];
   # The gateway's own PATH; hermes' code-execution tool brings its own Python.

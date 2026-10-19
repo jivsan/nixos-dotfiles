@@ -8,6 +8,7 @@
     ../../modules/system/locale.nix
     ../../modules/system/nix.nix
     ../../modules/system/users.nix       # christina + SSH key
+    ../../modules/system/neovim.nix
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
     ../../modules/apps/herdr.nix
@@ -56,7 +57,7 @@
   };
 
   environment.systemPackages = with pkgs; [
-    git vim curl wget htop tree jq
+    git curl wget htop tree jq
   ];
 
   system.stateVersion = "26.05";   # fresh install on the latest release

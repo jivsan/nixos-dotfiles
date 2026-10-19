@@ -7,6 +7,7 @@
     ../../modules/system/locale.nix
     ../../modules/system/nix.nix
     ../../modules/system/users.nix
+    ../../modules/system/neovim.nix
     ../../modules/system/tailscale.nix
     ../../modules/system/dotfiles-pull.nix
 
@@ -37,7 +38,7 @@
   };
 
   environment.systemPackages = with pkgs; [
-    git vim curl wget htop tree jq
+    git curl wget htop tree jq
   ];
 
   system.stateVersion = "26.05";
