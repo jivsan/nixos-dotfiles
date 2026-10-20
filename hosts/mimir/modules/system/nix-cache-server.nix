@@ -34,12 +34,10 @@ in
         urls = [
           "https://cache.nixos.org"
           "https://cache.numtide.com"
-          "https://hyprland.cachix.org"
         ];
         publicKeys = [
           "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
           "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g="
-          "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
         ];
       };
     };
@@ -48,6 +46,11 @@ in
 
   # paths built on this box get the same signature, so what the runner uploads is trusted too
   nix.settings.secret-key-files = [ key ];
+
+  # ncps 0.9.4 can't read cachix's nar names (uuids) and answers 500, so hyprland's cache isn't an upstream.
+  # this box fetches those paths from cachix itself, and ci uploads them here like the rest
+  nix.settings.extra-substituters = [ "https://hyprland.cachix.org" ];
+  nix.settings.extra-trusted-public-keys = [ "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=" ];
 
   services.nginx = {
     enable = true;

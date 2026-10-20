@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
 # the forgejo actions runner for git.oryxserver.org (yggdrasil). jobs from .forgejo/workflows run as a
 # plain user straight on this box: they build every host and upload the result to the nix cache
@@ -26,5 +26,9 @@
   nix.settings = {
     max-jobs = 4;
     cores = 8;
+    # ci leaves every host's system in this box's own store; the copy that counts is on brunnr
+    min-free = 100 * 1024 * 1024 * 1024;
+    max-free = 150 * 1024 * 1024 * 1024;
   };
+  nix.gc.dates = lib.mkForce "daily";
 }
