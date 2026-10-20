@@ -1,21 +1,19 @@
-{ config, pkgs, ... }:
+{ ... }:
+
+# brunnr: the two 1.2 tb sas disks as one zfs stripe, only for the fleet nix cache (nix-cache-server.nix).
+# no redundancy on purpose, everything on it can be downloaded or built again
 {
-  # zfs scratch pool. not imported: the ssds are out of mimir (see default.nix)
   boot.supportedFilesystems = [ "zfs" ];
+  boot.zfs.forceImportRoot = false;   # no zfs root here
 
-  # pinned: zfs won't auto-import pools with another hostid, never change it once pools exist
-  networking.hostId = "de34016a"; 
+  # pinned: zfs only auto-imports pools made with this hostid. never change it
+  networking.hostId = "de34016a";
 
-  # no zfs root here, this silences the forceImportRoot warning
-  boot.zfs.forceImportRoot = false;
+  # arc capped at 1 gib so the ram stays free for octane out-of-core textures
+  boot.extraModprobeConfig = ''
+    options zfs zfs_arc_max=1073741824 zfs_arc_min=268435456
+  '';
 
-  # zfs mounts these itself, so they're not in fileSystems
-  boot.zfs.extraPools = [ "scratch" ];
-  # boot.zfs.extraPools = [ "scratch" "brunnr" ];   # once the sas mirror exists
-
-  boot.kernelParams = [ "zfs.zfs_arc_max=8589934592" ];
-
-  services.zfs.trim.enable = true;
   services.zfs.autoScrub = {
     enable = true;
     interval = "monthly";

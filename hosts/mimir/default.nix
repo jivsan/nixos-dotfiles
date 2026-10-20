@@ -17,7 +17,7 @@
 
     # mimir's own: ai / gpu stack
     ./modules/system/nvidia.nix
-#   ./modules/system/storage.nix        # zfs scratch pool, the ssds are out. kept for the pinned hostId + brunnr plan
+    ./modules/system/storage.nix          # brunnr: zfs stripe on the two sas disks for the nix cache
     ./modules/system/immich-ml.nix
     ./modules/system/comfyui.nix
     ./modules/system/voice.nix            # whisper + kokoro for heimdall's brain bridge
