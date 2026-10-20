@@ -21,11 +21,10 @@ let
       hash = "sha256-4YhMYBw7N02kjPkn3neAKMWnVS0h99VPRHHs7KrcAqU=";
     };
     nativeBuildInputs = map (p: if p == pkgs.pnpm_11 then pkgs.pnpm_12 else p) prev.nativeBuildInputs;
-    # pnpm 12 prune re-checks minimumReleaseAge against the registry; fetchPnpmDeps already did
-    preInstall = builtins.replaceStrings
-      [ "pnpm --ignore-scripts prune" ]
-      [ "pnpm --offline --config.minimum-release-age=0 --ignore-scripts prune" ]
-      prev.preInstall;
+    # pnpm 12 prune --prod drops peer deps that are also dev deps (zod, pg), so keep the built tree
+    preInstall =
+      let prune = "CI=true pnpm --ignore-scripts prune --prod -w";
+      in assert lib.hasInfix prune prev.preInstall; builtins.replaceStrings [ prune ] [ "" ] prev.preInstall;
   });
 in
 {
