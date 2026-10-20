@@ -73,7 +73,7 @@ in
   ];
 
   virtualisation.oci-containers.containers.grafana = {
-    image = "docker.io/grafana/grafana-oss:latest";
+    image = "docker.io/grafana/grafana:13.2.4@sha256:dbbc38ea21103cefb50396340cd88afec779c7e070b0a7bf5a75b4ce46651d3f";   # grafana-oss stopped getting updates at 13.0.2
     autoStart = true;
     ports = [ "127.0.0.1:3002:3000" ];
     environmentFiles = [

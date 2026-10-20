@@ -10,10 +10,9 @@ in
   ];
 
   virtualisation.oci-containers.containers.homarr = {
-    # :latest is only pulled when the image is missing, so i update by hand:
-    # sudo podman pull ...; systemctl restart podman-homarr
+    # pinned by tag + digest: to update, put the new ones here and rebuild.
     # a new major migrates the db, so copy /var/lib/homarr first
-    image = "ghcr.io/homarr-labs/homarr:latest";
+    image = "ghcr.io/homarr-labs/homarr:v2.6.0@sha256:1e077fc77d3ad7482376bab964b89cfc8c1f31fe2ddeb5154cf2a1058d40b32d";
     autoStart = true;
     ports = [ "127.0.0.1:7575:7575" ];
     # fixed address: traefik's lan-only lets this one container in, not all of podman's network

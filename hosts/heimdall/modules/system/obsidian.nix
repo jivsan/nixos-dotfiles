@@ -33,7 +33,7 @@ in
 
   virtualisation.oci-containers.backend = "podman";
   virtualisation.oci-containers.containers.obsidian = {
-    image = "lscr.io/linuxserver/obsidian:latest";
+    image = "lscr.io/linuxserver/obsidian:v1.14.4-ls149@sha256:ca9c7878429b70d61129a614e95418fd930d5dcb5dc1c1f6ec2c132f0e6122a2";
     autoStart = true;
 
     environment = {

@@ -11,7 +11,7 @@ in
   ];
 
   virtualisation.oci-containers.containers.vaultwarden = {
-    image = "ghcr.io/dani-garcia/vaultwarden:latest";
+    image = "ghcr.io/dani-garcia/vaultwarden:1.37.4@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055";   # pinned; bump by hand
     autoStart = true;
     ports = [ "127.0.0.1:8222:80" ];
 

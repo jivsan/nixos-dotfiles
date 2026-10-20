@@ -1,6 +1,6 @@
 { ... }:
 let
-  craftyImage = "registry.gitlab.com/crafty-controller/crafty-4@sha256:d2f61fcabb4756a63bc8538fb4f5e35ffddca3f1916a733c95a31c705c697742";
+  craftyImage = "registry.gitlab.com/crafty-controller/crafty-4:4.11.0@sha256:7b6e87514259549647e15ceeaf73d238792e6d77e2c79fc744d5badc8d6e997c";
 in
 {
   virtualisation.oci-containers.containers.crafty = {
