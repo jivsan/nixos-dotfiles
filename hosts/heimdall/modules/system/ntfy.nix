@@ -94,6 +94,7 @@
   #   mjolnir        renders (~/.config/ntfy/token, the blender render hook)
   #   homeassistant  home, read-write (its event entity listens); ha logs in with a password and makes its own token
   #   changedetection changes (changedetection.nix, the token is in its own settings under /var/lib/changedetection)
+  #   n8n            reports, reads alerts/backups/updates/changes (the morning report, token only in n8n's credentials)
   #
   # hash: `ntfy user hash`, token: `ntfy token generate`. sender passwords are random and never used.
   # users removed from here are deleted from user.db on restart; a changed env file needs

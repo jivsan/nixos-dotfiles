@@ -125,6 +125,8 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
   opens 9090 to yggdrasil only), Scrutiny, Proxmox through the read-only token `n8n-report@pve!morning`
   (PVEAuditor on `/nodes/hella`, `/vms`, `/storage/pbs`) and the vault's `journal/` and `MOCs/`
   (`N8N_RESTRICT_FILE_ACCESS_TO`). The tokens live only in n8n's encrypted credentials.
+  Proxmox lists PBS backups only to users who may also make them (Datastore.AllocateSpace + VM.Backup),
+  so the workflow reads each night's vzdump task log instead, which Sys.Audit allows.
 - Health: `/healthz/readiness` answers 200 only when the database is connected and migrated
   (Prometheus `SiteDown` and the Homarr tile use it).
 
