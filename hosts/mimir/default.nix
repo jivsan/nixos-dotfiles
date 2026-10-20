@@ -1,4 +1,4 @@
-{ config, pkgs, pkgs-unstable, ... }:
+{ config, lib, pkgs, pkgs-unstable, ... }:
 {
   imports = [
     ./hardware-configuration.nix
@@ -32,7 +32,17 @@
 #    ./modules/system/discordbot.nix      # off until /var/lib/discordbot/.env exists
   ];
 
-  boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
+  # the newest kernel zfs supports (the brunnr pool), not simply the newest: zfs can trail a new kernel by weeks.
+  # moves up by itself once zfs supports the next one (from the nixos wiki's zfs page)
+  boot.kernelPackages =
+    let
+      zfsOk = name: kp:
+        builtins.match "linux_[0-9]+_[0-9]+" name != null
+        && (builtins.tryEval kp).success
+        && !kp.${config.boot.zfs.package.kernelModuleAttribute}.meta.broken;
+      ok = lib.filterAttrs zfsOk pkgs-unstable.linuxKernel.packages;
+    in
+    lib.last (lib.sort (a: b: lib.versionOlder a.kernel.version b.kernel.version) (lib.attrValues ok));
 
   networking.hostName = "mimir";
   networking.useDHCP = false;
