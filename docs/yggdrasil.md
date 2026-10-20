@@ -10,13 +10,13 @@ paperless, vaultwarden, homarr, grafana/prometheus/alertmanager, ntfy, changedet
 crafty, scrutiny, the muninn vault's huginn agents and the brain dashboard. see
 [`heimdall-docs.md`](heimdall-docs.md).
 
-**forgejo is the exception: it runs on yggdrasil**, with its files and database on odyn. new apps
+**forgejo and n8n are the exception: they run on yggdrasil**, with their files and databases on odyn. new apps
 from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 
 | host | what lives there |
 |---|---|
 | heimdall `10.0.20.17` | the services above, plus traefik for *every* `*.oryxserver.org` name (forgejo's too) |
-| **yggdrasil `10.0.20.21`** | **forgejo** (git.oryxserver.org), hermes (my agent), claude code + herdr |
+| **yggdrasil `10.0.20.21`** | **forgejo** (git.oryxserver.org), **n8n** (n8n.oryxserver.org), hermes (my agent), claude code + herdr |
 | odyn `10.0.20.6` | storage, **appdb** (postgres for the yggdrasil apps), dockge with the arr apps, plex/jellyfin |
 | mimir `10.0.20.18` | llm server, comfyui, immich machine learning, blender test node |
 | njord `10.0.20.20` | sure (finance), walled off |
@@ -55,6 +55,7 @@ forgejo has no push-to-create: make the repo in the web ui first (private is the
 | service | what it is | port (who may connect) | config |
 |---|---|---|---|
 | **forgejo** | my git server: web at https://git.oryxserver.org, ssh at `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`. repos, lfs, attachments, settings on odyn; issues, users etc. in appdb on odyn. unit `forgejo.service`, package `forgejo-lts` | 3000 web, 2222 ssh (only heimdall: traefik passes them through) | `hosts/yggdrasil/modules/system/forgejo.nix` |
+| **n8n** | workflow automation (reports, glue between services) at https://n8n.oryxserver.org. workflows, credentials and runs in appdb; encryption key and stored files on odyn. unit `n8n.service`, version set in the module (nixpkgs lags behind) | 5678 web (only heimdall: traefik) | `hosts/yggdrasil/modules/system/n8n.nix` |
 | **hermes-agent** | my ai agent (hermes) on my kimi pro plan with openrouter as fallback. tools over mcp: graphify (vault + dotfiles knowledge graphs on heimdall), blender, wowx and a dotfiles worktree on mjolnir, homarr | 8642 gateway api (only heimdall: the brain bridge) | `hosts/yggdrasil/modules/system/hermes-agent.nix` |
 | prometheus-node-exporter | cpu, memory, disk and systemd numbers for heimdall's prometheus (homarr host card, `UnitFailed` alerts) | 9100 | `hosts/yggdrasil/modules/system/exporters.nix` |
 | sshd | me (key only, no root, no passwords) | 22 | `default.nix` |
@@ -68,7 +69,7 @@ answers from the knowledge graph, `modules/system/muninn.nix`).
 
 | timer | what | when |
 |---|---|---|
-| `appdb-backup` | dumps every appdb database (forgejo …) to odyn `vault/appdata/backups`, keeps 14 days | 03:30 |
+| `appdb-backup` | dumps every appdb database (forgejo, n8n …) to odyn `vault/appdata/backups`, keeps 14 days | 03:30 |
 | `dotfiles-pull` | `git pull --ff-only` of `~/nixos-dotfiles` from github, never rebuilds | every 2 min |
 | `nix-gc` | old nix store paths | weekly |
 | `fstrim` | ssd trim | weekly |
@@ -80,6 +81,7 @@ a failed unit (any of these) shows up as `UnitFailed` on my phone through heimda
 | path | what | mount |
 |---|---|---|
 | `/mnt/appdata/forgejo` | forgejo's repos, lfs, attachments, ssh host keys, app.ini + secret keys | hard, automount |
+| `/mnt/appdata/n8n` | n8n's encryption key and stored files | hard, automount |
 | `/mnt/appdata/backups` | the nightly appdb dumps | hard, automount |
 | `~/muninn` and `/mnt/muninn` | the vault (the second path is for hermes, who can't enter my home) | soft, automount |
 | `/mnt/studio`, `/mnt/studio-cache` | my blender files and job scratch (same paths on mjolnir and mimir) | hard / soft |
@@ -93,7 +95,7 @@ only the local disk holds rebuildable things (logs, caches, forgejo's search ind
 
 | where | what |
 |---|---|
-| `/var/lib/secrets/` (root 0600) | appdb admin + backup passwords, forgejo's database password |
+| `/var/lib/secrets/` (root 0600) | appdb admin + backup passwords, forgejo's and n8n's database passwords |
 | `/etc/hermes/env` | hermes' api keys (kimi, openrouter, brave, homarr) |
 | `/var/lib/hermes-ssh/` | hermes' ssh key for its mcp servers (locked to forced commands on heimdall and mjolnir) |
 
@@ -125,5 +127,5 @@ sudo systemctl start appdb-backup
   --create` and restart the unit. later boots are fine.
 - forgejo's built-in ssh server only answers to the one user name in `BUILTIN_SSH_SERVER_USER`
   (`git`); anything else gets "Permission denied (publickey)".
-- after a power cut yggdrasil is up long before odyn: forgejo keeps retrying every 15 s until the
+- after a power cut yggdrasil is up long before odyn: forgejo and n8n keep retrying every 15 s until the
   share and appdb answer, nothing to do by hand.

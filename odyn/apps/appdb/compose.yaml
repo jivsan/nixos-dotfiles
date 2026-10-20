@@ -46,3 +46,4 @@ configs:
       hostssl all       backup     10.0.20.21/32  scram-sha-256
       # one line per app: its own database and role, only from the host it runs on
       hostssl forgejo   forgejo    10.0.20.21/32  scram-sha-256
+      hostssl n8n       n8n        10.0.20.21/32  scram-sha-256

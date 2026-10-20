@@ -89,6 +89,7 @@
             "https://changedetection.oryxserver.org"
             "https://search.oryxserver.org"
             "https://git.oryxserver.org"
+            "https://n8n.oryxserver.org/healthz/readiness"
           ];
         }];
         relabel_configs = [

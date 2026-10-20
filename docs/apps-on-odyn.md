@@ -8,7 +8,7 @@ be rebuilt (logs, caches, search indexes) and the secrets.
 So if yggdrasil dies, nothing is lost: a new box gets the flake, the secrets and the mounts, and
 the apps come back with all their data. odyn snapshots and the nightly dumps cover the data.
 
-Forgejo (`git.oryxserver.org`) is the first app built this way.
+Forgejo (`git.oryxserver.org`) is the first app built this way, n8n (`n8n.oryxserver.org`) the second.
 
 ## Where everything lives
 
@@ -29,11 +29,12 @@ Forgejo (`git.oryxserver.org`) is the first app built this way.
 Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scripts over its API).
 
 - **Users** (no login, no password): `appdb` 3010:3010 runs Postgres and owns the dumps,
-  `forgejo` 3011:3011 owns Forgejo's share. Each app gets its own user with a pinned id, and the
+  `forgejo` 3011:3011 owns Forgejo's share, `n8n` 3012:3012 owns n8n's. Each app gets its own user with a pinned id, and the
   same id on yggdrasil.
 - **Datasets** under `vault/appdata` (atime off):
   - `postgres`: recordsize 16K for Postgres pages, owner appdb, mode 700, not shared
   - `forgejo`: owner forgejo, mode 750, NFS share 18
+  - `n8n`: owner n8n, mode 750, NFS share 20
   - `backups`: owner appdb, mode 700, NFS share 19
 - **NFS shares** answer only `10.0.20.21` (yggdrasil) and map every client user to the dataset's owner
   (`mapall`), like the other shares on odyn.
@@ -75,6 +76,7 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
   | `appdb-admin.password`, `appdb-admin.pgpass` | Postgres superuser (admin from yggdrasil only) |
   | `appdb-backup.password`, `appdb-backup.pgpass` | The read-only `backup` role for the dumps |
   | `forgejo-db-password` | Forgejo's database role |
+  | `n8n-db-password` | n8n's database role |
 
   Forgejo's own secret keys (`SECRET_KEY`, `INTERNAL_TOKEN`, JWT secrets) are on odyn in
   `/mnt/appdata/forgejo/custom/conf/`. They encrypt the 2FA secrets in the database, so they're
@@ -103,6 +105,23 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
   sudo -u forgejo env FORGEJO_WORK_DIR=/var/lib/forgejo FORGEJO_CUSTOM=/mnt/appdata/forgejo/custom \
     forgejo admin user list
   ```
+
+## n8n
+
+- Web: <https://n8n.oryxserver.org>, LAN only like everything behind Traefik. Webhooks are under
+  the same name, so they only answer the LAN too.
+- Package: `pkgs.n8n` with the version and hashes set in `n8n.nix`, because nixpkgs lags behind
+  n8n's security releases. To update: new `version`, then build once with each hash emptied to get
+  the new `src` and `pnpmDeps` hashes. Drop the override when nixpkgs catches up.
+- The NixOS module runs n8n as a random user; `n8n.nix` turns that off and uses `n8n` 3012, so the
+  files on the share match odyn.
+- In appdb (database `n8n`): workflows, credentials (encrypted), run history, users.
+- On odyn (`/mnt/appdata/n8n`): `encryption-key` (0400) and `storage/` (files that runs keep).
+  Without the key the credentials in a restored database can't be read, so it lives next to the data.
+- On yggdrasil (`/var/lib/n8n`): `.n8n/config` (a copy of the key), logs. Rebuildable.
+- The first visitor to the web page makes the owner account. Make it right after a fresh install.
+- Health: `/healthz/readiness` answers 200 only when the database is connected and migrated
+  (Prometheus `SiteDown` and the Homarr tile use it).
 
 ## Adding the next app
 
@@ -142,7 +161,7 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
   pg_restore --clean --if-exists -d <db> /mnt/appdata/backups/postgres/<date>/<db>.dump
   ```
 
-  Stop the app first (`systemctl stop forgejo`). For a fresh appdb, recreate the roles first
+  Stop the app first (`systemctl stop forgejo` / `n8n`). For a fresh appdb, recreate the roles first
   (`roles.sql` has them without passwords; set the passwords again from `/var/lib/secrets`).
 - **The whole of appdb**: roll back `vault/appdata/postgres` to a snapshot with the app stopped. The
   snapshot is crash-consistent, and Postgres replays its WAL on start.

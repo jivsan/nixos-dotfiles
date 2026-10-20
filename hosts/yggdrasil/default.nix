@@ -28,6 +28,7 @@
     # self-hosted apps: they run here, their data and database live on odyn (docs/apps-on-odyn.md)
     ./modules/system/appdata.nix            # /mnt/appdata/<app> shares + nightly appdb dumps
     ./modules/system/forgejo.nix            # git.oryxserver.org
+    ./modules/system/n8n.nix
   ];
 
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;

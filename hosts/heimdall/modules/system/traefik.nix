@@ -222,6 +222,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          n8n = {
+            rule = "Host(`n8n.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "n8n";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -355,6 +363,7 @@
           searxng.loadBalancer.servers = [ { url = "http://127.0.0.1:8888"; } ];
           # forgejo on yggdrasil, whose firewall only lets heimdall reach :3000 and :2222
           forgejo.loadBalancer.servers = [ { url = "http://10.0.20.21:3000"; } ];
+          n8n.loadBalancer.servers = [ { url = "http://10.0.20.21:5678"; } ];
 
           pfsense = {
             loadBalancer = {

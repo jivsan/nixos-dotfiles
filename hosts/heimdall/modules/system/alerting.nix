@@ -37,7 +37,7 @@ let
           alert = "AppDbDown";
           expr = ''probe_success{job="appdb"} == 0'';
           for = "3m";
-          annotations.summary = "appdb (postgres on odyn, 10.0.20.6:5432) is not answering, forgejo is down with it";
+          annotations.summary = "appdb (postgres on odyn, 10.0.20.6:5432) is not answering, forgejo and n8n are down with it";
         }
         {
           alert = "PiholeDown";

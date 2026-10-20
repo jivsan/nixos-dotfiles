@@ -23,6 +23,7 @@ let
 in
 {
   fileSystems."/mnt/appdata/forgejo" = share "forgejo";   # odyn user forgejo (3011) owns it
+  fileSystems."/mnt/appdata/n8n" = share "n8n";
   fileSystems."/mnt/appdata/backups" = share "backups";   # odyn user appdb (3010) owns it
 
   # every night: each appdb database as its own pg_dump file, plus the roles (without passwords),
