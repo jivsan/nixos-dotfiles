@@ -209,14 +209,6 @@
             middlewares = [ "lan-only" ];
           };
 
-          manyfold = {
-            rule = "Host(`manyfold.oryxserver.org`)";
-            entryPoints = [ "websecure" ];
-            service = "manyfold";
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
         };
 
         services = {
@@ -348,7 +340,6 @@
           # so its dns-rebind and referer checks accept this name
           changedetection.loadBalancer.servers = [ { url = "http://127.0.0.1:5000"; } ];
           searxng.loadBalancer.servers = [ { url = "http://127.0.0.1:8888"; } ];
-          manyfold.loadBalancer.servers = [ { url = "http://127.0.0.1:3214"; } ];
 
           pfsense = {
             loadBalancer = {

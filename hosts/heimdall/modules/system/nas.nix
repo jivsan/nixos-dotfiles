@@ -52,12 +52,6 @@ in
     fsType = "nfs";
     options = commonOpts;
   };
-  # manyfold's library: only its own folder of the studio share, heimdall never sees my blender files
-  fileSystems."/mnt/nas/manyfold" = {
-    device = "10.0.20.6:/mnt/vault/studio/Manyfold";
-    fsType = "nfs";
-    options = commonOpts;
-  };
 
   # make network-online.target really wait, so the mounts above have something to wait for
   systemd.network.wait-online.enable = true;
