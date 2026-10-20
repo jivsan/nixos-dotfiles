@@ -112,8 +112,11 @@ never in git.
 
 `hosts/mimir/modules/system/nix-cache-server.nix`:
 
-- **ncps** (`services.ncps`) on `127.0.0.1:8501` only. what it doesn't have it asks cache.nixos.org,
-  cache.numtide.com and hyprland.cachix.org for, keeps a copy on brunnr and signs it.
+- **ncps** (`services.ncps`) on `127.0.0.1:8501` only. what it doesn't have it asks cache.nixos.org and
+  cache.numtide.com for, keeps a copy on brunnr and signs it.
+- hyprland.cachix.org is not one of them: cachix names its files with uuids, ncps 0.9.4 can't read those and
+  answers 500, and a 500 makes the rebuild fail instead of trying the next cache. mimir's own nix fetches the
+  hyprland paths from cachix, and ci uploads them to ncps like everything else. so: no cachix caches as upstreams.
 - size limit 1600G: at 04:00 it drops the least recently used paths above that. the dataset quota (1.8 T) is the
   hard stop.
 - it takes uploads (PUT), but only on localhost: that's how ci fills it.
@@ -135,7 +138,12 @@ if mimir is off a rebuild waits 5 seconds, then goes to cache.nixos.org as befor
 the nix daemon builds at idle cpu and io priority, 4 jobs × 8 cores at most, so comfyui, the llm and octane come first.
 
 the workflow, `.forgejo/workflows/build.yml`: check out the commit, `nix build` the host's system, `nix copy` it to
-ncps on localhost.
+ncps on localhost. the upload uses a temp folder in the job's own folder, because the runner's `/tmp` is a 3 gb
+tmpfs and mimir's cuda paths don't fit in it.
+
+every host's system ends up in mimir's own nix store too (that's where it's built). the copy that counts is on
+brunnr, so mimir cleans its store every night (`nix.gc` daily instead of weekly), and right away when less than
+100 GiB is free (`min-free`, until 150 GiB are free).
 
 it is registered for this repo only, so other repos can't run jobs on mimir. to register it again with a new token:
 
@@ -154,7 +162,7 @@ curl http://10.0.20.18:5000/nix-cache-info                         # from any of
 curl http://10.0.20.18:5000/pubkey                                  # must be mimir-nixcache-1:7VO4…
 nix path-info --store http://10.0.20.18:5000 /run/current-system    # is this host's system in the cache?
 systemctl status ncps nginx gitea-runner-mimir                      # on mimir
-zpool status brunnr; zfs list -o name,used,avail brunnr/nixcache    # on mimir
+zfs list -o name,used brunnr/nixcache brunnr/nixcache-db   # on mimir: the cache, and its small index
 journalctl -u renovate -n 50                                        # on yggdrasil; run it now: sudo systemctl start renovate
 ```
 
@@ -165,6 +173,9 @@ when the cache stops answering.
 
 - **mimir is off or the cache is down**: nothing breaks. rebuilds wait 5 s and download from cache.nixos.org, and ci
   waits until mimir is back.
+- **a rebuild fails with `HTTP error 500` from `10.0.20.18:5000`**: ncps choked on something from an upstream.
+  `journalctl -u ncps` on mimir shows which path and why; until it's fixed, a rebuild with
+  `--option substituters https://cache.nixos.org` skips mimir.
 - **ncps won't start after a first deploy or a new pool** ("unable to open database file"): the folders got their
   owner before the datasets were mounted. `sudo systemd-tmpfiles --create && sudo systemctl restart ncps`.
 - **a disk in brunnr dies**: the pool is gone, nothing else. `sudo zpool destroy brunnr` if it's still listed, make
