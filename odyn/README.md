@@ -10,9 +10,12 @@ no docker access, and doesn't need them.
 | app | what | files |
 |---|---|---|
 | `appdb` | Postgres 18 for the apps on yggdrasil, `10.0.20.6:5432`, tls + scram, only yggdrasil may log in | [`apps/appdb/`](apps/appdb/) |
+| `scrutiny-collector` | reads the disks' smart data every 10 min for the scrutiny hub on heimdall (same version as the hub) | [`apps/scrutiny-collector/`](apps/scrutiny-collector/) |
 
-Change `apps/appdb/compose.yaml`, then run `apps/appdb/apply.sh` (no secrets in the repo; the admin
-password exists only on yggdrasil).
+Change an app's `compose.yaml`, then run `apps/update.sh <app>`. appdb has its own `apps/appdb/apply.sh`
+(it also did the first install; no secrets in the repo, the admin password exists only on yggdrasil).
+Also on odyn but not kept here: the catalog apps `dockge` (the arr stacks in `/mnt/vault/stacks`) and
+`tailscale`.
 
 ## vault/appdata (made 2026-10-20)
 

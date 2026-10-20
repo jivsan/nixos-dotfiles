@@ -1,0 +1,28 @@
+# scrutiny-collector: reads odyn's disks' smart data every 10 minutes and sends it to the scrutiny
+# hub on heimdall (hosts/heimdall/modules/system/scrutiny.nix). hub and collector must run the same
+# version. a truenas custom app, applied from mjolnir with ../update.sh scrutiny-collector
+services:
+  scrutiny-collector:
+    image: ghcr.io/analogj/scrutiny:v0.9.5-collector@sha256:e55394663d4430af7dec36b1979785a2a2481b317047077eac84acb8305d583d
+    container_name: scrutiny-collector
+    restart: unless-stopped
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN
+    devices:
+      - /dev/sda:/dev/sda
+      - /dev/sdb:/dev/sdb
+      - /dev/sdc:/dev/sdc
+      - /dev/sdd:/dev/sdd
+      - /dev/sde:/dev/sde
+      - /dev/sdf:/dev/sdf
+      - /dev/sdg:/dev/sdg
+      - /dev/sdh:/dev/sdh
+      - /dev/sdi:/dev/sdi
+      - /dev/nvme0:/dev/nvme0
+      - /dev/nvme1:/dev/nvme1
+    environment:
+      COLLECTOR_API_ENDPOINT: http://10.0.20.17:8080
+      COLLECTOR_CRON_SCHEDULE: "*/10 * * * *"
+    volumes:
+      - /run/udev:/run/udev:ro

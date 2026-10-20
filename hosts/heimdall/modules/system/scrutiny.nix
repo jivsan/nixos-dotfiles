@@ -3,8 +3,11 @@
 { config, pkgs, lib, ... }:
 
 let
-  scrutinyVersion = "v0.8.6";
-  influxdbVersion = "2.7";
+  # the collector on odyn (odyn/apps/scrutiny-collector) must run the same version: 0.9 finds
+  # drives by a scrutiny uuid and drops reports from older collectors
+  scrutinyWeb = "ghcr.io/analogj/scrutiny:v0.9.5-web@sha256:4f2ec0c874aec7fb0da5505b8ee127a8d7ac5b9d2b0622b53cf27fb47693877c";
+  # 2.8 as in scrutiny's own compose. not 2.9: it turns on token hashing, which can't be undone
+  influxdbImage = "docker.io/library/influxdb:2.8.0@sha256:983c696655e862517f07384ff427291928846174de60615b95027b50804c9592";
   stateDir = "/var/lib/scrutiny";
 in
 {
@@ -43,7 +46,7 @@ in
 
     # influxdb 2, separate from influxdb.nix; no host port, only scrutiny-web reaches it
     scrutiny-influxdb = {
-      image = "influxdb:${influxdbVersion}";
+      image = influxdbImage;
       autoStart = true;
       volumes = [
         "${stateDir}/influxdb2:/var/lib/influxdb2"
@@ -54,7 +57,7 @@ in
     };
 
     scrutiny-web = {
-      image = "ghcr.io/analogj/scrutiny:${scrutinyVersion}-web";
+      image = scrutinyWeb;
       autoStart = true;
       ports = [
         "8080:8080"
