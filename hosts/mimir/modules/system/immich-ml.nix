@@ -1,8 +1,8 @@
 { pkgs, ... }:
 let
-  # v3.0.3-cuda. must be the same immich version as immich-server in heimdall's
-  # immich.nix, a mismatched ml/server pair can break the api
-  immichMlImage = "ghcr.io/immich-app/immich-machine-learning@sha256:0d66acce99224495fda2288e2d8f52b459712b2e897e67b492729bce07775c08";
+  # must be the same immich version as immich-server in heimdall's immich.nix,
+  # a mismatched ml/server pair can break the api
+  immichMlImage = "ghcr.io/immich-app/immich-machine-learning:v3.3.3-cuda@sha256:1bbdd544178fbd5702fba7f2932505a78ec98d6a0f90e0ae87caaa2696228f5c";
 in
 {
   systemd.tmpfiles.rules = [

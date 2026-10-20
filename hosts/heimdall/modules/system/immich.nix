@@ -1,10 +1,10 @@
 { pkgs, ... }:
 let
-  # immich-server v3.0.3; keep immich-ml on mimir on the same release
-  immichImage = "ghcr.io/immich-app/immich-server@sha256:c716dc20f957aafd89fa9d284a2ec63e25c9e2d8d8e87c6197d540a3dce237db";
+  # immich-server; keep immich-ml on mimir on the same release
+  immichImage = "ghcr.io/immich-app/immich-server:v3.3.3@sha256:bae7664ff3aa4c2c1fcbdcdd86b40b105643c5f861f3e6a770fc760089f25862";
   # immich's own postgres, tag 16-vectorchord0.4.3-pgvector0.8.1-pgvectors0.2.1
   pgvectorImage = "ghcr.io/immich-app/postgres@sha256:13d1ff1638f54be482620d0ef1eb2b004c99bfd674d06359ae0b91d8f5b5696b";
-  redisImage = "redis:alpine";
+  redisImage = "docker.io/library/redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0";   # queue only, no volume
 
   # ml on mimir (hosts/mimir/modules/system/immich-ml.nix); when it's down
   # immich still runs, only smart search is gone
