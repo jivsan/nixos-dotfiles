@@ -1,6 +1,6 @@
 { ... }:
 
-# brunnr: the two 1.2 tb sas disks as one zfs stripe, only for the fleet nix cache (nix-cache-server.nix).
+# brunnr: the two 1.2 tb sas disks as one zfs stripe, only for the nix cache (nix-cache-server.nix) and ci's store (forgejo-runner.nix).
 # no redundancy on purpose, everything on it can be downloaded or built again
 {
   boot.supportedFilesystems = [ "zfs" ];

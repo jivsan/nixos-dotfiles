@@ -29,7 +29,7 @@ in
       databaseURL = "sqlite:/srv/nixcache-db/db.sqlite";
       maxSize = "1600G";               # brunnr/nixcache has a 1.8 tb quota
       lru.schedule = "0 4 * * *";
-      allowPutVerb = true;
+      allowPutVerb = true;               # ci uploads here; ncps signs those with the same key
       upstream = {
         urls = [
           "https://cache.nixos.org"
@@ -43,9 +43,6 @@ in
     };
   };
   systemd.services.ncps.unitConfig.RequiresMountsFor = [ "/srv/nixcache" "/srv/nixcache-db" ];
-
-  # paths built on this box get the same signature, so what the runner uploads is trusted too
-  nix.settings.secret-key-files = [ key ];
 
   # ncps 0.9.4 can't read cachix's nar names (uuids) and answers 500, so hyprland's cache isn't an upstream.
   # this box fetches those paths from cachix itself, and ci uploads them here like the rest

@@ -29,8 +29,4 @@ jobs:
             ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" > out-path
           cat out-path
       - name: upload to the nix cache
-        run: |
-          # the runner's /tmp is a 3 gb tmpfs, too small for the cuda paths nix compresses there
-          export TMPDIR="$PWD/.tmp"
-          mkdir -p "$TMPDIR"
-          nix copy --to 'http://127.0.0.1:8501/upload?compression=zstd' "$(cat out-path)"
+        run: nix copy --to 'http://127.0.0.1:8501/upload?compression=zstd' "$(cat out-path)"
