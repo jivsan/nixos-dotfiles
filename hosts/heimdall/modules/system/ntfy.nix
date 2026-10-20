@@ -92,7 +92,7 @@
   #   proxmox        backups, alerts, updates (tokens "hella" and "pbs", in their notification secrets)
   #   truenas        alerts (odyn's slack-type alert service, basic auth in the url)
   #   mjolnir        renders (~/.config/ntfy/token, the blender render hook)
-  #   homeassistant  home
+  #   homeassistant  home, read-write (its event entity listens); ha logs in with a password and makes its own token
   #
   # hash: `ntfy user hash`, token: `ntfy token generate`. sender passwords are random and never used.
   # users removed from here are deleted from user.db on restart; a changed env file needs
