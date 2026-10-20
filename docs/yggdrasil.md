@@ -30,6 +30,8 @@ from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 | `Hlidskjalf` | yes (private) | same, two push urls on origin |
 | `agentic-os` | no, its github repo is gone | origin is forgejo |
 | `muninn-os-linux` | yes (private) | copied once from github; no local clone |
+| `wowx` | no | origin is forgejo (folder `~/projects/testwowexportai`; vendor/, data/, exports ignored) |
+| `fx_runner`, `ue_runner`, `bridge_runner` | no | origin is forgejo (`~/projects/<name>`; ue_runner's retoc + oodle binaries ignored) |
 
 on a fresh clone, add the second push url again (the first `--add --push` replaces the default):
 
