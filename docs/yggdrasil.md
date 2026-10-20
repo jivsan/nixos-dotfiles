@@ -22,6 +22,24 @@ from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 | njord `10.0.20.20` | sure (finance), walled off |
 | mjolnir `10.0.20.100` | my desktop, the one place i edit this repo |
 
+## repos on forgejo
+
+| repo | also on github | how it gets there |
+|---|---|---|
+| `nixos-dotfiles` | yes (public) | `git push origin` sends to both: origin has two push urls. hosts keep pulling from github |
+| `Hlidskjalf` | yes (private) | same, two push urls on origin |
+| `agentic-os` | no, its github repo is gone | origin is forgejo |
+| `muninn-os-linux` | yes (private) | copied once from github; no local clone |
+
+on a fresh clone, add the second push url again (the first `--add --push` replaces the default):
+
+```sh
+git remote set-url --add --push origin git@github.com:jivsan/nixos-dotfiles.git
+git remote set-url --add --push origin ssh://git@git.oryxserver.org:2222/jivsan/nixos-dotfiles.git
+```
+
+forgejo has no push-to-create: make the repo in the web ui first (private is the default).
+
 ## the box
 
 - **hardware:** i5-4570T (2 cores / 4 threads), 16 GB ram, 223 GB sata ssd, one intel nic
