@@ -43,6 +43,7 @@ in
         SSH_PORT = 2222;                       # what clone urls show (traefik's tcp entrypoint)
         SSH_LISTEN_PORT = 2222;
         SSH_DOMAIN = "git.oryxserver.org";
+        BUILTIN_SSH_SERVER_USER = "git";       # ssh://git@…; it only accepts this one name (default: forgejo)
         OFFLINE_MODE = true;                   # no cdn or gravatar lookups
       };
       database = {

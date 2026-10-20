@@ -89,7 +89,8 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
 
 ## Forgejo
 
-- Web: <https://git.oryxserver.org>. Clone over ssh: `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`.
+- Web: <https://git.oryxserver.org>. Clone over ssh: `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`
+  (the built-in ssh server only accepts the user `git`, `BUILTIN_SSH_SERVER_USER`).
 - Package `forgejo-lts` (the long-term-support line) from nixpkgs.
 - Registration is off. Accounts are made by the admin, and nothing is visible without logging in.
   New repos are private.
