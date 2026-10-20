@@ -32,6 +32,9 @@ in
       environment = {
         BASE_URL = "https://changedetection.oryxserver.org";   # links in the pushes point here
         USE_X_SETTINGS = "1";                                    # behind traefik: trust X-Forwarded-*
+        # its live-update websocket refused its own https origin behind traefik (400 every few seconds)
+        SOCKETIO_CORS_ORIGINS = "https://changedetection.oryxserver.org";
+        LOGGER_LEVEL = "INFO";                                   # DEBUG by default: ~70 journal lines a minute
         PLAYWRIGHT_DRIVER_URL = "ws://changedetection-browser:3000";
         HIDE_REFERER = "true";
         DISABLE_VERSION_CHECK = "true";
