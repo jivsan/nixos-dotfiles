@@ -50,7 +50,9 @@ in
         MAX_OPEN_CONNS = 20;
         MAX_IDLE_CONNS = 5;
       };
+      # rebuildable caches stay local (bleve's index wants a local disk, and would default to the share)
       queue.DATADIR = "/var/lib/forgejo/queues";
+      indexer.ISSUE_INDEXER_PATH = "/var/lib/forgejo/indexers/issues.bleve";
       git.HOME_PATH = "/var/lib/forgejo/home";
       session = {
         PROVIDER = "db";                       # logins survive a restart
