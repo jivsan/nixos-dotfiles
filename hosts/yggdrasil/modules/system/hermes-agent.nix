@@ -1,4 +1,4 @@
-{ inputs, config, lib, ... }:
+{ inputs, config, lib, pkgs, agentBrowser, ... }:
 let
   # one key for every mcp server over ssh, for the gateway (hermes) and my cli alike.
   # root:hermes 0640 works for both: ssh only checks the permissions of keys the caller owns.
@@ -64,11 +64,16 @@ in
     settings.web.search_backend = "searxng";
     # pages via firecrawl's keyless public tier; when it throttles hermes moves on to keenable, exa and parallel
     settings.web.extract_backend = "firecrawl";
+    # a browser to look at what it builds, like my homarr board (modules/apps/agent-browser.nix).
+    # logins go in hermes' vault (`hermes vault add`): filled in on the page, the model never sees them
+    extraPackages = [ agentBrowser ];
     environmentFiles = [ "/etc/hermes/env" ];
     environment = {
       API_SERVER_ENABLED = "true";
       API_SERVER_HOST = "0.0.0.0";
       SEARXNG_URL = "https://search.oryxserver.org";
+      # hermes looks for chromium itself before it offers the browser tools (the cli reads it from .env too)
+      AGENT_BROWSER_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
     };
     mcpServers = {
       graphify-dotfiles = graphify "dotfiles";
