@@ -53,6 +53,8 @@ let
       "qwen3.8-27b" = { target = "mimir-chat"; tier = "capable"; };
     } // {
       "minimax/minimax-m3" = { target = "openrouter"; tier = "capable"; };
+      # on trial against m3 (2026-10-20): half the price, but it always thinks. huginn stays on m3 until i pick
+      "minimax/minimax-m3.1-flash" = { target = "openrouter"; tier = "capable"; };
     };
 
     # auto: local model first, minimax when the request is too long or mimir fails.
