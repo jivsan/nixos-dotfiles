@@ -27,11 +27,12 @@ from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 | repo | also on github | how it gets there |
 |---|---|---|
 | `nixos-dotfiles` | yes (public) | `git push origin` sends to both: origin has two push urls. hosts keep pulling from github |
-| `Hlidskjalf` | yes (private) | same, two push urls on origin |
+| `Hlidskjalf` | archived there 2026-10-20 (private, read-only) | origin is forgejo only; the github-only PR history is exported to `~/.agent-memory/claude-scratch/hlidskjalf-github-archive-2026-10-20/` |
 | `agentic-os` | no, its github repo is gone | origin is forgejo |
 | `muninn-os-linux` | yes (private) | copied once from github; no local clone |
 | `wowx` | no | origin is forgejo (folder `~/projects/testwowexportai`; vendor/, data/, exports ignored) |
 | `fx_runner`, `ue_runner`, `bridge_runner` | no | origin is forgejo (`~/projects/<name>`; ue_runner's retoc + oodle binaries ignored) |
+| `octane_tools` | no | origin is forgejo (`/mnt/studio/3DBLENDER/OCTANE/scripts/Tools`; the share's files are uid 3002, so git needs `safe.directory`) |
 
 on a fresh clone, add the second push url again (the first `--add --push` replaces the default):
 
