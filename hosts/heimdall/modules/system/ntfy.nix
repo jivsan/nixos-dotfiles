@@ -76,7 +76,7 @@
     ip6tables -t raw -D PREROUTING -p tcp --dport 2586 ! -i lo -j DROP 2>/dev/null || true
   '';
 
-  # topics: alerts (something is wrong), backups, renders, updates, home
+  # topics: alerts (something is wrong), backups, renders, updates, home, changes
   #
   # /var/lib/secrets/ntfy.env (root, 0600). single quotes, the bcrypt hashes have $ in them.
   # every sender is its own user that can only write to its own topics, with its own token, so a
@@ -93,6 +93,7 @@
   #   truenas        alerts (odyn's slack-type alert service, basic auth in the url)
   #   mjolnir        renders (~/.config/ntfy/token, the blender render hook)
   #   homeassistant  home, read-write (its event entity listens); ha logs in with a password and makes its own token
+  #   changedetection changes (changedetection.nix, the token is in its own settings under /var/lib/changedetection)
   #
   # hash: `ntfy user hash`, token: `ntfy token generate`. sender passwords are random and never used.
   # users removed from here are deleted from user.db on restart; a changed env file needs

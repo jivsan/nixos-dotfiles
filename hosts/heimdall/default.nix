@@ -37,6 +37,9 @@
     ./modules/system/vaultwarden.nix
     ./modules/system/ntfy.nix             # push notifications at ntfy.oryxserver.org
     ./modules/system/alerting.nix         # prometheus alert rules + alertmanager → ntfy
+    ./modules/system/changedetection.nix  # web page watcher → ntfy "changes"
+    ./modules/system/searxng.nix          # private search at search.oryxserver.org
+    ./modules/system/manyfold.nix         # 3D model library, own folder on odyn
   ];
 
   networking.hostName = "heimdall";

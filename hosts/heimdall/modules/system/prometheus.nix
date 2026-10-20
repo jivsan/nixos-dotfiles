@@ -86,6 +86,9 @@
             "https://paperless.oryxserver.org"
             "https://vault.oryxserver.org"
             "https://brain.oryxserver.org"
+            "https://changedetection.oryxserver.org"
+            "https://search.oryxserver.org"
+            "https://manyfold.oryxserver.org"
           ];
         }];
         relabel_configs = [
