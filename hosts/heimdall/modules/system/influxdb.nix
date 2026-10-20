@@ -1,14 +1,19 @@
 { pkgs, ... }:
 {
-  # influxdb 1.8 for pfsense's telegraf and pfsense-geoip.nix, read by grafana
+  # influxdb 1.x for pfsense's telegraf and pfsense-geoip.nix, read by grafana (influxql)
   # pfsense keeps no history itself, these 90 days are all there is
+  #
+  # since 1.11 the image runs as influxdb (uid 1500) instead of root. going from 1.8 to 1.12 on
+  # 2026-10-20 took one `chown -R 1500:1500 /var/lib/influxdb` with the container stopped; the
+  # data from before is in /mnt/nas/nix-services/influxdb-before-1.12-2026-10-20.tar.gz
+  # (rollback: stop, untar over /var/lib/influxdb, the 1.8 image, root:root here)
   systemd.tmpfiles.rules = [
-    "d /var/lib/influxdb 0750 root root -"
+    "d /var/lib/influxdb 0750 1500 1500 -"
   ];
 
   virtualisation.oci-containers.backend = "podman";
   virtualisation.oci-containers.containers.influxdb = {
-    image = "docker.io/library/influxdb:1.8";
+    image = "docker.io/library/influxdb:1.12.4@sha256:f86abb84b7b78f82f5bef55dd9d034837e10701940e408d3cfb8da256ffd4bb5";
     autoStart = true;
     # on all interfaces so pfsense can push, the raw rule below decides who gets in
     ports = [ "8086:8086" ];
