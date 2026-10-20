@@ -18,6 +18,7 @@
     ../../modules/apps/mimir-blender.nix
     ../../modules/apps/unfree.nix          # claude-code is unfree
     ../../modules/apps/claude-code.nix
+    ../../modules/apps/codex.nix
     ../../modules/system/agent-memory.nix   # claude's memory notes, same copy as mjolnir
     ../../modules/system/ratatoskr.nix      # /mnt/ratatoskr on odyn: screenshots + snippets with mjolnir
     ../../modules/apps/herdr.nix

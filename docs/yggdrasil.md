@@ -16,7 +16,7 @@ from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 | host | what lives there |
 |---|---|
 | heimdall `10.0.20.17` | the services above, plus traefik for *every* `*.oryxserver.org` name (forgejo's too) |
-| **yggdrasil `10.0.20.21`** | **forgejo** (git.oryxserver.org), **n8n** (n8n.oryxserver.org), hermes (my agent), claude code + herdr |
+| **yggdrasil `10.0.20.21`** | **forgejo** (git.oryxserver.org), **n8n** (n8n.oryxserver.org), hermes (my agent), claude code, codex + herdr |
 | odyn `10.0.20.6` | storage, **appdb** (postgres for the yggdrasil apps), dockge with the arr apps, plex/jellyfin |
 | mimir `10.0.20.18` | llm server, comfyui, immich machine learning, blender test node |
 | njord `10.0.20.20` | sure (finance), walled off |
@@ -62,7 +62,7 @@ forgejo has no push-to-create: make the repo in the web ui first (private is the
 | sshd | me (key only, no root, no passwords) | 22 | `default.nix` |
 | thermald, fstrim | keep the little box cool, trim the ssd weekly | — | `default.nix` |
 
-**tools for me and the agents** (no daemon): `claude` (claude code), `herdr` (agent runner),
+**tools for me and the agents** (no daemon): `claude` (claude code), `codex`, `herdr` (agent runner),
 `mimir-blender` (runs blender on mimir for agent checks), `capture` / `ask` (vault inbox and cheap
 answers from the knowledge graph, `modules/system/muninn.nix`).
 
