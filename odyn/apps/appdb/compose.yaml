@@ -1,0 +1,48 @@
+# appdb: one postgres on odyn for the apps that run on yggdrasil (forgejo first).
+# its files sit on odyn's own disks (vault/appdata/postgres), never on nfs; the apps reach it over the lan.
+# a truenas custom app, applied from mjolnir with ./apply.sh. no secrets in here.
+# see docs/apps-on-odyn.md
+services:
+  postgres:
+    image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    container_name: appdb
+    restart: unless-stopped
+    user: "3010:3010"                  # odyn user appdb, owns vault/appdata/postgres (700)
+    shm_size: 256mb
+    mem_limit: 4g
+    ports:
+      - "10.0.20.6:5432:5432"
+    command:
+      - postgres
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - max_connections=100
+    volumes:
+      # postgres 18 images keep the cluster in /var/lib/postgresql/18/docker
+      - /mnt/vault/appdata/postgres:/var/lib/postgresql
+    configs:
+      - source: pg_hba
+        target: /etc/postgresql/pg_hba.conf
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "/var/run/postgresql", "-U", "postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+configs:
+  # who may log in, from where. anything not listed is refused before a password is asked.
+  # hostssl: the lan side only with tls (self-signed server.crt/server.key in the data dir, ssl=on
+  # in postgresql.auto.conf; how they got there: docs/apps-on-odyn.md)
+  pg_hba:
+    content: |
+      # inside the container only (healthcheck). only root on odyn can get in there
+      local   all       all                       trust
+      # admin, only from yggdrasil: /var/lib/secrets/appdb-admin.pgpass there
+      hostssl all       postgres   10.0.20.21/32  scram-sha-256
+      # the nightly dumps (yggdrasil appdb-backup.service), a read-only role
+      hostssl all       backup     10.0.20.21/32  scram-sha-256
+      # one line per app: its own database and role, only from the host it runs on
+      hostssl forgejo   forgejo    10.0.20.21/32  scram-sha-256
