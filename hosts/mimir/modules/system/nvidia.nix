@@ -1,17 +1,14 @@
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 {
+  imports = [ ../../../../modules/system/nvidia-driver.nix ];
+
   # headless nvidia compute, no desktop
   nixpkgs.config.allowUnfree = true;
 
   services.xserver.videoDrivers = [ "nvidia" ];   # loads the driver, doesn't start x
 
   hardware.nvidia = {
-    modesetting.enable = true;
-    # rtx 4060 ti (8 gb) on the closed 580 branch. it can move to the newer driver:
-    #   open = true;  package = config.boot.kernelPackages.nvidiaPackages.stable;
-    open = false;
     nvidiaSettings = false;
-    package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
     # keeps the card set up while idle, so the gpu exporter's nvidia-smi every 15 s
     # only reads numbers instead of waking the card (and its fans)
     nvidiaPersistenced = true;
