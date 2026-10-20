@@ -1,4 +1,4 @@
-{ ... }:
+{ lib, pkgs, ... }:
 
 let
   # fleet accent colours
@@ -8,6 +8,8 @@ in
 {
   programs.fastfetch = {
     enable = true;
+    # with libzfs, or the zpool line stays empty; hiPrio over the plain one from modules/home/shell.nix
+    package = lib.hiPrio (pkgs.fastfetch.override { zfsSupport = true; });
 
     settings = {
       "$schema" = "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json";
@@ -46,7 +48,8 @@ in
         "break"
 
         # storage
-        { type = "disk";   key = "󰋊 disk";   keyColor = cyan; }
+        # / and the nix cache; on its own it picks brunnr/nixcache-db, the cache's few mb of index
+        { type = "disk";   key = "󰋊 disk";   keyColor = cyan;  folders = "/:/srv/nixcache"; }
         { type = "zpool";  key = " zpool";  keyColor = pink; }
         "break"
 
