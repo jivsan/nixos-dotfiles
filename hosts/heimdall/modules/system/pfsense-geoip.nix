@@ -6,6 +6,9 @@ in
   # weekly GeoLite2-City.mmdb download, maxmind license key in /var/lib/secrets/maxmind-license
   systemd.services.geolite-update = {
     description = "Download/refresh MaxMind GeoLite2-City database";
+    # pfsense-geoip pulls it in at boot, so wait for the network (and dns) first
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
     path = [ pkgs.curl pkgs.gnutar pkgs.gzip pkgs.coreutils pkgs.findutils ];
     serviceConfig = { Type = "oneshot"; };
     script = ''
