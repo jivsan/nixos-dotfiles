@@ -45,6 +45,10 @@ deploy mjolnir             # mjolnir itself (asks for my sudo password)
 a host that doesn't have mjolnir's commit yet (i forgot to push) is skipped with a message, the others carry on, and
 at the end it lists which went fine and which failed.
 
+njord is the exception: it only has 1.9 gb of ram and gets oom-killed evaluating the flake, so for njord `deploy`
+evaluates the pushed commit on mjolnir and njord only builds (`--build-host` and `--target-host` njord, like in
+`docs/nixos-structure.md`).
+
 before a heimdall switch that changes the brain bridge, check it has no running jobs: the switch restarts it.
 `deploy --dry heimdall` shows what would restart.
 

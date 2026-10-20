@@ -58,9 +58,17 @@ if [ "$have" != "$want" ]; then
   echo "$host is at ${have:0:7}, mjolnir at ${want:0:7}: push from mjolnir first" >&2
   exit 1
 fi
+[ "$host" = njord ] && exit 0   # njord is rebuilt from mjolnir, see remote_njord
 cd /tmp
 sudo nixos-rebuild "$action" --flake "$HOME/nixos-dotfiles#$host"
 EOF
+}
+
+# njord (1.9 gb ram) gets oom-killed evaluating the flake: mjolnir evaluates the pushed commit, njord only builds
+remote_njord() {
+  remote njord || return 1
+  (cd /tmp && nixos-rebuild "$action" --flake "git+file://$repo?rev=$head#njord" \
+    --build-host "christina@${ip[njord]}" --target-host "christina@${ip[njord]}" --sudo)
 }
 
 local_mjolnir() {
@@ -73,6 +81,8 @@ for h in "${hosts[@]}"; do
   printf '\n== %s (%s)\n' "$h" "$action"
   if [ "$h" = mjolnir ]; then
     if local_mjolnir; then ok+=("$h"); else failed+=("$h"); fi
+  elif [ "$h" = njord ]; then
+    if remote_njord; then ok+=("$h"); else failed+=("$h"); fi
   else
     if remote "$h"; then ok+=("$h"); else failed+=("$h"); fi
   fi
