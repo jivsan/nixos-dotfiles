@@ -24,7 +24,7 @@ own little box, so my agents keep running even when hella is down.
 | `mimir`     | `10.0.20.18`  | headless ai box (5950X, RTX 4060 Ti) with llm, comfyui and immich ml            | none                                                    |
 | `tyr`       | `10.0.20.19`  | agent workstation vm with claude code, codex and herdr, linked to the muninn vault | neon oxwm over xrdp, i connect from `mjolnir` with remmina |
 | `njord`     | `10.0.20.20`  | headless finance vm running [sure](https://github.com/we-promise/sure), walled off from everything else | none                    |
-| `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets | none |
+| `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets, and my self hosted apps (forgejo) with their data on odyn | none |
 
 > these are only the nixos hosts. the switch, pfsense, truenas and a pihole lxc aren't nixos, they're in the
 > network part below.
@@ -98,6 +98,7 @@ modules/home/        # home modules two or more hosts share (git, neovim, shell,
 modules/apps/        # app modules two or more hosts share (blender, claude code, codex, herdr …)
 config/              # program configs (nvim, alacritty) and the st and dmenu sources
 network/             # the homelab network, arista eos config and pfsense runbook (not nixos)
+odyn/                # the truenas parts the hosts depend on: appdb (postgres) and the appdata datasets (not nixos)
 docs/                # documentation, runbooks for octane, comfyui and the ai gateway in docs/misc
 ```
 
@@ -144,6 +145,8 @@ pihole dns, and iot firewalled off the trusted side.
 | [`docs/deploying-services.md`](docs/deploying-services.md)             | adding and deploying self hosted services               |
 | [`docs/deploy-new-host.md`](docs/deploy-new-host.md)                   | bringing a brand new host into the flake                |
 | [`docs/heimdall-docs.md`](docs/heimdall-docs.md)                       | the services vm in detail                               |
+| [`docs/apps-on-odyn.md`](docs/apps-on-odyn.md)                         | apps on yggdrasil with their data and database on odyn  |
+| [`odyn/README.md`](odyn/README.md)                                     | what's set up on odyn (truenas) for the hosts           |
 | [`docs/muninn-agentic-os.md`](docs/muninn-agentic-os.md)               | the vault, the agents and the knowledge graph           |
 | [`network/bifrost-arista-core.cfg`](network/bifrost-arista-core.cfg)   | the arista switch config                                |
 | [`network/CHANGELOG.md`](network/CHANGELOG.md)                         | what changed on the network and why                     |
