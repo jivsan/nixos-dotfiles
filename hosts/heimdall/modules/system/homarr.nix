@@ -12,7 +12,7 @@ in
   virtualisation.oci-containers.containers.homarr = {
     # pinned by tag + digest: to update, put the new ones here and rebuild.
     # a new major migrates the db, so copy /var/lib/homarr first
-    image = "ghcr.io/homarr-labs/homarr:v2.6.0@sha256:1e077fc77d3ad7482376bab964b89cfc8c1f31fe2ddeb5154cf2a1058d40b32d";
+    image = "ghcr.io/homarr-labs/homarr:v2.7.0@sha256:f532ce7cb2a388096d6dce30b7ee41ff4b413b48ddc219ad2321dedb758cd772";
     autoStart = true;
     ports = [ "127.0.0.1:7575:7575" ];
     # fixed address: traefik's lan-only lets this one container in, not all of podman's network
