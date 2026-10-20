@@ -58,15 +58,17 @@ in
     settings.skills.external_dirs = [ "/var/lib/hermes/claude/skills" ];
     # the index of claude's notes (~26 KB) goes into every session, the notes are read on demand
     settings.skills.auto_load = [ "claude-memory" ];
-    # brave: BRAVE_SEARCH_API_KEY=... in /etc/hermes/env, free tier 2,000 a month, search only (can't read pages).
-    # a failed brave call is retried on the free keyless backends, brave again on the next search
-    settings.web.search_backend = "brave-free";
+    # search through my own searxng on heimdall (search.oryxserver.org, its json api): no key, no monthly
+    # limit, nothing leaves the house but the searches themselves. search only (can't read pages); a failed
+    # call is retried on the free keyless backends. brave's key stays in /etc/hermes/env for going back
+    settings.web.search_backend = "searxng";
     # pages via firecrawl's keyless public tier; when it throttles hermes moves on to keenable, exa and parallel
     settings.web.extract_backend = "firecrawl";
     environmentFiles = [ "/etc/hermes/env" ];
     environment = {
       API_SERVER_ENABLED = "true";
       API_SERVER_HOST = "0.0.0.0";
+      SEARXNG_URL = "https://search.oryxserver.org";
     };
     mcpServers = {
       graphify-dotfiles = graphify "dotfiles";
