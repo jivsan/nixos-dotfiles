@@ -27,7 +27,7 @@ in
   systemd.tmpfiles.rules = [
     "d ${sureBase} 0750 root root -"
     "d ${sureBase}/postgres 0700 70 70 -"   # alpine postgres runs as uid/gid 70
-    "d ${sureBase}/redis 0755 root root -"
+    "d ${sureBase}/redis 0700 999 1000 -"   # redis-alpine runs as 999:1000; root-owned, a rebuild stops its writes
     "d ${sureBase}/backups 0700 root root -"
   ];
 

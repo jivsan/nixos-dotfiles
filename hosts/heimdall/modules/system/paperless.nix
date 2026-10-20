@@ -11,7 +11,9 @@ in
     "d ${paperlessBase}/export 0775 christina users -"
     "d ${paperlessBase}/backups 0775 christina users -"
     "d /var/lib/paperless/postgres 0700 70 70 -"   # alpine postgres runs as uid/gid 70
-    "d /var/lib/paperless/redis 0755 root root -"
+    # redis-alpine runs as 999:1000. owned by root, every rebuild took it back and redis stopped
+    # taking writes (paperless answered 500 from 2026-10-18 until the 20th)
+    "d /var/lib/paperless/redis 0700 999 1000 -"
   ];
 
   systemd.services.create-paperless-network = {
