@@ -41,6 +41,7 @@
     ../../modules/system/ratatoskr.nix     # /mnt/ratatoskr on odyn: screenshots + snippets for hermes and claude
     ./modules/system/exporters.nix         # node + gpu numbers for heimdall's prometheus (homarr host card)
     ../../modules/system/nix-cache.nix     # mimir's nix cache first, then cache.nixos.org
+    ./modules/system/deploy.nix            # `deploy`: pull + rebuild the other hosts from here
   ];
 
   networking.hostName = "mjolnir";

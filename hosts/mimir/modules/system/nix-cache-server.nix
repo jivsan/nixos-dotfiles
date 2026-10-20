@@ -1,6 +1,6 @@
 { ... }:
 
-# the fleet nix cache on brunnr (storage.nix). ncps keeps everything the hosts download from the upstream
+# my nix cache on brunnr (storage.nix). ncps keeps everything the hosts download from the upstream
 # caches, plus what the forgejo runner builds here (forgejo-runner.nix). hosts read it through nginx on :5000,
 # which only lets GET and HEAD through; uploads go straight to ncps on localhost. docs/ci-and-nix-cache.md
 let
@@ -68,7 +68,7 @@ in
     after = [ "network-online.target" ];
   };
 
-  # the fleet only: mjolnir, heimdall, tyr, njord, yggdrasil. nginx listens on the lan address alone,
+  # my hosts only: mjolnir, heimdall, tyr, njord, yggdrasil. nginx listens on the lan address alone,
   # so tailscale (which skips nixos-fw) can't reach it on mimir's 100.x address
   networking.firewall.extraCommands = ''
     for ip in 10.0.20.100 10.0.20.17 10.0.20.19 10.0.20.20 10.0.20.21; do

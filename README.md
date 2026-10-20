@@ -12,6 +12,11 @@ i only ever edit on `mjolnir`. i commit there and push, and every other machine 
 they also pull by themselves every two minutes, but they never rebuild on their own, so a change goes from
 mjolnir to github to the host and then i rebuild on that host.
 
+after a push forgejo builds every host on mimir and puts the result in my nix cache there, so the rebuild on a host
+downloads instead of compiling. `deploy` on mjolnir does the pull and the rebuild on the hosts for me when i don't
+want to ssh into each one, and renovate opens pull requests for updates. all of it is in
+[`docs/ci-and-nix-cache.md`](docs/ci-and-nix-cache.md).
+
 ## hosts
 
 everything sits on vlan 20 (`10.0.20.0/24`). heimdall, tyr and njord are vms on `hella` (proxmox). yggdrasil is its
@@ -81,6 +86,10 @@ sudo nixos-rebuild switch --flake .#mjolnir      # or #heimdall, #yggdrasil ...
 # push yggdrasil straight from mjolnir (it builds here, the mini pc only switches)
 nixos-rebuild switch --flake .#yggdrasil --target-host christina@10.0.20.21 --sudo
 
+# or from mjolnir: every host pulls and rebuilds itself, from mimir's cache
+deploy                  # every host but mjolnir
+deploy heimdall mimir   # only these, --dry first to see what would restart
+
 # after changing flake inputs
 nix flake lock
 ```
@@ -115,7 +124,8 @@ and it hot reloads without a rebuild.
 
 **bleeding edge gpu stack on `mjolnir`.** it takes `boot.kernelPackages`, and with it the nvidia driver, from
 `nixpkgs-unstable` instead of the pinned 26.05, because the 595 driver in 26.05 doesn't build against kernel 7.2
-anymore. right now that's kernel 7.2 with `nvidia-open` 610. everything else on the host still comes from 26.05.
+anymore. right now that's kernel 7.2 with the 595 driver on the open module, the same as mimir
+(`modules/system/nvidia-driver.nix`). everything else on the host still comes from 26.05.
 
 **self hosted stack on `heimdall`** with immich, paperless, vaultwarden, homarr and crafty behind traefik, watched by
 prometheus, loki and grafana.
@@ -146,6 +156,7 @@ pihole dns, and iot firewalled off the trusted side.
 | [`docs/deploy-new-host.md`](docs/deploy-new-host.md)                   | bringing a brand new host into the flake                |
 | [`docs/heimdall-docs.md`](docs/heimdall-docs.md)                       | the services vm in detail                               |
 | [`docs/yggdrasil.md`](docs/yggdrasil.md)                               | the control box: everything running on it (forgejo, hermes) |
+| [`docs/ci-and-nix-cache.md`](docs/ci-and-nix-cache.md)                 | ci on forgejo, the nix cache on mimir, renovate, `deploy` |
 | [`docs/apps-on-odyn.md`](docs/apps-on-odyn.md)                         | apps on yggdrasil with their data and database on odyn  |
 | [`odyn/README.md`](odyn/README.md)                                     | what's set up on odyn (truenas) for the hosts           |
 | [`docs/muninn-agentic-os.md`](docs/muninn-agentic-os.md)               | the vault, the agents and the knowledge graph           |

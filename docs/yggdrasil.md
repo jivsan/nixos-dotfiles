@@ -26,7 +26,7 @@ from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 
 | repo | also on github | how it gets there |
 |---|---|---|
-| `nixos-dotfiles` | yes (public) | `git push origin` sends to both: origin has two push urls. hosts keep pulling from github |
+| `nixos-dotfiles` | yes (public) | `git push origin` sends to both: origin has two push urls. mjolnir pulls from forgejo, the other hosts still from github. ci and renovate, see [`ci-and-nix-cache.md`](ci-and-nix-cache.md) |
 | `Hlidskjalf` | archived there 2026-10-20 (private, read-only) | origin is forgejo only; the github-only PR history is exported to `~/.agent-memory/claude-scratch/hlidskjalf-github-archive-2026-10-20/` |
 | `agentic-os` | no, its github repo is gone | origin is forgejo |
 | `muninn-os-linux` | yes (private) | copied once from github; no local clone |
@@ -55,7 +55,7 @@ forgejo has no push-to-create: make the repo in the web ui first (private is the
 
 | service | what it is | port (who may connect) | config |
 |---|---|---|---|
-| **forgejo** | my git server: web at https://git.oryxserver.org, ssh at `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`. repos, lfs, attachments, settings on odyn; issues, users etc. in appdb on odyn. unit `forgejo.service`, package `forgejo-lts` | 3000 web, 2222 ssh (only heimdall: traefik passes them through) | `hosts/yggdrasil/modules/system/forgejo.nix` |
+| **forgejo** | my git server: web at https://git.oryxserver.org, ssh at `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`. repos, lfs, attachments, settings on odyn; issues, users etc. in appdb on odyn. unit `forgejo.service`, package `forgejo-lts`. actions are on, the runner is on mimir | 3000 web, 2222 ssh (only heimdall: traefik passes them through) | `hosts/yggdrasil/modules/system/forgejo.nix` |
 | **n8n** | workflow automation (reports, glue between services) at https://n8n.oryxserver.org. workflows, credentials and runs in appdb; encryption key and stored files on odyn. unit `n8n.service`, version set in the module (nixpkgs lags behind) | 5678 web (only heimdall: traefik) | `hosts/yggdrasil/modules/system/n8n.nix` |
 | **hermes-agent** | my ai agent (hermes) on my kimi pro plan with openrouter as fallback. tools over mcp: graphify (vault + dotfiles knowledge graphs on heimdall), blender, wowx and a dotfiles worktree on mjolnir, homarr | 8642 gateway api (only heimdall: the brain bridge) | `hosts/yggdrasil/modules/system/hermes-agent.nix` |
 | prometheus-node-exporter | cpu, memory, disk and systemd numbers for heimdall's prometheus (homarr host card, `UnitFailed` alerts) | 9100 | `hosts/yggdrasil/modules/system/exporters.nix` |
@@ -72,6 +72,7 @@ answers from the knowledge graph, `modules/system/muninn.nix`).
 |---|---|---|
 | `appdb-backup` | dumps every appdb database (forgejo, n8n …) to odyn `vault/appdata/backups`, keeps 14 days | 03:30 |
 | `dotfiles-pull` | `git pull --ff-only` of `~/nixos-dotfiles` from github, never rebuilds | every 2 min |
+| `renovate` | pull requests on forgejo when a pinned image or a flake input in nixos-dotfiles is behind, never merges | every 3 h at :20 |
 | `nix-gc` | old nix store paths | weekly |
 | `fstrim` | ssd trim | weekly |
 
@@ -96,7 +97,7 @@ only the local disk holds rebuildable things (logs, caches, forgejo's search ind
 
 | where | what |
 |---|---|
-| `/var/lib/secrets/` (root 0600) | appdb admin + backup passwords, forgejo's and n8n's database passwords |
+| `/var/lib/secrets/` (root 0600) | appdb admin + backup passwords, forgejo's and n8n's database passwords, renovate's forgejo token |
 | `/etc/hermes/env` | hermes' api keys (kimi, openrouter, brave, homarr) |
 | `/var/lib/hermes-ssh/` | hermes' ssh key for its mcp servers (locked to forced commands on heimdall and mjolnir) |
 

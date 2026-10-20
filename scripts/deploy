@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# deploy hosts from mjolnir: each host pulls main and rebuilds itself (from mimir's cache).
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+deploy [--dry | --boot] [host ...]
+
+  switch hosts to the commit that is pushed on main. no host named: every host except mjolnir.
+  --dry   build and list what would restart, change nothing
+  --boot  use it from the next boot (a new nvidia driver on mjolnir or mimir)
+
+  hosts: mimir heimdall yggdrasil tyr njord mjolnir
+EOF
+}
+
+repo=${DOTFILES:-$HOME/nixos-dotfiles}
+declare -A ip=(
+  [mimir]=10.0.20.18
+  [heimdall]=10.0.20.17
+  [yggdrasil]=10.0.20.21
+  [tyr]=10.0.20.19
+  [njord]=10.0.20.20
+)
+servers=(mimir heimdall yggdrasil tyr njord)
+
+action=switch
+case "${1:-}" in
+  --dry) action=dry-activate; shift ;;
+  --boot) action=boot; shift ;;
+  -h | --help) usage; exit 0 ;;
+esac
+
+hosts=("$@")
+[ ${#hosts[@]} -eq 0 ] && hosts=("${servers[@]}")
+for h in "${hosts[@]}"; do
+  if [ "$h" != mjolnir ] && [ -z "${ip[$h]:-}" ]; then
+    echo "unknown host: $h" >&2
+    usage >&2
+    exit 2
+  fi
+done
+
+head=$(git -C "$repo" rev-parse HEAD)
+if [ -n "$(git -C "$repo" status --porcelain --untracked-files=no)" ]; then
+  echo "note: mjolnir's clone has uncommitted changes; other hosts only get what is pushed" >&2
+fi
+
+remote() {
+  local host=$1
+  ssh -o BatchMode=yes -o ConnectTimeout=5 "christina@${ip[$host]}" \
+    bash -s -- "$host" "$action" "$head" <<'EOF'
+set -euo pipefail
+host=$1 action=$2 want=$3
+sudo systemctl start dotfiles-pull.service   # the host's own 2-minute pull, so the two never race
+have=$(git -C ~/nixos-dotfiles rev-parse HEAD)
+if [ "$have" != "$want" ]; then
+  echo "$host is at ${have:0:7}, mjolnir at ${want:0:7}: push from mjolnir first" >&2
+  exit 1
+fi
+cd /tmp
+sudo nixos-rebuild "$action" --flake "$HOME/nixos-dotfiles#$host"
+EOF
+}
+
+local_mjolnir() {
+  (cd /tmp && sudo nixos-rebuild "$action" --flake "$repo#mjolnir")
+}
+
+ok=()
+failed=()
+for h in "${hosts[@]}"; do
+  printf '\n== %s (%s)\n' "$h" "$action"
+  if [ "$h" = mjolnir ]; then
+    if local_mjolnir; then ok+=("$h"); else failed+=("$h"); fi
+  else
+    if remote "$h"; then ok+=("$h"); else failed+=("$h"); fi
+  fi
+done
+
+printf '\n'
+[ ${#ok[@]} -gt 0 ] && echo "ok: ${ok[*]}"
+if [ ${#failed[@]} -gt 0 ]; then
+  echo "failed: ${failed[*]}" >&2
+  exit 1
+fi
