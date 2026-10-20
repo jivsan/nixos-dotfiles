@@ -685,10 +685,17 @@ in
   };
   # only sees writes through heimdall's own nfs client (hosted obsidian, huginn itself);
   # other hosts are covered by capture's ssh nudge, the poll above and the timer below
+  # started with the services, not in early boot (paths.target): the vault is on nfs, which needs the network.
+  # in early boot that was an ordering loop, and systemd dropped heimdall's network setup to break it
   systemd.paths."huginn-inbox-sweep" = {
     description = "huginn: watch _inbox and sweep on change";
-    wantedBy = [ "paths.target" ];
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "sysinit.target" ];
+    after = [ "sysinit.target" ];
+    before = [ "shutdown.target" ];
+    conflicts = [ "shutdown.target" ];
     unitConfig = {
+      DefaultDependencies = false;
       RequiresMountsFor = vault;
       OnFailure = [ "huginn-inbox-rearm.service" ];
     };
