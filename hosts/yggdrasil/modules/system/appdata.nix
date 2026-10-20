@@ -50,7 +50,7 @@ in
       set -euo pipefail
       dir=/mnt/appdata/backups/postgres/$(date +%F)
       mkdir -p "$dir"
-      pg_dumpall -d postgres --roles-only --no-role-passwords > "$dir/roles.sql"
+      pg_dumpall -l postgres --roles-only --no-role-passwords > "$dir/roles.sql"
       for db in $(psql -d postgres -Atc "select datname from pg_database where datallowconn and not datistemplate and datname <> 'postgres'"); do
         pg_dump -d "$db" -Fc -f "$dir/$db.dump.part"
         mv "$dir/$db.dump.part" "$dir/$db.dump"
