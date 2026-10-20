@@ -88,6 +88,7 @@
             "https://brain.oryxserver.org"
             "https://changedetection.oryxserver.org"
             "https://search.oryxserver.org"
+            "https://git.oryxserver.org"
           ];
         }];
         relabel_configs = [

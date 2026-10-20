@@ -32,6 +32,13 @@ let
           for = "3m";
           annotations.summary = "odyn (TrueNAS) is not answering on {{ $labels.instance }}";
         }
+        # appdb: the postgres on odyn that the apps on yggdrasil keep their data in (odyn/apps/appdb)
+        {
+          alert = "AppDbDown";
+          expr = ''probe_success{job="appdb"} == 0'';
+          for = "3m";
+          annotations.summary = "appdb (postgres on odyn, 10.0.20.6:5432) is not answering, forgejo is down with it";
+        }
         {
           alert = "PiholeDown";
           expr = ''probe_success{job="pihole-dns"} == 0'';
@@ -76,6 +83,7 @@ in
     scrapeConfigs = [
       (probe "odyn" "tcp_connect" [ "10.0.20.6:2049" "10.0.20.6:443" ])   # nfs and the web ui
       (probe "pihole-dns" "dns_oryx" [ "10.0.20.4:53" ])
+      (probe "appdb" "tcp_connect" [ "10.0.20.6:5432" ])   # odyn/apps/appdb
     ];
 
     # every alert goes to the ntfy topic "alerts", rendered by the prometheus template in ntfy.nix

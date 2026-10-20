@@ -26,6 +26,11 @@
         metrics = {
           address = "127.0.0.1:8082";
         };
+
+        # forgejo's ssh (git push/pull), passed through to yggdrasil
+        gitssh = {
+          address = ":2222";
+        };
       };
 
       metrics.prometheus = {
@@ -209,6 +214,14 @@
             middlewares = [ "lan-only" ];
           };
 
+          forgejo = {
+            rule = "Host(`git.oryxserver.org`)";
+            entryPoints = [ "websecure" ];
+            service = "forgejo";
+            tls = {};
+            middlewares = [ "lan-only" ];
+          };
+
         };
 
         services = {
@@ -340,6 +353,8 @@
           # so its dns-rebind and referer checks accept this name
           changedetection.loadBalancer.servers = [ { url = "http://127.0.0.1:5000"; } ];
           searxng.loadBalancer.servers = [ { url = "http://127.0.0.1:8888"; } ];
+          # forgejo on yggdrasil, whose firewall only lets heimdall reach :3000 and :2222
+          forgejo.loadBalancer.servers = [ { url = "http://10.0.20.21:3000"; } ];
 
           pfsense = {
             loadBalancer = {
@@ -391,10 +406,26 @@
 
         };
       };
+
+      # ssh://git@git.oryxserver.org:2222 → forgejo's own ssh server on yggdrasil
+      tcp = {
+        routers.forgejo-ssh = {
+          rule = "HostSNI(`*`)";
+          entryPoints = [ "gitssh" ];
+          service = "forgejo-ssh";
+          middlewares = [ "lan-only-tcp" ];
+        };
+        services.forgejo-ssh.loadBalancer.servers = [ { address = "10.0.20.21:2222"; } ];
+        middlewares.lan-only-tcp.ipAllowList.sourceRange = [
+          "10.0.20.0/24"
+          "10.0.50.10/32"    # my phone
+          "100.64.0.0/10"
+        ];
+      };
     };
   };
 
   systemd.services.traefik.serviceConfig.SupplementaryGroups = [ "traefik" ];
 
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.allowedTCPPorts = [ 80 443 2222 ];
 }
