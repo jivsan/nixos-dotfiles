@@ -144,6 +144,8 @@ in
       "d /var/lib/hermes-ssh 0750 root hermes -"
       "z /var/lib/hermes-ssh/id_ed25519 0640 root hermes -"
       "d /var/lib/hermes/claude 2770 hermes hermes -"
+      # ~/hermes-workspace links here: what i put in it stays editable for hermes, whatever my umask
+      "a+ /var/lib/hermes/workspace - - - - default:group:hermes:rwx,group:hermes:rwx"
     ]
   ];
 }
