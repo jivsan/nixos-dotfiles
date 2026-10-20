@@ -17,6 +17,9 @@
       requireConfig = "required";
       persistRepoData = true;
       repositoryCache = "enabled";
+      configFileNames = [ ".forgejo/renovate.json" ];   # 44.79 leaves .forgejo/ out when it checks a repo has a config
+      internalHostAccess = "block";                     # no lan addresses, except forgejo itself
+      hostRules = [ { matchHost = "git.oryxserver.org"; allowInternal = true; } ];
     };
   };
 }
