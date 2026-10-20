@@ -24,6 +24,10 @@
 
     ./modules/system/hermes-agent.nix
     ./modules/system/exporters.nix          # node numbers for heimdall's prometheus (homarr host card)
+
+    # self-hosted apps: they run here, their data and database live on odyn (docs/apps-on-odyn.md)
+    ./modules/system/appdata.nix            # /mnt/appdata/<app> shares + nightly appdb dumps
+    ./modules/system/forgejo.nix            # git.oryxserver.org
   ];
 
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
