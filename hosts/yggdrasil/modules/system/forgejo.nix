@@ -59,6 +59,9 @@ in
         PROVIDER = "db";                       # logins survive a restart
         COOKIE_SECURE = true;
       };
+      # take the client's address from traefik's X-Forwarded-For, so failed logins show who it was
+      # instead of heimdall. only heimdall is trusted to set it
+      security.REVERSE_PROXY_TRUSTED_PROXIES = "10.0.20.17/32";
       service = {
         DISABLE_REGISTRATION = true;           # accounts only by admin; no first-visitor-becomes-admin
         REQUIRE_SIGNIN_VIEW = true;            # nothing visible without logging in

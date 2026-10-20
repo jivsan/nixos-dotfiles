@@ -24,8 +24,8 @@ in
 
   virtualisation.oci-containers.containers = {
     changedetection = {
-      # pinned; update by changing the tag (releases: github.com/dgtlmoon/changedetection.io)
-      image = "ghcr.io/dgtlmoon/changedetection.io:0.60.9";
+      # pinned by digest; update tag and digest together (releases: github.com/dgtlmoon/changedetection.io)
+      image = "ghcr.io/dgtlmoon/changedetection.io:0.60.9@sha256:04eaae7915bad711160cb15abe160f6d3fabe98bbbd658509d4b7a654000fb2d";
       autoStart = true;
       ports = [ "127.0.0.1:5000:5000" ];
       volumes = [ "${data}:/datastore" ];

@@ -54,7 +54,7 @@ forgejo has no push-to-create: make the repo in the web ui first (private is the
 
 | service | what it is | port (who may connect) | config |
 |---|---|---|---|
-| **forgejo** | my git server: web at https://git.oryxserver.org, ssh at `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`. repos, lfs, attachments, settings on odyn; issues, users etc. in appdb on odyn. `forgejo-lts` | 3000 web, 2222 ssh (only heimdall: traefik passes them through) | `hosts/yggdrasil/modules/system/forgejo.nix` |
+| **forgejo** | my git server: web at https://git.oryxserver.org, ssh at `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`. repos, lfs, attachments, settings on odyn; issues, users etc. in appdb on odyn. unit `forgejo.service`, package `forgejo-lts` | 3000 web, 2222 ssh (only heimdall: traefik passes them through) | `hosts/yggdrasil/modules/system/forgejo.nix` |
 | **hermes-agent** | my ai agent (hermes) on my kimi pro plan with openrouter as fallback. tools over mcp: graphify (vault + dotfiles knowledge graphs on heimdall), blender, wowx and a dotfiles worktree on mjolnir, homarr | 8642 gateway api (only heimdall: the brain bridge) | `hosts/yggdrasil/modules/system/hermes-agent.nix` |
 | prometheus-node-exporter | cpu, memory, disk and systemd numbers for heimdall's prometheus (homarr host card, `UnitFailed` alerts) | 9100 | `hosts/yggdrasil/modules/system/exporters.nix` |
 | sshd | me (key only, no root, no passwords) | 22 | `default.nix` |

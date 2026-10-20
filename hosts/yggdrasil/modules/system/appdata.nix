@@ -54,7 +54,7 @@ in
       for db in $(psql -d postgres -Atc "select datname from pg_database where datallowconn and not datistemplate and datname <> 'postgres'"); do
         pg_dump -d "$db" -Fc -f "$dir/$db.dump.part"
         mv "$dir/$db.dump.part" "$dir/$db.dump"
-        echo "$db: $(du -h "$dir/$db.dump" | cut -f1)"
+        echo "$db: $(du -h --apparent-size "$dir/$db.dump" | cut -f1)"   # plain du shows the share's allocated blocks
       done
       find /mnt/appdata/backups/postgres -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} +
     '';
