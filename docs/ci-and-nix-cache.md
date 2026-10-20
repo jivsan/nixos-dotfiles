@@ -84,12 +84,15 @@ B=/dev/disk/by-id/wwn-0x5000cca01d54b810
 sudo zpool create -o ashift=12 -O atime=off -O xattr=sa -O compression=lz4 -O mountpoint=none -O canmount=off brunnr $A $B
 sudo zfs create -o mountpoint=legacy -o recordsize=1M -o primarycache=metadata -o quota=1800G brunnr/nixcache
 sudo zfs create -o mountpoint=legacy -o recordsize=16K brunnr/nixcache-db
-sudo zpool export brunnr     # from here on nixos imports and mounts it (fileSystems in nix-cache-server.nix)
+sudo zfs create -o mountpoint=legacy -o quota=300G brunnr/ci-store
+sudo zpool export brunnr     # from here on nixos imports and mounts it (fileSystems in nix-cache-server.nix
+                             # and forgejo-runner.nix)
 ```
 
 - `recordsize=1M`: the cache is big compressed files that are read whole.
 - `primarycache=metadata`: zfs keeps only the index in ram, not the files.
 - `recordsize=16K`: the small pages of ncps's sqlite database.
+- `brunnr/ci-store`: ci's own nix store (see the runner below), 300G at most.
 
 `hosts/mimir/modules/system/storage.nix` turns zfs on for mimir, pins `networking.hostId` (zfs won't import a pool
 on a host with another id) and caps zfs's ram cache (arc) at 1 gib with `zfs_arc_max`, so the rest of the ram stays
@@ -123,7 +126,7 @@ never in git.
 - **nginx** on `10.0.20.18:5000` in front: only GET and HEAD go through, so nobody on the lan can put anything in it.
 - **firewall**: port 5000 only from mjolnir, heimdall, tyr, njord and yggdrasil. nginx listens on the lan address
   alone, so tailscale (which skips nixos-fw) can't reach it.
-- what mimir builds itself is signed with the same key (`nix.settings.secret-key-files`).
+- what ci uploads gets signed by ncps with the same key, so the runner never needs the key.
 
 ### the hosts
 
@@ -134,16 +137,20 @@ if mimir is off a rebuild waits 5 seconds, then goes to cache.nixos.org as befor
 ## the runner (mimir)
 
 `hosts/mimir/modules/system/forgejo-runner.nix`: `forgejo-runner` as `gitea-runner-mimir.service`, label
-`nixos:host`, so jobs run as a plain user straight on mimir (no container) with nix. one job at a time, 6 h limit.
-the nix daemon builds at idle cpu and io priority, 4 jobs × 8 cores at most, so comfyui, the llm and octane come first.
+`nixos:host`, so jobs run as the user `gitea-runner` straight on mimir (no container) with nix. one job at a time,
+6 h limit, idle cpu and io priority and 4 jobs × 8 cores at most, so comfyui, the llm and octane come first.
 
 the workflow, `.forgejo/workflows/build.yml`: check out the commit, `nix build` the host's system, `nix copy` it to
-ncps on localhost. the upload uses a temp folder in the job's own folder, because the runner's `/tmp` is a 3 gb
-tmpfs and mimir's cuda paths don't fit in it.
+ncps on localhost.
 
-every host's system ends up in mimir's own nix store too (that's where it's built). the copy that counts is on
-brunnr, so mimir cleans its store every night (`nix.gc` daily instead of weekly), and right away when less than
-100 GiB is free (`min-free`, until 150 GiB are free).
+**ci has its own nix store on brunnr**, `/srv/ci-store` (`brunnr/ci-store`), not mimir's `/nix/store`: the runner
+gives every job `NIX_CONFIG=store = /srv/ci-store`, and nix's temp files (`TMPDIR`) and caches (`XDG_CACHE_HOME`)
+are in there too. so building all six hosts never fills mimir's boot disk. nix cleans that store by itself when
+less than 60G of its 300G is free (`min-free`, until 120G are free). mimir's own `/nix/store` only holds mimir.
+
+the runner is a fixed system user, not a dynamic one, so the files in that store keep their owner. its state
+folder `/var/lib/gitea-runner` still belongs to uid 65534 on disk (from when it was dynamic); systemd mounts it
+id-mapped for the service, so that's fine.
 
 it is registered for this repo only, so other repos can't run jobs on mimir. to register it again with a new token:
 
@@ -162,7 +169,7 @@ curl http://10.0.20.18:5000/nix-cache-info                         # from any of
 curl http://10.0.20.18:5000/pubkey                                  # must be mimir-nixcache-1:7VO4…
 nix path-info --store http://10.0.20.18:5000 /run/current-system    # is this host's system in the cache?
 systemctl status ncps nginx gitea-runner-mimir                      # on mimir
-zfs list -o name,used brunnr/nixcache brunnr/nixcache-db   # on mimir: the cache, and its small index
+zfs list -r -o name,used,quota brunnr                       # on mimir: the cache, its small index, ci's store
 journalctl -u renovate -n 50                                        # on yggdrasil; run it now: sudo systemctl start renovate
 ```
 
@@ -176,10 +183,15 @@ when the cache stops answering.
 - **a rebuild fails with `HTTP error 500` from `10.0.20.18:5000`**: ncps choked on something from an upstream.
   `journalctl -u ncps` on mimir shows which path and why; until it's fixed, a rebuild with
   `--option substituters https://cache.nixos.org` skips mimir.
+- **a rebuild wants to build or fetch something ci already put in the cache**: nix remembers "not in the cache"
+  for an hour, from asking before ci was done. add `--option narinfo-cache-negative-ttl 0` to that rebuild, or
+  wait the hour.
 - **ncps won't start after a first deploy or a new pool** ("unable to open database file"): the folders got their
   owner before the datasets were mounted. `sudo systemd-tmpfiles --create && sudo systemctl restart ncps`.
 - **a disk in brunnr dies**: the pool is gone, nothing else. `sudo zpool destroy brunnr` if it's still listed, make
-  it again as above with the disks left, then `sudo systemctl restart ncps`.
+  it again as above with the disks left, then `sudo systemctl restart ncps gitea-runner-mimir`.
+- **ci's store is broken or too big**: stop the runner, `sudo zfs destroy brunnr/ci-store`, make it again as above,
+  deploy mimir (or start the runner). the next jobs download everything again from the cache.
 - **a new signing key** (the old one leaked or got lost): make a key with a new name (`mimir-nixcache-2`), add its
   public half to `modules/system/nix-cache.nix` next to the old one and deploy every host. then swap the secret on
   mimir, stop ncps, delete everything under `/srv/nixcache` and `/srv/nixcache-db`, start ncps, remove the old
