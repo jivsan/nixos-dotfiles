@@ -18,6 +18,8 @@
     # mimir's own: ai / gpu stack
     ./modules/system/nvidia.nix
     ./modules/system/storage.nix          # brunnr: zfs stripe on the two sas disks for the nix cache
+    ./modules/system/nix-cache-server.nix # the fleet nix cache on brunnr (ncps behind nginx :5000)
+    ./modules/system/forgejo-runner.nix   # ci for nixos-dotfiles: builds every host, fills the cache
     ./modules/system/immich-ml.nix
     ./modules/system/comfyui.nix
     ./modules/system/voice.nix            # whisper + kokoro for heimdall's brain bridge

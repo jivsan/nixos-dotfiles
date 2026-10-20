@@ -74,6 +74,10 @@
         }];
       }
       {
+        job_name = "nixcache";
+        static_configs = [{ targets = [ "10.0.20.18:5000" ]; labels.host = "mimir"; }];
+      }
+      {
         job_name = "blackbox-https";
         metrics_path = "/probe";
         params.module = [ "http_2xx" ];
@@ -90,6 +94,7 @@
             "https://search.oryxserver.org"
             "https://git.oryxserver.org"
             "https://n8n.oryxserver.org/healthz/readiness"
+            "http://10.0.20.18:5000/nix-cache-info"   # the nix cache on mimir
           ];
         }];
         relabel_configs = [

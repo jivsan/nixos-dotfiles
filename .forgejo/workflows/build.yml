@@ -1,0 +1,32 @@
+# builds every host on each push to main and each pull request (renovate's too), on the runner on mimir.
+# what it builds goes into the nix cache, so a rebuild on the host downloads it instead. docs/ci-and-nix-cache.md
+name: build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: nixos
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [heimdall, mimir, mjolnir, njord, tyr, yggdrasil]
+    steps:
+      - name: checkout
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git -c http.extraHeader="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)" \
+            fetch -q --depth=1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_SHA"
+          git checkout -qf FETCH_HEAD
+      - name: build ${{ matrix.host }}
+        run: |
+          nix build --print-build-logs --no-link --print-out-paths \
+            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" > out-path
+          cat out-path
+      - name: upload to the nix cache
+        run: nix copy --to 'http://127.0.0.1:8501/upload?compression=zstd' "$(cat out-path)"

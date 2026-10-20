@@ -68,7 +68,7 @@ in
       };
       repository.DEFAULT_PRIVATE = "private";
       picture.DISABLE_GRAVATAR = true;
-      actions.ENABLED = false;                 # no runner (yet)
+      actions.ENABLED = true;                  # the runner is on mimir (hosts/mimir/modules/system/forgejo-runner.nix)
       mailer.ENABLED = false;
       "cron.update_checker".ENABLED = false;
     };

@@ -40,6 +40,7 @@
     ../../modules/system/agent-memory.nix  # ~/.agent-memory on odyn: claude's memory notes
     ../../modules/system/ratatoskr.nix     # /mnt/ratatoskr on odyn: screenshots + snippets for hermes and claude
     ./modules/system/exporters.nix         # node + gpu numbers for heimdall's prometheus (homarr host card)
+    ../../modules/system/nix-cache.nix     # mimir's nix cache first, then cache.nixos.org
   ];
 
   networking.hostName = "mjolnir";

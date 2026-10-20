@@ -1,0 +1,103 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "Europe/Oslo",
+  "semanticCommits": "disabled",
+  "nix": {
+    "enabled": true
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "container images pinned as \"registry/name:tag@sha256:...\" in the nix files",
+      "managerFilePatterns": [
+        "/\\.nix$/"
+      ],
+      "matchStrings": [
+        "\"(?<depName>[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}/[a-z0-9._/-]+):(?<currentValue>[A-Za-z0-9._-]+)@(?<currentDigest>sha256:[a-f0-9]{64})\""
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "flake inputs: one pull request a week",
+      "matchManagers": [
+        "nix"
+      ],
+      "groupName": "flake inputs",
+      "schedule": [
+        "before 7am on monday"
+      ]
+    },
+    {
+      "description": "image digests that move under the same tag: one pull request a week",
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "image digests",
+      "schedule": [
+        "before 7am on monday"
+      ]
+    },
+    {
+      "description": "database majors need a dump and restore, done by hand",
+      "matchPackageNames": [
+        "docker.io/library/postgres",
+        "postgres",
+        "docker.io/library/redis",
+        "redis",
+        "docker.io/library/influxdb",
+        "influxdb"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "comfyui's python base moves with comfyui and its torch wheels, by hand",
+      "matchPackageNames": [
+        "docker.io/library/python",
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "immich server (heimdall) and machine learning (mimir) move together",
+      "matchPackageNames": [
+        "ghcr.io/immich-app/**"
+      ],
+      "groupName": "immich"
+    },
+    {
+      "description": "scrutiny web (heimdall) and collector (odyn) move together",
+      "matchPackageNames": [
+        "ghcr.io/analogj/scrutiny"
+      ],
+      "groupName": "scrutiny"
+    },
+    {
+      "matchPackageNames": [
+        "lscr.io/linuxserver/obsidian"
+      ],
+      "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-ls(?<build>\\d+)$"
+    },
+    {
+      "description": "searxng tags a release almost every day",
+      "matchPackageNames": [
+        "docker.io/searxng/searxng"
+      ],
+      "versioning": "regex:^(?<major>\\d{4})\\.(?<minor>\\d+)\\.(?<patch>\\d+)-[0-9a-f]+$",
+      "schedule": [
+        "before 7am on monday"
+      ]
+    }
+  ]
+}

@@ -29,6 +29,7 @@
     ./modules/system/appdata.nix            # /mnt/appdata/<app> shares + nightly appdb dumps
     ./modules/system/forgejo.nix            # git.oryxserver.org
     ./modules/system/n8n.nix
+    ./modules/system/renovate.nix           # pull requests on forgejo for pinned images and flake inputs
   ];
 
   boot.kernelPackages = pkgs-unstable.linuxPackages_latest;
