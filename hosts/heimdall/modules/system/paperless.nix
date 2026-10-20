@@ -14,6 +14,9 @@ in
     # redis-alpine runs as 999:1000. owned by root, every rebuild took it back and redis stopped
     # taking writes (paperless answered 500 from 2026-10-18 until the 20th)
     "d /var/lib/paperless/redis 0700 999 1000 -"
+    # search index, classifier, scheduler state: kept across container re-creates (it was an
+    # anonymous volume, thrown away on every rebuild). paperless runs as USERMAP 1000:100
+    "d /var/lib/paperless/data 0750 1000 100 -"
   ];
 
   systemd.services.create-paperless-network = {
@@ -28,7 +31,7 @@ in
 
   virtualisation.oci-containers.containers = {
     paperless-db = {
-      image = "docker.io/library/postgres:16-alpine";
+      image = "docker.io/library/postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea";
       autoStart = true;
       environmentFiles = [ "/var/lib/secrets/paperless.env" ];
       volumes = [ "/var/lib/paperless/postgres:/var/lib/postgresql/data" ];
@@ -36,7 +39,7 @@ in
     };
 
     paperless-redis = {
-      image = "docker.io/library/redis:7-alpine";
+      image = "docker.io/library/redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499";
       autoStart = true;
       cmd = [ "redis-server" "--appendonly" "yes" ];
       volumes = [ "/var/lib/paperless/redis:/data" ];
@@ -44,7 +47,7 @@ in
     };
 
     paperless-web = {
-      image = "ghcr.io/paperless-ngx/paperless-ngx:latest";
+      image = "ghcr.io/paperless-ngx/paperless-ngx:3.3.3@sha256:dba0242c1df1843643df4eb50ce5639f3a7900f414879088fd5bed8eaf2d456d";
       autoStart = true;
       ports = [ "127.0.0.1:8010:8000" ];
 
@@ -55,6 +58,7 @@ in
         USERMAP_GID = "100";
 
         PAPERLESS_REDIS = "redis://paperless-redis:6379";
+        PAPERLESS_DBENGINE = "postgresql";            # required since 3.0
         PAPERLESS_DBHOST = "paperless-db";
         PAPERLESS_DBNAME = "paperless";
         PAPERLESS_DBUSER = "paperless";
@@ -65,14 +69,18 @@ in
 
         PAPERLESS_TIME_ZONE = config.time.timeZone;
         PAPERLESS_OCR_LANGUAGE = "eng";
-        PAPERLESS_CONSUMER_POLLING = "30";
-        PAPERLESS_FILENAME_FORMAT = "{created_year}/{correspondent}/{title}";
+        # consume/ is on nfs, where inotify sees nothing: look every 30 s. 3.0 renamed this from
+        # PAPERLESS_CONSUMER_POLLING; with the old name it silently stops picking up files
+        PAPERLESS_CONSUMER_POLLING_INTERVAL = "30";
+        PAPERLESS_CONSUMER_DELETE_DUPLICATES = "true";   # 2.x behaviour: a duplicate is not imported again
+        PAPERLESS_FILENAME_FORMAT = "{{ created_year }}/{{ correspondent }}/{{ title }}";
       };
 
       volumes = [
         "${paperlessBase}/consume:/usr/src/paperless/consume"
         "${paperlessBase}/media:/usr/src/paperless/media"
         "${paperlessBase}/export:/usr/src/paperless/export"
+        "/var/lib/paperless/data:/usr/src/paperless/data"
       ];
 
       extraOptions = [ "--network=paperless" ];
