@@ -145,6 +145,7 @@ pihole dns, and iot firewalled off the trusted side.
 | [`docs/deploying-services.md`](docs/deploying-services.md)             | adding and deploying self hosted services               |
 | [`docs/deploy-new-host.md`](docs/deploy-new-host.md)                   | bringing a brand new host into the flake                |
 | [`docs/heimdall-docs.md`](docs/heimdall-docs.md)                       | the services vm in detail                               |
+| [`docs/yggdrasil.md`](docs/yggdrasil.md)                               | the control box: everything running on it (forgejo, hermes) |
 | [`docs/apps-on-odyn.md`](docs/apps-on-odyn.md)                         | apps on yggdrasil with their data and database on odyn  |
 | [`odyn/README.md`](odyn/README.md)                                     | what's set up on odyn (truenas) for the hosts           |
 | [`docs/muninn-agentic-os.md`](docs/muninn-agentic-os.md)               | the vault, the agents and the knowledge graph           |

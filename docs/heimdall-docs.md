@@ -3,6 +3,10 @@
 my services vm. everything stateful and self hosted lives here, behind traefik at `*.oryxserver.org`.
 it runs on `hella` (proxmox) and keeps its bulk data on `odyn` (truenas).
 
+> **not everything:** forgejo (git.oryxserver.org) runs on **yggdrasil**, with its data and database
+> on odyn. traefik here still serves its name. new apps go that way too: [`yggdrasil.md`](yggdrasil.md),
+> [`apps-on-odyn.md`](apps-on-odyn.md).
+
 ## specs
 
 - **ip:** `10.0.20.17`, static in the config, outside the vlan 20 dhcp pool
