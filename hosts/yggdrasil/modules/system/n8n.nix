@@ -46,6 +46,7 @@ in
       N8N_PROXY_HOPS = 1;
       N8N_ENCRYPTION_KEY_FILE = "${data}/encryption-key";
       N8N_STORAGE_PATH = "${data}/storage";
+      N8N_RESTRICT_FILE_ACCESS_TO = "/mnt/muninn/journal;/mnt/muninn/MOCs";
       DB_TYPE = "postgresdb";
       DB_POSTGRESDB_HOST = "10.0.20.6";
       DB_POSTGRESDB_PORT = 5432;

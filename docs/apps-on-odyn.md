@@ -120,6 +120,11 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
   Without the key the credentials in a restored database can't be read, so it lives next to the data.
 - On yggdrasil (`/var/lib/n8n`): `.n8n/config` (a copy of the key), logs. Rebuildable.
 - The first visitor to the web page makes the owner account. Make it right after a fresh install.
+- Morning report (workflow "Morning report", 07:30) posts to ntfy `reports` as the ntfy user `n8n`
+  (write `reports`, read `alerts`, `backups`, `updates`, `changes`). It reads Prometheus (heimdall
+  opens 9090 to yggdrasil only), Scrutiny, Proxmox through the read-only token `n8n-report@pve!morning`
+  (PVEAuditor on `/nodes/hella`, `/vms`, `/storage/pbs`) and the vault's `journal/` and `MOCs/`
+  (`N8N_RESTRICT_FILE_ACCESS_TO`). The tokens live only in n8n's encrypted credentials.
 - Health: `/healthz/readiness` answers 200 only when the database is connected and migrated
   (Prometheus `SiteDown` and the Homarr tile use it).
 

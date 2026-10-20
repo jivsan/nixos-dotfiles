@@ -102,4 +102,9 @@
   };
   # grafana's container reaches prometheus, loki and influxdb on the host over podman0
   networking.firewall.trustedInterfaces = [ "podman0" ];
+
+  # n8n on yggdrasil reads metrics for its morning report
+  networking.firewall.extraCommands = ''
+    iptables -A nixos-fw -p tcp -s 10.0.20.21 --dport 9090 -j nixos-fw-accept
+  '';
 }
