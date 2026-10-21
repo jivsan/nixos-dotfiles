@@ -23,6 +23,14 @@ let
       fi
       export LD_LIBRARY_PATH="${octaneBase}/server:${octaneBase}/server/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
       cd ${octaneBase}/server
+      # from a launcher stdin is /dev/null: the server's command prompt hits end-of-file
+      # and reprints itself forever (one core at 100 %). a fifo opened read-write never ends
+      if [ ! -t 0 ]; then
+        fifo=$(${pkgs.coreutils}/bin/mktemp -u "''${XDG_RUNTIME_DIR:-/tmp}/octane-stdin.XXXXXX")
+        ${pkgs.coreutils}/bin/mkfifo -m 600 "$fifo"
+        exec 0<>"$fifo"
+        ${pkgs.coreutils}/bin/rm -f "$fifo"
+      fi
       exec ./OctaneServer "$@"
     '';
   };
