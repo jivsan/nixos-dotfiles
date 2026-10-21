@@ -89,4 +89,26 @@ in
 
   # awg0 is not a trusted interface on purpose: forwarding doesn't need it,
   # and it would open every port heimdall listens on to the peers
+
+  # mishka only gets odyn's smb share, pihole dns and the internet. without this the
+  # masquerade makes her look like heimdall to the whole lan (nfs exports, ssh, web uis,
+  # ipmi) and heimdall's own open ports. raw table like influxdb.nix, so it also covers
+  # podman's forwarded ports. only traffic inside the tunnel: the awg handshake on ens18 is untouched
+  networking.firewall.extraCommands = ''
+    iptables -t raw -N awg-mishka 2>/dev/null || iptables -t raw -F awg-mishka
+    iptables -t raw -A awg-mishka -d 10.0.20.6 -p tcp --dport 445 -j RETURN
+    iptables -t raw -A awg-mishka -d 10.0.20.4 -p udp --dport 53 -j RETURN
+    iptables -t raw -A awg-mishka -d 10.0.20.4 -p tcp --dport 53 -j RETURN
+    iptables -t raw -A awg-mishka -d 10.0.0.0/8 -j DROP
+    iptables -t raw -A awg-mishka -d 172.16.0.0/12 -j DROP
+    iptables -t raw -A awg-mishka -d 192.168.0.0/16 -j DROP
+    iptables -t raw -A awg-mishka -d 100.64.0.0/10 -j DROP
+    iptables -t raw -C PREROUTING -i awg0 -j awg-mishka 2>/dev/null \
+      || iptables -t raw -A PREROUTING -i awg0 -j awg-mishka
+  '';
+  networking.firewall.extraStopCommands = ''
+    iptables -t raw -D PREROUTING -i awg0 -j awg-mishka 2>/dev/null || true
+    iptables -t raw -F awg-mishka 2>/dev/null || true
+    iptables -t raw -X awg-mishka 2>/dev/null || true
+  '';
 }
