@@ -111,6 +111,14 @@
       "allowedVersions": "<2.9"
     },
     {
+      "description": "immich's postgres (odyn/apps/immichdb) on its own, never in one pull request with server and ml, and it stays on 16: a new postgres or vectorchord needs its own plan",
+      "matchPackageNames": [
+        "ghcr.io/immich-app/postgres"
+      ],
+      "groupName": "immichdb",
+      "allowedVersions": "<17"
+    },
+    {
       "description": "moving heimdall's data to odyn (2026-10): no updates for these while they move, so a new image never lands between the rehearsal and the move. each comes off this list a week after its app moved",
       "matchPackageNames": [
         "ghcr.io/paperless-ngx/paperless-ngx",

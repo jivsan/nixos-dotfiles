@@ -17,8 +17,10 @@ it runs on `hella` (proxmox) and keeps its bulk data on `odyn` (truenas).
 
 ## storage on odyn
 
-bulk files go to odyn over nfs, databases stay on heimdall's own disk (nfs locking can corrupt
-sqlite and postgres). mounts are in `hosts/heimdall/modules/system/nas.nix`:
+bulk files go to odyn over nfs. databases go to odyn too, but never as files on nfs (its locking can
+corrupt sqlite and postgres): they live in appdb or in their own odyn app (immichdb), on odyn's own
+disks, and the apps reach them over the lan ([`apps-on-odyn.md`](apps-on-odyn.md)). the older mounts are in
+`hosts/heimdall/modules/system/nas.nix`, the per-app shares in `appdata.nix`:
 
 ```
 10.0.20.6:/mnt/vault/immich                       → immich photos (own dataset, export only for heimdall)
@@ -26,8 +28,8 @@ sqlite and postgres). mounts are in `hosts/heimdall/modules/system/nas.nix`:
 10.0.20.6:/mnt/vault/obsidian                     → the muninn vault
 ```
 
-the nfs mounts are `soft`, so a slow odyn gives write errors instead of hanging. another reason to keep
-databases local.
+the old mounts in `nas.nix` are `soft`, so a slow odyn gives write errors instead of hanging. immich's photos
+and the per-app shares are `hard`: a write waits for odyn instead of failing half way.
 
 ## services
 
@@ -37,7 +39,7 @@ phone, tailscale).
 | service              | runs as | notes                                                       |
 |----------------------|---------|-------------------------------------------------------------|
 | traefik              | native  | reverse proxy + dashboard at `traefik.oryxserver.org`       |
-| immich               | podman  | photos at `immich.oryxserver.org`, machine learning on mimir (`10.0.20.18:3003`) |
+| immich               | podman  | photos at `immich.oryxserver.org`, database in the odyn app `immichdb` (since 2026-10-22), machine learning on mimir (`10.0.20.18:3003`) |
 | paperless            | podman  | documents: database in appdb, files in `vault/appdata/paperless` on odyn, own redis |
 | vaultwarden          | podman  | passwords at `vault.oryxserver.org`, sqlite on local disk, daily backup to odyn |
 | homarr               | podman  | dashboard at `home.oryxserver.org`, database in appdb on odyn (since 2026-10-22) |
@@ -49,7 +51,7 @@ phone, tailscale).
 | prometheus + loki    | native  | metrics and logs (no log shipper yet, promtail is off)       |
 | alertmanager         | native  | fleet alert rules in `alerting.nix` (hosts, odyn, pi-hole, failed units, disks, sites, cert) → ntfy `alerts` |
 | blackbox-exporter    | native  | https probes of the main sites                               |
-| postgres-exporter    | native  | immich db metrics                                            |
+| postgres-exporter    | native  | immich db metrics (immichdb on odyn, as its own read-only role) |
 | switch-snmp          | native  | telegraf polls bifrost over snmp for prometheus             |
 | pfsense-geoip        | native  | geolocates blocked sources from pfsense syslog into influxdb |
 | huginn               | native  | my vault agents (systemd timers on minimax via openrouter)   |

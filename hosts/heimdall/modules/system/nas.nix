@@ -15,11 +15,12 @@ let
   ];
 in
 {
-  # immich photos: dataset 700 root:root, the export answers only heimdall (maproot=root)
+  # immich photos: dataset 700 root:root, the export answers only heimdall (maproot=root).
+  # hard since 2026-10-22, like the appdata shares: a write waits for odyn instead of failing half way
   fileSystems."/mnt/nas/immich-upload" = {
     device = "10.0.20.6:/mnt/vault/immich";
     fsType = "nfs";
-    options = commonOpts;
+    options = [ "nfsvers=4.2" "hard" "noatime" "_netdev" "nofail" "x-systemd.automount" "x-systemd.mount-timeout=30" ];
   };
   # paperless data and the vaultwarden backups
   fileSystems."/mnt/nas/nix-services" = {

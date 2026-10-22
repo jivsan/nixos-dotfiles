@@ -2,8 +2,14 @@
 let
   # immich-server; keep immich-ml on mimir on the same release
   immichImage = "ghcr.io/immich-app/immich-server:v3.3.3@sha256:bae7664ff3aa4c2c1fcbdcdd86b40b105643c5f861f3e6a770fc760089f25862";
-  # immich's own postgres, tag 16-vectorchord0.4.3-pgvector0.8.1-pgvectors0.2.1
-  pgvectorImage = "ghcr.io/immich-app/postgres@sha256:13d1ff1638f54be482620d0ef1eb2b004c99bfd674d06359ae0b91d8f5b5696b";
+  # immich's own postgres is an odyn app since 2026-10-22: odyn/apps/immichdb (vectorchord, user 3017,
+  # vault/appdata/immichdb). the server reaches it by name, so the certificate is checked against
+  # immichdb.odyn (with an ip, node would check "localhost" and fail)
+  dbHost = "immichdb.odyn";
+  # one url for both the server and its nightly backup (pg_dump gets this url as it is, so it checks the
+  # certificate too and only does scram, never sends the password in clear). no password in it:
+  # the server takes PGPASSWORD from its env file, pg_dump reads /root/.pgpass (both made from immich-db.env)
+  dbUrl = "postgres://immich@${dbHost}:5433/immich?sslmode=verify-full&sslrootcert=/etc/immichdb/ca.crt&require_auth=scram-sha-256&channel_binding=require";
   redisImage = "docker.io/library/redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0";   # queue only, no volume
 
   # ml on mimir (hosts/mimir/modules/system/immich-ml.nix); when it's down
@@ -14,41 +20,9 @@ let
   uploadHostPath = "/mnt/nas/immich-upload";
 in
 {
-  # db on local disk (999 is postgres inside the image)
-  systemd.tmpfiles.rules = [
-    "d /var/lib/immich-db 0700 999 999 -"
-  ];
-
   virtualisation.oci-containers.backend = "podman";
 
   virtualisation.oci-containers.containers = {
-
-    immich-db = {
-      image = pgvectorImage;
-      autoStart = true;
-
-      environment = {
-        POSTGRES_USER = "immich";
-        POSTGRES_DB = "immich";
-        POSTGRES_INITDB_ARGS = "--data-checksums";
-      };
-
-      environmentFiles = [ "/var/lib/secrets/immich-db.env" ];
-
-      volumes = [
-        "/var/lib/immich-db:/var/lib/postgresql/data"
-      ];
-
-      ports = [
-        "127.0.0.1:5433:5432"          # 5433 so a native postgres can have 5432 later
-      ];
-
-      # no cmd override: the image's entrypoint sets shared_preload_libraries itself
-
-      extraOptions = [
-        "--network=immich-net"
-      ];
-    };
 
     immich-redis = {
       image = redisImage;
@@ -68,9 +42,7 @@ in
       autoStart = true;
 
       environment = {
-        DB_HOSTNAME = "immich-db";
-        DB_DATABASE_NAME = "immich";
-        DB_USERNAME = "immich";
+        DB_URL = dbUrl;
         REDIS_HOSTNAME = "immich-redis";
         IMMICH_MACHINE_LEARNING_URL = mlUrl;
 
@@ -78,21 +50,25 @@ in
         IMMICH_VERSION_CHECK = "false";
       };
 
-      environmentFiles = [ "/var/lib/secrets/immich-db.env" ];
+      # PGPASSWORD (0600). immich-db.env stays as it was, for a rollback
+      environmentFiles = [ "/var/lib/secrets/immich-server-db.env" ];
 
       volumes = [
         "${uploadHostPath}:/usr/src/app/upload:rw"
         "/etc/localtime:/etc/localtime:ro"
+        "/etc/immichdb/ca.crt:/etc/immichdb/ca.crt:ro"   # appdata.nix
+        "/var/lib/secrets/immich-db.pgpass:/root/.pgpass:ro"   # 0600, for the backup job's pg_dump
       ];
 
       ports = [
         "0.0.0.0:2283:2283"
       ];
 
-      dependsOn = [ "immich-db" "immich-redis" ];
+      dependsOn = [ "immich-redis" ];
 
       extraOptions = [
         "--network=immich-net"
+        "--add-host=${dbHost}:10.0.20.6"
       ];
     };
   };

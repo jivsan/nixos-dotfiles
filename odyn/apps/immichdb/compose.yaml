@@ -1,0 +1,62 @@
+# immichdb: immich's own postgres (with vectorchord for smart search and faces), on odyn since
+# 2026-10-22 (it was on heimdall). immich-server on heimdall reaches it as immichdb.odyn:5433, over tls,
+# and checks the certificate (verify-full against ./server.crt). same image as on heimdall, so the data
+# dir was copied as it was: nothing converted. not in appdb because vectorchord has to be preloaded.
+# a truenas custom app, applied from mjolnir with ../update.sh immichdb (the first time: --create)
+#
+# files in vault/appdata/immichdb (user immichdb 3017, 700), on odyn's own disks, never nfs:
+#   data/   the postgres 16 data dir
+#   tls/    server.crt + server.key (0600) for ssl. server.crt is also ./server.crt here (public)
+services:
+  postgres:
+    image: ghcr.io/immich-app/postgres:16-vectorchord0.4.3-pgvector0.8.1-pgvectors0.2.1@sha256:13d1ff1638f54be482620d0ef1eb2b004c99bfd674d06359ae0b91d8f5b5696b
+    container_name: immichdb
+    restart: unless-stopped
+    user: "3017:3017"                  # odyn user immichdb, owns vault/appdata/immichdb (700)
+    shm_size: 128mb
+    mem_limit: 2g
+    ports:
+      - "10.0.20.6:5433:5432"
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      # DB_STORAGE_TYPE stays unset (= SSD): the same postgres settings it had on heimdall
+    # the image's own start line (its config file preloads vectorchord), plus tls and our pg_hba
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - hba_file=/etc/immichdb/pg_hba.conf
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/immichdb-tls/server.crt
+      - -c
+      - ssl_key_file=/etc/immichdb-tls/server.key
+      # zfs is copy-on-write: zero-filling new wal files or reusing old ones only costs writes there
+      - -c
+      - wal_init_zero=off
+      - -c
+      - wal_recycle=off
+    volumes:
+      - /mnt/vault/appdata/immichdb/data:/var/lib/postgresql/data
+      - /mnt/vault/appdata/immichdb/tls:/etc/immichdb-tls:ro
+    configs:
+      - source: pg_hba
+        target: /etc/immichdb/pg_hba.conf
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "/var/run/postgresql", "-U", "immich", "-d", "immich"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+configs:
+  # who may log in, from where. anything not listed is refused before a password is asked
+  pg_hba:
+    content: |
+      # inside the container only (healthcheck). only root on odyn can get in there
+      local   all     all                                  trust
+      # immich-server on heimdall (its role is the owner and superuser, as immich sets it up)
+      hostssl all     immich              10.0.20.17/32    scram-sha-256
+      # heimdall's postgres exporter, a pg_monitor role (metrics only)
+      hostssl immich  postgres_exporter   10.0.20.17/32    scram-sha-256

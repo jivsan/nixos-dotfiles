@@ -12,6 +12,7 @@ no docker access, and doesn't need them.
 | `appdb` | Postgres 18 for the apps on yggdrasil (forgejo, n8n) and heimdall (moving one at a time since 2026-10), `10.0.20.6:5432`, tls + scram, each role only from its own host | [`apps/appdb/`](apps/appdb/) |
 | `scrutiny-collector` | reads the disks' smart data every 10 min for the scrutiny hub (same version as the hub) | [`apps/scrutiny-collector/`](apps/scrutiny-collector/) |
 | `scrutiny` | the scrutiny hub (web + its own influxdb), `10.0.20.6:30808`, files in `vault/appdata/scrutiny`; was on heimdall until 2026-10-22, traefik there still serves `scrutiny.oryxserver.org` | [`apps/scrutiny/`](apps/scrutiny/) |
+| `immichdb` | immich's own Postgres 16 with vectorchord, `10.0.20.6:5433`, tls (verify-full, `server.crt`) + scram, only from heimdall; files in `vault/appdata/immichdb`; was on heimdall until 2026-10-22 | [`apps/immichdb/`](apps/immichdb/) |
 
 Change an app's `compose.yaml`, then run `apps/update.sh <app>` (a new app: `apps/update.sh --create <app>`). appdb has its own `apps/appdb/apply.sh`
 (it also did the first install; no secrets in the repo, the admin password exists only on yggdrasil).
@@ -29,6 +30,7 @@ Also on odyn but not kept here: the catalog apps `dockge` (the arr stacks in `/m
 | `vault/appdata/paperless` | paperless 3014, 750 | NFS share 22, 10.0.20.17 only, mapall paperless | Paperless's documents (heimdall) |
 | `vault/appdata/changedetection` | changedetection 3015, 700 | NFS share 23, 10.0.20.17 only, mapall changedetection | changedetection's watches (heimdall) |
 | `vault/appdata/scrutiny` | scrutiny 3016, 700 | no (share 24 only for the copy from heimdall, then deleted) | the `scrutiny` app here |
+| `vault/appdata/immichdb` | immichdb 3017, 700, recordsize 16K | no (a share only for the copy from heimdall, then deleted) | the `immichdb` app here (`data/`, `tls/`) |
 
 Snapshot tasks 13 (hourly, 2 days), 14 (daily, 30 days), 15 (weekly, 12 weeks): recursive on
 `vault/appdata`.
@@ -51,8 +53,8 @@ midclt call sharing.nfs.create '{"path":"/mnt/vault/appdata/<app>","hosts":["10.
 For an app on heimdall, put `10.0.20.17` in `hosts` instead.
 
 Ids so far: appdb 3010, forgejo 3011, n8n 3012, backups 3013 (owns `vault/backups`, see below),
-paperless 3014, changedetection 3015, scrutiny 3016.
-Kept for heimdall's apps as they move: immichdb 3017, vaultwarden 3018, crafty 3019 (archived 2026-10-22,
+paperless 3014, changedetection 3015, scrutiny 3016, immichdb 3017.
+Kept for heimdall's apps as they move: vaultwarden 3018, crafty 3019 (archived 2026-10-22,
 for when it comes back in kubernetes), homarr 3020 (for kubernetes later).
 The next new app gets 3021. Check the id is free first: `midclt call user.query '[["uid","=",<id>]]'`
 gives `[]`. The snapshot tasks already cover new datasets under `vault/appdata`. The whole pattern is

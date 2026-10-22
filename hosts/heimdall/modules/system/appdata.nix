@@ -29,6 +29,11 @@ in
     source = ../../../../odyn/apps/appdb/server.crt;
     mode = "0444";
   };
+  # the same for immich's own postgres on odyn (odyn/apps/immichdb), used by immich-server and its exporter
+  environment.etc."immichdb/ca.crt" = {
+    source = ../../../../odyn/apps/immichdb/server.crt;
+    mode = "0444";
+  };
 
   # one share per app, added in the commit that moves it. each is written as its own odyn user (mapall)
   fileSystems = {

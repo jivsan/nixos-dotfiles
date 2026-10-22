@@ -39,6 +39,13 @@ let
           for = "3m";
           annotations.summary = "appdb (postgres on odyn, 10.0.20.6:5432) is not answering, every app with its database there is down with it (docs/apps-on-odyn.md)";
         }
+        # immich's own postgres on odyn (odyn/apps/immichdb)
+        {
+          alert = "ImmichDbDown";
+          expr = ''probe_success{job="immichdb"} == 0'';
+          for = "3m";
+          annotations.summary = "immichdb (immich's postgres on odyn, 10.0.20.6:5433) is not answering, so immich is down (docs/apps-on-odyn.md)";
+        }
         {
           alert = "PiholeDown";
           expr = ''probe_success{job="pihole-dns"} == 0'';
@@ -84,6 +91,7 @@ in
       (probe "odyn" "tcp_connect" [ "10.0.20.6:2049" "10.0.20.6:443" ])   # nfs and the web ui
       (probe "pihole-dns" "dns_oryx" [ "10.0.20.4:53" ])
       (probe "appdb" "tcp_connect" [ "10.0.20.6:5432" ])   # odyn/apps/appdb
+      (probe "immichdb" "tcp_connect" [ "10.0.20.6:5433" ])   # odyn/apps/immichdb
     ];
 
     # every alert goes to the ntfy topic "alerts", rendered by the prometheus template in ntfy.nix
