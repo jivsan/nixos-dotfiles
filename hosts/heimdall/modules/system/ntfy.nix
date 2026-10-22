@@ -88,9 +88,10 @@
   #
   #   christina      admin, the phone and the web app
   #   publisher      * (my own curl token, only in vaultwarden)
-  #   heimdall       alerts (alertmanager, grafana, scrutiny, huginn: /var/lib/secrets/ntfy-publish.env)
+  #   heimdall       alerts (alertmanager, grafana, huginn: /var/lib/secrets/ntfy-publish.env)
   #   proxmox        backups, alerts, updates (tokens "hella" and "pbs", in their notification secrets)
-  #   truenas        alerts (odyn's slack-type alert service, basic auth in the url)
+  #   truenas        alerts (odyn's slack-type alert service, basic auth in the url; token "scrutiny-odyn"
+  #                  for the scrutiny app, in vault/appdata/scrutiny/config/ntfy-auth.hdr on odyn)
   #   mjolnir        renders (~/.config/ntfy/token, the blender render hook)
   #   homeassistant  home, read-write (its event entity listens); ha logs in with a password and makes its own token
   #   changedetection changes (changedetection.nix, the token is in its own settings under /var/lib/changedetection)

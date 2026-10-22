@@ -77,7 +77,7 @@
       "groupName": "immich"
     },
     {
-      "description": "scrutiny web (heimdall) and collector (odyn) move together",
+      "description": "scrutiny web and collector (both odyn apps) move together",
       "matchPackageNames": [
         "ghcr.io/analogj/scrutiny"
       ],
@@ -98,6 +98,17 @@
       "schedule": [
         "before 7am on monday"
       ]
+    },
+    {
+      "description": "scrutiny's influxdb stays on 2.8: 2.9 turns on token hashing, which can't be undone",
+      "matchFileNames": [
+        "odyn/apps/scrutiny/compose.yaml"
+      ],
+      "matchPackageNames": [
+        "docker.io/library/influxdb",
+        "influxdb"
+      ],
+      "allowedVersions": "<2.9"
     },
     {
       "description": "moving heimdall's data to odyn (2026-10): no updates for these while they move, so a new image never lands between the rehearsal and the move. each comes off this list a week after its app moved",

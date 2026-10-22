@@ -47,7 +47,7 @@ phone, tailscale).
 | obsidian             | podman  | the muninn vault in the browser at `obsidian.oryxserver.org` |
 | grafana              | podman  | dashboards at `grafana.oryxserver.org`                      |
 | influxdb             | podman  | pfsense metrics from telegraf, 90 days                      |
-| scrutiny             | podman  | drive health, the collector runs on odyn and pushes here    |
+| scrutiny             | odyn    | drive health: since 2026-10-22 an odyn app (`odyn/apps/scrutiny`), traefik here serves `scrutiny.oryxserver.org` |
 | prometheus + loki    | native  | metrics and logs (no log shipper yet, promtail is off)       |
 | alertmanager         | native  | fleet alert rules in `alerting.nix` (hosts, odyn, pi-hole, failed units, disks, sites, cert) → ntfy `alerts` |
 | blackbox-exporter    | native  | https probes of the main sites                               |

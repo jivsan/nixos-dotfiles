@@ -285,7 +285,7 @@
           scrutiny = {
             loadBalancer = {
               servers = [
-                { url = "http://127.0.0.1:8080"; }
+                { url = "http://10.0.20.6:30808"; }   # an odyn app since 2026-10-22 (odyn/apps/scrutiny)
               ];
             };
           };
@@ -392,7 +392,7 @@
             ];
           };
 
-          # lan-only plus heimdall's own podman networks: scrutiny sends drive alerts to ntfy by its
+          # lan-only plus heimdall's own podman networks: apps in containers here send to ntfy by its
           # https name. ntfy still wants a login or a token from every one of them
           ntfy-allow = {
             ipAllowList.sourceRange = [
@@ -401,7 +401,7 @@
               "100.64.0.0/10"
               "127.0.0.1/32"
               "10.88.0.0/16"     # podman's default network
-              "10.89.0.0/16"     # the per-app networks (immich, paperless, scrutiny)
+              "10.89.0.0/16"     # the per-app networks (immich, paperless, changedetection)
             ];
           };
 

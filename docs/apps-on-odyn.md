@@ -94,6 +94,7 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
 heimdall's own apps (Paperless, Grafana, Homarr, Vaultwarden, Immich, ...) stay on heimdall for now,
 but their data moves to odyn the same way, one app at a time: the database in appdb, the files in
 `vault/appdata/<app>`. Immich gets its own Postgres app, `immichdb`, because it needs VectorChord.
+Scrutiny's hub moved whole: it's an odyn app now (`odyn/apps/scrutiny`, next to its collector).
 Moving an app to Kubernetes later then only changes where it runs. The plan is in the vault:
 "heimdall databases to odyn — the plan, one app at a time (2026-10-21)".
 

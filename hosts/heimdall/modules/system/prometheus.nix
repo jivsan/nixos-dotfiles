@@ -91,6 +91,7 @@
             "https://vault.oryxserver.org"
             "https://brain.oryxserver.org"
             "https://changedetection.oryxserver.org"
+            "https://scrutiny.oryxserver.org/api/health"   # the scrutiny app on odyn, through traefik
             "https://search.oryxserver.org"
             "https://git.oryxserver.org"
             "https://n8n.oryxserver.org/healthz/readiness"

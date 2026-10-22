@@ -1,0 +1,48 @@
+# scrutiny hub: the web ui and its own influxdb, on odyn since 2026-10-22 (it was on heimdall).
+# the collector (../scrutiny-collector) pushes to 10.0.20.6:30808, and traefik on heimdall serves it
+# as scrutiny.oryxserver.org. hub and collector must run the same version.
+# a truenas custom app, applied from mjolnir with ../update.sh scrutiny (the first time: --create)
+#
+# files in vault/appdata/scrutiny (user scrutiny 3016, 700):
+#   config/scrutiny.db      devices + settings (sqlite)
+#   config/scrutiny.yaml    only `notify: urls: ["script:///opt/scrutiny/config/ntfy-alert.sh"]`
+#   config/ntfy-alert.sh    a copy of ntfy-alert.sh here: sends drive alerts to ntfy
+#   config/ntfy-auth.hdr    its token (0600): ntfy user truenas, token "scrutiny-odyn", topic alerts
+#   influxdb2/              the smart history
+services:
+  # 2.8 as in scrutiny's own compose. not 2.9: it turns on token hashing, which can't be undone.
+  # scrutiny sets it up with its built-in default login, so it has no port: only web reaches it,
+  # inside this app's own network
+  influxdb:
+    image: docker.io/library/influxdb:2.8.0@sha256:983c696655e862517f07384ff427291928846174de60615b95027b50804c9592
+    user: "3016:3016"
+    restart: unless-stopped
+    volumes:
+      - /mnt/vault/appdata/scrutiny/influxdb2:/var/lib/influxdb2
+    # web gives up at start if influx doesn't answer yet, so it waits for this (as in scrutiny's compose)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  web:
+    image: ghcr.io/analogj/scrutiny:v0.9.5-web@sha256:4f2ec0c874aec7fb0da5505b8ee127a8d7ac5b9d2b0622b53cf27fb47693877c
+    user: "3016:3016"
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      SCRUTINY_WEB_INFLUXDB_HOST: influxdb
+      SCRUTINY_WEB_INFLUXDB_PORT: "8086"
+      # scrutiny prints every notify url to its log whatever the log level (a plain printf), so the
+      # ntfy token isn't in a url: the url is the script, the token is in ntfy-auth.hdr.
+      # warn only quiets the rest of its log
+      SCRUTINY_LOG_LEVEL: "WARN"
+    volumes:
+      - /mnt/vault/appdata/scrutiny/config:/opt/scrutiny/config
+    ports:
+      # only on odyn's main address. no login of its own: the collector posts here, traefik on
+      # heimdall (lan-only) is the way in for people
+      - "10.0.20.6:30808:8080"
