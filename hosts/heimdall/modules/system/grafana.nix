@@ -1,7 +1,5 @@
 { pkgs, ... }:
 let
-  grafanaBackupDir = "/mnt/nas/nix-services/grafana-backups";
-
   grafanaProvisioning = pkgs.runCommand "grafana-provisioning" {} ''
     mkdir -p $out/datasources $out/dashboards $out/dashboards-json $out/alerting
 
@@ -64,12 +62,17 @@ let
     cp ${./switch-dashboard.json} $out/dashboards-json/switch.json
     cp ${./pfsense-geomap-dashboard.json} $out/dashboards-json/pfsense-geomap.json
     cp ${./ai-gateway-dashboard.json} $out/dashboards-json/ai-gateway.json
+    # these two were made in the web page; saved as files 2026-10-22 when grafana moved to appdb
+    cp ${./node-exporter-full-dashboard.json} $out/dashboards-json/node-exporter-full.json
+    cp ${./pfsense-system-dashboard.json} $out/dashboards-json/pfsense-system.json
   '';
 in
 {
+  # grafana's database is in appdb on odyn since 2026-10-22 (started fresh: every dashboard,
+  # datasource and the ntfy contact point come from the files above, the admin from grafana.env).
+  # /var/lib/grafana keeps only plugins and caches
   systemd.tmpfiles.rules = [
     "d /var/lib/grafana 0750 472 472 -"
-    "d ${grafanaBackupDir} 0775 christina users -"
   ];
 
   virtualisation.oci-containers.containers.grafana = {
@@ -79,6 +82,7 @@ in
     environmentFiles = [
       "/var/lib/secrets/grafana.env"
       "/var/lib/secrets/ntfy-publish.env"   # NTFY_TOKEN for the ntfy contact point
+      "/var/lib/secrets/grafana-db.env"     # GF_DATABASE_PASSWORD (its appdb role) + GF_SECURITY_SECRET_KEY
     ];
     environment = {
       GF_SERVER_ROOT_URL = "https://grafana.oryxserver.org";
@@ -86,35 +90,26 @@ in
       GF_USERS_ALLOW_SIGN_UP = "false";
       GF_ANALYTICS_REPORTING_ENABLED = "false";
       GF_ANALYTICS_CHECK_FOR_UPDATES = "false";
+
+      # appdb on odyn (odyn/apps/appdb), checked against its certificate
+      GF_DATABASE_TYPE = "postgres";
+      GF_DATABASE_HOST = "10.0.20.6:5432";
+      GF_DATABASE_NAME = "grafana";
+      GF_DATABASE_USER = "grafana";
+      GF_DATABASE_SSL_MODE = "verify-full";
+      GF_DATABASE_CA_CERT_PATH = "/etc/appdb/ca.crt";
+      GF_DATABASE_MAX_OPEN_CONN = "10";      # its role allows 15
+      GF_DATABASE_MAX_IDLE_CONN = "2";
     };
     volumes = [
       "/var/lib/grafana:/var/lib/grafana"
       "${grafanaProvisioning}:/etc/grafana/provisioning:ro"
+      "/etc/appdb/ca.crt:/etc/appdb/ca.crt:ro"
     ];
     extraOptions = [
       "--add-host=host.containers.internal:host-gateway"
     ];
   };
 
-  systemd.services.grafana-db-backup = {
-    description = "Back up Grafana database to TrueNAS";
-    path = [ pkgs.sqlite pkgs.coreutils ];
-    serviceConfig.Type = "oneshot";
-    unitConfig.RequiresMountsFor = [ grafanaBackupDir ];
-    script = ''
-      mkdir -p ${grafanaBackupDir}
-      if [ -f /var/lib/grafana/grafana.db ]; then
-        sqlite3 /var/lib/grafana/grafana.db ".backup '${grafanaBackupDir}/grafana-$(date +%F-%H%M%S).db'"
-        find ${grafanaBackupDir} -type f -name 'grafana-*.db' -mtime +30 -delete
-      fi
-    '';
-  };
-
-  systemd.timers.grafana-db-backup = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "daily";
-      Persistent = true;
-    };
-  };
+  # no backup job here any more: yggdrasil's appdb-backup dumps the grafana database every night
 }
