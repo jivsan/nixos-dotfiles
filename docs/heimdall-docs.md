@@ -46,7 +46,7 @@ phone, tailscale).
 | crafty               | podman  | minecraft server control                                     |
 | obsidian             | podman  | the muninn vault in the browser at `obsidian.oryxserver.org` |
 | grafana              | podman  | dashboards at `grafana.oryxserver.org`                      |
-| influxdb             | podman  | pfsense metrics from telegraf, 90 days                      |
+| influxdb             | podman  | pfsense metrics from telegraf, 90 days; backup every night at 02:15 to odyn (`vault/backups/influxdb-pfsense`, a week kept) |
 | scrutiny             | odyn    | drive health: since 2026-10-22 an odyn app (`odyn/apps/scrutiny`), traefik here serves `scrutiny.oryxserver.org` |
 | prometheus + loki    | native  | metrics and logs (no log shipper yet, promtail is off)       |
 | alertmanager         | native  | fleet alert rules in `alerting.nix` (hosts, odyn, pi-hole, failed units, disks, sites, cert) → ntfy `alerts` |

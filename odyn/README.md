@@ -63,4 +63,6 @@ in [`docs/apps-on-odyn.md`](../docs/apps-on-odyn.md).
 Where data backups go from now on (recordsize 1M, owner backups 3013, 700). Snapshot tasks 19/20/21
 (hourly 2 days, daily 30 days, weekly 12 weeks), recursive. `vault/backups/heimdall-move` holds the
 backups for moving heimdall's data to odyn (NFS share 21, heimdall only, mapall backups), with a
-`README.txt` that says what's where.
+`README.txt` that says what's where. `vault/backups/influxdb-pfsense` (since 2026-10-22, NFS share 25,
+heimdall only, mapall backups) gets heimdall's nightly influxdb backup, a folder per night, a week kept
+(`hosts/heimdall/modules/system/influxdb.nix`).
