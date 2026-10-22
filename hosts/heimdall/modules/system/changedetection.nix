@@ -1,15 +1,16 @@
 { config, pkgs, ... }:
 
 let
-  data = "/var/lib/changedetection";
+  # on odyn: vault/appdata/changedetection, mounted in appdata.nix (moved from /var/lib 2026-10-22).
+  # the watch list, history and the ntfy token live here, as json files (no sqlite, so nfs is fine).
+  # the app runs as root in its container; odyn writes everything as its user changedetection (mapall),
+  # so no tmpfiles line: a chown on that share only fails
+  data = "/mnt/appdata/changedetection";
 in
 {
   # changedetection.io at changedetection.oryxserver.org: watches web pages and pushes to ntfy
   # (topic "changes") when they change. a chrome container next to it renders pages that only
   # fill in with javascript
-  systemd.tmpfiles.rules = [
-    "d ${data} 0700 root root -"      # the app runs as root in its container; the watch list and the ntfy token live here
-  ];
 
   # their own network: the browser answers only changedetection, nothing on the host or lan
   systemd.services.create-changedetection-network = {
@@ -74,5 +75,6 @@ in
     after = [ "create-changedetection-network.service" "podman-changedetection-browser.service" ];
     requires = [ "create-changedetection-network.service" ];
     wants = [ "podman-changedetection-browser.service" ];
+    unitConfig.RequiresMountsFor = [ data ];
   };
 }

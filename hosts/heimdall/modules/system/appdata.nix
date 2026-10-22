@@ -33,5 +33,6 @@ in
   # one share per app, added in the commit that moves it. each is written as its own odyn user (mapall)
   fileSystems = {
     "/mnt/appdata/paperless" = share "paperless";   # odyn user paperless (3014), share 22
+    "/mnt/appdata/changedetection" = share "changedetection";   # odyn user changedetection (3015), share 23
   };
 }
