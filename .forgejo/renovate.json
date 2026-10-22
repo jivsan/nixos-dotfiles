@@ -123,8 +123,7 @@
         "docker.io/library/influxdb",
         "influxdb",
         "ghcr.io/immich-app/**",
-        "ghcr.io/dani-garcia/vaultwarden",
-        "registry.gitlab.com/crafty-controller/crafty-4"
+        "ghcr.io/dani-garcia/vaultwarden"
       ],
       "enabled": false
     }

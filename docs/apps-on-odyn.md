@@ -95,6 +95,8 @@ heimdall's own apps (Paperless, Grafana, Homarr, Vaultwarden, Immich, ...) stay 
 but their data moves to odyn the same way, one app at a time: the database in appdb, the files in
 `vault/appdata/<app>`. Immich gets its own Postgres app, `immichdb`, because it needs VectorChord.
 Scrutiny's hub moved whole: it's an odyn app now (`odyn/apps/scrutiny`, next to its collector).
+Crafty is archived (2026-10-22) until Kubernetes: stopped, its files kept in
+`vault/backups/heimdall-move/archive/crafty-2026-10-22`.
 Moving an app to Kubernetes later then only changes where it runs. The plan is in the vault:
 "heimdall databases to odyn — the plan, one app at a time (2026-10-21)".
 

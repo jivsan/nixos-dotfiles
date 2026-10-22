@@ -1,6 +1,6 @@
 # Deploying services on heimdall
 
-How to add a new containerized service to heimdall using NixOS's `virtualisation.oci-containers` (podman). This is the same pattern used for immich, paperless, vaultwarden and crafty.
+How to add a new containerized service to heimdall using NixOS's `virtualisation.oci-containers` (podman). This is the same pattern used for immich, paperless and vaultwarden (and crafty, until it was archived in 2026-10).
 
 ## Mental model
 
@@ -531,7 +531,7 @@ Either is a future improvement. Plain files work fine for a homelab.
 | immich | `hosts/heimdall/modules/system/immich.nix` | Multi-container (server + db + redis) on shared network, NFS data, Traefik HTTP |
 | paperless | `hosts/heimdall/modules/system/paperless.nix` | Multi-container (web + db + redis) on its own podman network, NFS for documents, DB on local disk |
 | vaultwarden | `hosts/heimdall/modules/system/vaultwarden.nix` | Single container, SQLite on local disk, daily backup timer to the NAS |
-| crafty | `hosts/heimdall/modules/system/crafty.nix` | Single container, NFS data, mixed Traefik HTTPS + raw TCP/UDP ports |
+| crafty (archived 2026-10-22) | `git show f396a59:hosts/heimdall/modules/system/crafty.nix` | Single container, NFS data, mixed Traefik HTTPS + raw TCP/UDP ports |
 | odyn proxy | `hosts/heimdall/modules/system/traefik.nix` | No container — just a Traefik route to an external HTTPS backend |
 
 When adding something new, find the closest match and copy from there.

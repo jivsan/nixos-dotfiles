@@ -127,7 +127,7 @@ and it hot reloads without a rebuild.
 anymore. right now that's kernel 7.2 with the 595 driver on the open module, the same as mimir
 (`modules/system/nvidia-driver.nix`). everything else on the host still comes from 26.05.
 
-**self hosted stack on `heimdall`** with immich, paperless, vaultwarden, homarr and crafty behind traefik, watched by
+**self hosted stack on `heimdall`** with immich, paperless, vaultwarden and homarr behind traefik, watched by
 prometheus, loki and grafana.
 
 **[muninn](docs/muninn-agentic-os.md), my agentic os.** an obsidian vault on `odyn` is shared memory for me and my

@@ -52,8 +52,8 @@ For an app on heimdall, put `10.0.20.17` in `hosts` instead.
 
 Ids so far: appdb 3010, forgejo 3011, n8n 3012, backups 3013 (owns `vault/backups`, see below),
 paperless 3014, changedetection 3015, scrutiny 3016.
-Kept for heimdall's apps as they move: immichdb 3017, vaultwarden 3018, crafty 3019 (only if it
-moves), homarr 3020 (for kubernetes later).
+Kept for heimdall's apps as they move: immichdb 3017, vaultwarden 3018, crafty 3019 (archived 2026-10-22,
+for when it comes back in kubernetes), homarr 3020 (for kubernetes later).
 The next new app gets 3021. Check the id is free first: `midclt call user.query '[["uid","=",<id>]]'`
 gives `[]`. The snapshot tasks already cover new datasets under `vault/appdata`. The whole pattern is
 in [`docs/apps-on-odyn.md`](../docs/apps-on-odyn.md).
@@ -65,4 +65,5 @@ Where data backups go from now on (recordsize 1M, owner backups 3013, 700). Snap
 backups for moving heimdall's data to odyn (NFS share 21, heimdall only, mapall backups), with a
 `README.txt` that says what's where. `vault/backups/influxdb-pfsense` (since 2026-10-22, NFS share 25,
 heimdall only, mapall backups) gets heimdall's nightly influxdb backup, a folder per night, a week kept
-(`hosts/heimdall/modules/system/influxdb.nix`).
+(`hosts/heimdall/modules/system/influxdb.nix`). `heimdall-move/archive/crafty-2026-10-22` is crafty, archived when it
+left heimdall: its five folders as tars, a checked `crafty.sqlite`, and a `MANIFEST.txt` that says how to restore it.

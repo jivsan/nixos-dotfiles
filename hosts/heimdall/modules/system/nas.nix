@@ -21,31 +21,6 @@ in
     fsType = "nfs";
     options = commonOpts;
   };
-  fileSystems."/mnt/nas/crafty-config" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/config";
-    fsType = "nfs";
-    options = commonOpts;
-  };
-  fileSystems."/mnt/nas/crafty-backups" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/backups";
-    fsType = "nfs";
-    options = commonOpts;
-  };
-  fileSystems."/mnt/nas/crafty-logs" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/logs";
-    fsType = "nfs";
-    options = commonOpts;
-  };
-  fileSystems."/mnt/nas/crafty-import" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/import";
-    fsType = "nfs";
-    options = commonOpts;
-  };
-  fileSystems."/mnt/nas/crafty-servers" = {
-    device = "10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/servers";
-    fsType = "nfs";
-    options = commonOpts;
-  };
   # paperless data and the vaultwarden backups
   fileSystems."/mnt/nas/nix-services" = {
     device = "10.0.20.6:/mnt/vault/nix-services";

@@ -18,7 +18,6 @@
     ./modules/system/podman.nix          # podman for every container here
     ./modules/system/appdata.nix         # the apps' data on odyn: appdb's cert + /mnt/appdata shares
     ./modules/system/immich.nix
-    ./modules/system/crafty.nix
     ./modules/system/homarr.nix          # dashboard at home.oryxserver.org
     ./modules/system/paperless.nix
     ./modules/system/grafana.nix

@@ -86,14 +86,6 @@
             middlewares = [ "lan-only" ];
           };
 
-          crafty = {
-            rule = "Host(`crafty.oryxserver.org`)";
-            service = "crafty";
-            entryPoints = [ "websecure" ];
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
           homarr = {
             rule = "Host(`home.oryxserver.org`)";
             service = "homarr";
@@ -245,15 +237,6 @@
             loadBalancer = {
               servers = [
                 { url = "https://10.0.20.6"; }
-              ];
-              serversTransport = "insecure";
-            };
-          };
-
-          crafty = {
-            loadBalancer = {
-              servers = [
-                { url = "https://127.0.0.1:8443"; }
               ];
               serversTransport = "insecure";
             };

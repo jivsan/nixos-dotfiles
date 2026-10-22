@@ -22,7 +22,6 @@ sqlite and postgres). mounts are in `hosts/heimdall/modules/system/nas.nix`:
 
 ```
 10.0.20.6:/mnt/vault/immich                       → immich photos (own dataset, export only for heimdall)
-10.0.20.6:/mnt/vault/nfs-pvc-kubernetes/crafty/*  → crafty config, backups, servers …
 10.0.20.6:/mnt/vault/nix-services                 → service data (paperless, grafana and vaultwarden backups)
 10.0.20.6:/mnt/vault/obsidian                     → the muninn vault
 ```
@@ -43,7 +42,6 @@ phone, tailscale).
 | vaultwarden          | podman  | passwords at `vault.oryxserver.org`, sqlite on local disk, daily backup to odyn |
 | homarr               | podman  | dashboard at `home.oryxserver.org`, database in appdb on odyn (since 2026-10-22) |
 | ntfy                 | native  | push notifications at `ntfy.oryxserver.org`, login or token only, ios wake-ups via ntfy.sh |
-| crafty               | podman  | minecraft server control                                     |
 | obsidian             | podman  | the muninn vault in the browser at `obsidian.oryxserver.org` |
 | grafana              | podman  | dashboards at `grafana.oryxserver.org`                      |
 | influxdb             | podman  | pfsense metrics from telegraf, 90 days; backup every night at 02:15 to odyn (`vault/backups/influxdb-pfsense`, a week kept) |
@@ -58,6 +56,10 @@ phone, tailscale).
 | brain                | native  | the muninn brain page + bridge at `brain.oryxserver.org`     |
 | ai-gateway           | native  | one openai-style endpoint on `:4000` for mimir's models and openrouter |
 | amneziawg            | native  | obfuscated wireguard for remote access                       |
+
+crafty (my minecraft server) is archived since 2026-10-22: stopped and gone from here, its files kept in
+`vault/backups/heimdall-move/archive/crafty-2026-10-22` on odyn (`MANIFEST.txt` there says how to restore). it comes
+back in kubernetes later. the originals are still in `nfs-pvc-kubernetes/crafty`.
 
 traefik also proxies to other hosts: `truenas` → odyn, `comfyui` → mimir, `sure` → njord,
 `homeassistant` → `10.0.50.101`.
