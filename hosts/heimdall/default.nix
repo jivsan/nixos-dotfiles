@@ -15,6 +15,7 @@
     ./modules/system/acme.nix
     ./modules/system/traefik.nix
     ./modules/system/nas.nix
+    ./modules/system/appdata.nix         # the apps' data on odyn: appdb's cert + /mnt/appdata shares
     ./modules/system/immich.nix
     ./modules/system/crafty.nix
     ./modules/system/homarr.nix          # dashboard at home.oryxserver.org

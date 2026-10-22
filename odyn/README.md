@@ -9,7 +9,7 @@ no docker access, and doesn't need them.
 
 | app | what | files |
 |---|---|---|
-| `appdb` | Postgres 18 for the apps on yggdrasil (forgejo, n8n), `10.0.20.6:5432`, tls + scram, only yggdrasil may log in | [`apps/appdb/`](apps/appdb/) |
+| `appdb` | Postgres 18 for the apps on yggdrasil (forgejo, n8n) and heimdall (moving one at a time since 2026-10), `10.0.20.6:5432`, tls + scram, each role only from its own host | [`apps/appdb/`](apps/appdb/) |
 | `scrutiny-collector` | reads the disks' smart data every 10 min for the scrutiny hub on heimdall (same version as the hub) | [`apps/scrutiny-collector/`](apps/scrutiny-collector/) |
 
 Change an app's `compose.yaml`, then run `apps/update.sh <app>`. appdb has its own `apps/appdb/apply.sh`
@@ -44,6 +44,18 @@ midclt call -j filesystem.setperm '{"path":"/mnt/vault/appdata/<app>","uid":<id>
 midclt call sharing.nfs.create '{"path":"/mnt/vault/appdata/<app>","hosts":["10.0.20.21"],"mapall_user":"<app>","mapall_group":"<app>"}'
 ```
 
-Ids so far: appdb 3010, forgejo 3011, n8n 3012. The next app gets 3013. The snapshot tasks already cover
-new datasets under `vault/appdata`. The whole pattern is in
-[`docs/apps-on-odyn.md`](../docs/apps-on-odyn.md).
+For an app on heimdall, put `10.0.20.17` in `hosts` instead.
+
+Ids so far: appdb 3010, forgejo 3011, n8n 3012, backups 3013 (owns `vault/backups`, see below).
+Kept for heimdall's apps as they move: paperless 3014, changedetection 3015, scrutiny 3016,
+immichdb 3017, vaultwarden 3018, crafty 3019 (only if it moves), homarr 3020 (for kubernetes later).
+The next new app gets 3021. Check the id is free first: `midclt call user.query '[["uid","=",<id>]]'`
+gives `[]`. The snapshot tasks already cover new datasets under `vault/appdata`. The whole pattern is
+in [`docs/apps-on-odyn.md`](../docs/apps-on-odyn.md).
+
+## vault/backups (made 2026-10-21)
+
+Where data backups go from now on (recordsize 1M, owner backups 3013, 700). Snapshot tasks 19/20/21
+(hourly 2 days, daily 30 days, weekly 12 weeks), recursive. `vault/backups/heimdall-move` holds the
+backups for moving heimdall's data to odyn (NFS share 21, heimdall only, mapall backups), with a
+`README.txt` that says what's where.

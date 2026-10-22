@@ -98,6 +98,24 @@
       "schedule": [
         "before 7am on monday"
       ]
+    },
+    {
+      "description": "moving heimdall's data to odyn (2026-10): no updates for these while they move, so a new image never lands between the rehearsal and the move. each comes off this list a week after its app moved",
+      "matchPackageNames": [
+        "ghcr.io/paperless-ngx/paperless-ngx",
+        "docker.io/library/postgres",
+        "postgres",
+        "ghcr.io/dgtlmoon/changedetection.io",
+        "docker.io/grafana/grafana",
+        "ghcr.io/homarr-labs/homarr",
+        "ghcr.io/analogj/scrutiny",
+        "docker.io/library/influxdb",
+        "influxdb",
+        "ghcr.io/immich-app/**",
+        "ghcr.io/dani-garcia/vaultwarden",
+        "registry.gitlab.com/crafty-controller/crafty-4"
+      ],
+      "enabled": false
     }
   ]
 }

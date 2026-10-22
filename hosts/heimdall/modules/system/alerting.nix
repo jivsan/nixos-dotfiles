@@ -32,12 +32,12 @@ let
           for = "3m";
           annotations.summary = "odyn (TrueNAS) is not answering on {{ $labels.instance }}";
         }
-        # appdb: the postgres on odyn that the apps on yggdrasil keep their data in (odyn/apps/appdb)
+        # appdb: the postgres on odyn that the apps on yggdrasil and heimdall keep their data in (odyn/apps/appdb)
         {
           alert = "AppDbDown";
           expr = ''probe_success{job="appdb"} == 0'';
           for = "3m";
-          annotations.summary = "appdb (postgres on odyn, 10.0.20.6:5432) is not answering, forgejo and n8n are down with it";
+          annotations.summary = "appdb (postgres on odyn, 10.0.20.6:5432) is not answering, every app with its database there is down with it (docs/apps-on-odyn.md)";
         }
         {
           alert = "PiholeDown";

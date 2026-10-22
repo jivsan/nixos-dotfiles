@@ -1,4 +1,5 @@
-# appdb: one postgres on odyn for the apps that run on yggdrasil (forgejo first).
+# appdb: one postgres on odyn for the apps that run on yggdrasil (forgejo first) and heimdall
+# (moved one app at a time from 2026-10).
 # its files sit on odyn's own disks (vault/appdata/postgres), never on nfs; the apps reach it over the lan.
 # a truenas custom app, applied from mjolnir with ./apply.sh. no secrets in here.
 # see docs/apps-on-odyn.md
@@ -20,6 +21,11 @@ services:
       - shared_buffers=512MB
       - -c
       - max_connections=100
+      # zfs is copy-on-write: zero-filling new wal files or reusing old ones only costs writes there
+      - -c
+      - wal_init_zero=off
+      - -c
+      - wal_recycle=off
     volumes:
       # postgres 18 images keep the cluster in /var/lib/postgresql/18/docker
       - /mnt/vault/appdata/postgres:/var/lib/postgresql
@@ -47,3 +53,12 @@ configs:
       # one line per app: its own database and role, only from the host it runs on
       hostssl forgejo   forgejo    10.0.20.21/32  scram-sha-256
       hostssl n8n       n8n        10.0.20.21/32  scram-sha-256
+      # heimdall's apps, each only from heimdall. they check the certificate (verify-full, server.crt here)
+      hostssl paperless    paperless    10.0.20.17/32  scram-sha-256
+      hostssl grafana      grafana      10.0.20.17/32  scram-sha-256
+      hostssl homarr       homarr       10.0.20.17/32  scram-sha-256
+      hostssl vaultwarden  vaultwarden  10.0.20.17/32  scram-sha-256
+      # coming later, from yggdrasil: databasus (backups), pgadmin (read-only) and my own login
+      hostssl all       databasus  10.0.20.21/32  scram-sha-256
+      hostssl all       pgadmin_ro 10.0.20.21/32  scram-sha-256
+      hostssl all       christina  10.0.20.21/32  scram-sha-256

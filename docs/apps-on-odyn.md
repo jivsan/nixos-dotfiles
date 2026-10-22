@@ -89,6 +89,24 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
 - `prometheus.nix`: the app's URL in the blackbox `SiteDown` list.
 - `alerting.nix`: the `appdb` TCP probe and the `AppDbDown` alert.
 
+## heimdall's apps (moving since 2026-10)
+
+heimdall's own apps (Paperless, Grafana, Homarr, Vaultwarden, Immich, ...) stay on heimdall for now,
+but their data moves to odyn the same way, one app at a time: the database in appdb, the files in
+`vault/appdata/<app>`. Immich gets its own Postgres app, `immichdb`, because it needs VectorChord.
+Moving an app to Kubernetes later then only changes where it runs. The plan is in the vault:
+"heimdall databases to odyn — the plan, one app at a time (2026-10-21)".
+
+- `hosts/heimdall/modules/system/appdata.nix`: the `/mnt/appdata/<app>` shares (`hard`, like
+  yggdrasil's) and appdb's certificate at `/etc/appdb/ca.crt`.
+- The apps connect with `sslmode=verify-full` against that certificate
+  (`odyn/apps/appdb/server.crt`), so they know they really talk to appdb.
+- pg_hba: one line per app, from `10.0.20.17/32` only.
+- Each app's password is made on heimdall (`/var/lib/secrets/<app>-db-password`).
+  `odyn/apps/appdb/scram-verifier.py` turns it into a verifier there, so only the hash reaches appdb.
+- The secrets stay on heimdall in `/var/lib/secrets/`, not on odyn.
+- Backups from before and during the move: `vault/backups/heimdall-move` on odyn.
+
 ## Forgejo
 
 - Web: <https://git.oryxserver.org>. Clone over ssh: `ssh://git@git.oryxserver.org:2222/<user>/<repo>.git`
@@ -137,7 +155,7 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
 2. **appdb** (if it needs a database), on yggdrasil as root with
    `PGPASSFILE=/var/lib/secrets/appdb-admin.pgpass`:
    - Generate the password into `/var/lib/secrets/<app>-db-password`.
-   - Turn it into a SCRAM verifier locally, so only the hash crosses the wire (python `hashlib.pbkdf2_hmac`, 4096 rounds).
+   - Turn it into a SCRAM verifier on the same box with `odyn/apps/appdb/scram-verifier.py`, so only the hash crosses the wire.
    - Run:
 
      ```sql
@@ -183,4 +201,4 @@ Defined in `odyn/` in this repo (odyn isn't NixOS, so these are applied with scr
 
 - Nothing leaves the house. odyn has no off-site copy (Backrest is first on the self-hosting roadmap
   in the vault).
-- appdb's certificate isn't checked by clients (`require`, not `verify-full`).
+- Forgejo and n8n don't check appdb's certificate yet (`require`, not `verify-full`). heimdall's apps do.
