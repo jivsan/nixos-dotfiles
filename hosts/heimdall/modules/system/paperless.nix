@@ -1,22 +1,21 @@
 { config, pkgs, ... }:
 
 let
-  paperlessBase = "/mnt/nas/nix-services/paperless";
+  # the documents are on odyn: vault/appdata/paperless, mounted in appdata.nix. the database is in
+  # appdb on odyn. both moved there from heimdall 2026-10-22 (docs/apps-on-odyn.md)
+  paperlessBase = "/mnt/appdata/paperless";
 in
 {
   systemd.tmpfiles.rules = [
-    "d ${paperlessBase} 0775 christina users -"
-    "d ${paperlessBase}/consume 0775 christina users -"
-    "d ${paperlessBase}/media 0775 christina users -"
-    "d ${paperlessBase}/export 0775 christina users -"
-    "d ${paperlessBase}/backups 0775 christina users -"
-    "d /var/lib/paperless/postgres 0700 70 70 -"   # alpine postgres runs as uid/gid 70
+    # nothing for paperlessBase: odyn makes every file on that share paperless's own (mapall), so a
+    # chown there only fails on every rebuild. the copy made consume/, media/ and export/
     # redis-alpine runs as 999:1000. owned by root, every rebuild took it back and redis stopped
     # taking writes (paperless answered 500 from 2026-10-18 until the 20th)
     "d /var/lib/paperless/redis 0700 999 1000 -"
     # search index, classifier, scheduler state: kept across container re-creates (it was an
-    # anonymous volume, thrown away on every rebuild). paperless runs as USERMAP 1000:100
-    "d /var/lib/paperless/data 0750 1000 100 -"
+    # anonymous volume, thrown away on every rebuild). local, not on nfs (it holds sqlite files).
+    # paperless runs as USERMAP 3014:3014, the odyn user that owns its share
+    "d /var/lib/paperless/data 0750 3014 3014 -"
   ];
 
   systemd.services.create-paperless-network = {
@@ -30,14 +29,6 @@ in
   };
 
   virtualisation.oci-containers.containers = {
-    paperless-db = {
-      image = "docker.io/library/postgres:16.15-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea";
-      autoStart = true;
-      environmentFiles = [ "/var/lib/secrets/paperless.env" ];
-      volumes = [ "/var/lib/paperless/postgres:/var/lib/postgresql/data" ];
-      extraOptions = [ "--network=paperless" ];
-    };
-
     paperless-redis = {
       image = "docker.io/library/redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499";
       autoStart = true;
@@ -51,17 +42,22 @@ in
       autoStart = true;
       ports = [ "127.0.0.1:8010:8000" ];
 
-      environmentFiles = [ "/var/lib/secrets/paperless.env" ];
+      # PAPERLESS_SECRET_KEY (the same as before the move) and PAPERLESS_DBPASS (its appdb role)
+      environmentFiles = [ "/var/lib/secrets/paperless-app.env" ];
 
       environment = {
-        USERMAP_UID = "1000";
-        USERMAP_GID = "100";
+        # the odyn user paperless (3014) that owns vault/appdata/paperless
+        USERMAP_UID = "3014";
+        USERMAP_GID = "3014";
 
         PAPERLESS_REDIS = "redis://paperless-redis:6379";
         PAPERLESS_DBENGINE = "postgresql";            # required since 3.0
-        PAPERLESS_DBHOST = "paperless-db";
+        # appdb on odyn (odyn/apps/appdb), checked against its certificate
+        PAPERLESS_DBHOST = "10.0.20.6";
+        PAPERLESS_DBPORT = "5432";
         PAPERLESS_DBNAME = "paperless";
         PAPERLESS_DBUSER = "paperless";
+        PAPERLESS_DB_OPTIONS = "sslmode=verify-full,sslrootcert=/etc/appdb/ca.crt";
 
         PAPERLESS_URL = "https://paperless.oryxserver.org";
         PAPERLESS_ALLOWED_HOSTS = "paperless.oryxserver.org,localhost,127.0.0.1";
@@ -81,15 +77,11 @@ in
         "${paperlessBase}/media:/usr/src/paperless/media"
         "${paperlessBase}/export:/usr/src/paperless/export"
         "/var/lib/paperless/data:/usr/src/paperless/data"
+        "/etc/appdb/ca.crt:/etc/appdb/ca.crt:ro"
       ];
 
       extraOptions = [ "--network=paperless" ];
     };
-  };
-
-  systemd.services.podman-paperless-db = {
-    after = [ "create-paperless-network.service" ];
-    requires = [ "create-paperless-network.service" ];
   };
 
   systemd.services.podman-paperless-redis = {
@@ -100,34 +92,15 @@ in
   systemd.services.podman-paperless-web = {
     after = [
       "create-paperless-network.service"
-      "podman-paperless-db.service"
       "podman-paperless-redis.service"
     ];
     requires = [
       "create-paperless-network.service"
-      "podman-paperless-db.service"
       "podman-paperless-redis.service"
     ];
     unitConfig.RequiresMountsFor = [ paperlessBase ];
   };
 
-  systemd.services.paperless-db-backup = {
-    description = "Back up Paperless database to TrueNAS";
-    path = [ pkgs.podman pkgs.coreutils ];
-    serviceConfig.Type = "oneshot";
-    script = ''
-      mkdir -p ${paperlessBase}/backups
-      podman exec paperless-db pg_dump -U paperless paperless \
-        > ${paperlessBase}/backups/paperless-$(date +%F-%H%M%S).sql
-      find ${paperlessBase}/backups -type f -name 'paperless-*.sql' -mtime +30 -delete
-    '';
-  };
-
-  systemd.timers.paperless-db-backup = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "daily";
-      Persistent = true;
-    };
-  };
+  # no backup job here any more: yggdrasil's appdb-backup dumps the paperless database every night,
+  # and odyn snapshots vault/appdata (documents included)
 }
