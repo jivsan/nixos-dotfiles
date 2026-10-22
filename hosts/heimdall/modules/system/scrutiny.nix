@@ -11,16 +11,6 @@ let
   stateDir = "/var/lib/scrutiny";
 in
 {
-  # podman settings for the whole host live here, not only scrutiny's
-  virtualisation = {
-    podman = {
-      enable = true;
-      defaultNetwork.settings.dns_enabled = true;
-      dockerCompat = true;   # `docker` alias
-    };
-    oci-containers.backend = "podman";
-  };
-
   systemd.services.podman-network-scrutiny = {
     description = "Create scrutiny podman network";
     after = [ "podman.service" ];

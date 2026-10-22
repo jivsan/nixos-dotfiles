@@ -15,6 +15,7 @@
     ./modules/system/acme.nix
     ./modules/system/traefik.nix
     ./modules/system/nas.nix
+    ./modules/system/podman.nix          # podman for every container here
     ./modules/system/appdata.nix         # the apps' data on odyn: appdb's cert + /mnt/appdata shares
     ./modules/system/immich.nix
     ./modules/system/crafty.nix
