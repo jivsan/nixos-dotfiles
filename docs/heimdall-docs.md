@@ -39,9 +39,9 @@ phone, tailscale).
 |----------------------|---------|-------------------------------------------------------------|
 | traefik              | native  | reverse proxy + dashboard at `traefik.oryxserver.org`       |
 | immich               | podman  | photos at `immich.oryxserver.org`, machine learning on mimir (`10.0.20.18:3003`) |
-| paperless            | podman  | documents, with its own postgres + redis                    |
+| paperless            | podman  | documents: database in appdb, files in `vault/appdata/paperless` on odyn, own redis |
 | vaultwarden          | podman  | passwords at `vault.oryxserver.org`, sqlite on local disk, daily backup to odyn |
-| homarr               | podman  | dashboard at `home.oryxserver.org`, sqlite in `/var/lib/homarr` |
+| homarr               | podman  | dashboard at `home.oryxserver.org`, database in appdb on odyn (since 2026-10-22) |
 | ntfy                 | native  | push notifications at `ntfy.oryxserver.org`, login or token only, ios wake-ups via ntfy.sh |
 | crafty               | podman  | minecraft server control                                     |
 | obsidian             | podman  | the muninn vault in the browser at `obsidian.oryxserver.org` |

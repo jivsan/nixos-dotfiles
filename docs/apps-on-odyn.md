@@ -101,6 +101,12 @@ Moving an app to Kubernetes later then only changes where it runs. The plan is i
   yggdrasil's) and appdb's certificate at `/etc/appdb/ca.crt`.
 - The apps connect with `sslmode=verify-full` against that certificate
   (`odyn/apps/appdb/server.crt`), so they know they really talk to appdb.
+  - Apps on node's `pg` driver (Homarr) check the certificate against "localhost" when they get an
+    ip address, and fail. They connect by the certificate's name, `appdb.odyn`, and the container
+    gets `--add-host=appdb.odyn:10.0.20.6` (in Kubernetes later: `hostAliases`).
+- Apps that come from sqlite (Homarr) are copied row by row with `odyn/apps/appdb/migrate/`:
+  the app builds its empty tables in a throwaway postgres, the script fills them, then
+  `pg_dump` + `pg_restore` as the app's own role into appdb (the restore checks every foreign key).
 - pg_hba: one line per app, from `10.0.20.17/32` only.
 - Each app's password is made on heimdall (`/var/lib/secrets/<app>-db-password`).
   `odyn/apps/appdb/scram-verifier.py` turns it into a verifier there, so only the hash reaches appdb.
