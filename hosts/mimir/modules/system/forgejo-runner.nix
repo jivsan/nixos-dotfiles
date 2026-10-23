@@ -1,11 +1,18 @@
 { lib, pkgs, ... }:
 
-# the forgejo actions runner for git.oryxserver.org (yggdrasil). jobs from .forgejo/workflows run as a
-# plain user straight on this box: they build every host and upload the result to the nix cache.
+# the forgejo actions runners for git.oryxserver.org (yggdrasil). jobs from .forgejo/workflows run as a
+# plain user straight on this box: they build the hosts and upload the result to the nix cache.
+# one runner per repo, each registered with its own token, so a token only reaches its own repo.
 # ci has its own nix store on brunnr, with its temp files and caches, so none of it lands on the boot disk
 let
   ci = "/srv/ci-store";
   gib = n: toString (n * 1024 * 1024 * 1024);
+
+  # runner -> its token file (TOKEN=<registration token>, root 0600)
+  runners = {
+    mimir = "/var/lib/secrets/forgejo-runner-token";                    # jivsan/nixos-dotfiles
+    modgud = "/var/lib/secrets/forgejo-runner-token-modgud-vps-nix";    # jivsan/modgud-vps-nix
+  };
 in
 {
   fileSystems.${ci} = {
@@ -23,11 +30,11 @@ in
 
   services.gitea-actions-runner = {
     package = pkgs.forgejo-runner;
-    instances.mimir = {
+    instances = lib.mapAttrs (name: tokenFile: {
       enable = true;
-      name = "mimir";
+      name = if name == "mimir" then "mimir" else "mimir-${name}";
       url = "https://git.oryxserver.org";
-      tokenFile = "/var/lib/secrets/forgejo-runner-token";   # TOKEN=<registration token>, root 0600
+      inherit tokenFile;
       labels = [ "nixos:host" ];
       hostPackages = with pkgs; [ bash coreutils findutils gnugrep gnused gitMinimal nix ];
       settings = {
@@ -41,10 +48,10 @@ in
         };
         cache.enabled = false;
       };
-    };
+    }) runners;
   };
 
-  systemd.services.gitea-runner-mimir = {
+  systemd.services = lib.mapAttrs' (name: _: lib.nameValuePair "gitea-runner-${name}" {
     unitConfig.RequiresMountsFor = [ ci ];
     serviceConfig = {
       DynamicUser = lib.mkForce false;
@@ -55,7 +62,7 @@ in
       CPUSchedulingPolicy = "idle";
       IOSchedulingClass = "idle";
     };
-  };
+  }) runners;
 
   nix.settings = {
     max-jobs = 4;

@@ -166,6 +166,11 @@ sudo -u forgejo env FORGEJO_WORK_DIR=/var/lib/forgejo FORGEJO_CUSTOM=/mnt/appdat
 sudo systemctl restart gitea-runner-mimir     # a changed token makes it register again
 ```
 
+my private repo `modgud-vps-nix` (the modgud vps) has its own runner, `gitea-runner-modgud` (shows as `mimir-modgud`
+in forgejo), with its own token in `/var/lib/secrets/forgejo-runner-token-modgud-vps-nix`. same box, same ci store,
+same cache, but each token only reaches its own repo. same steps with `--scope jivsan/modgud-vps-nix`, that file and
+`sudo systemctl restart gitea-runner-modgud`.
+
 ## checks
 
 ```sh
