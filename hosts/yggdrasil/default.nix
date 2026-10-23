@@ -45,6 +45,8 @@
     address = [ "10.0.20.21/24" ];
     gateway = [ "10.0.20.1" ];
     dns = [ "10.0.20.4" ];
+    # pfsense's router ads also hand out its own ipv6 dns, which drops our internal names
+    ipv6AcceptRAConfig.UseDNS = false;
     linkConfig.RequiredForOnline = "routable";
   };
   networking.firewall.enable = true;
