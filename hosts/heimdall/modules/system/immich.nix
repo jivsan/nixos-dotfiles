@@ -10,7 +10,7 @@ let
   # certificate too and only does scram, never sends the password in clear). no password in it:
   # the server takes PGPASSWORD from its env file, pg_dump reads /root/.pgpass (both made from immich-db.env)
   dbUrl = "postgres://immich@${dbHost}:5433/immich?sslmode=verify-full&sslrootcert=/etc/immichdb/ca.crt&require_auth=scram-sha-256&channel_binding=require";
-  redisImage = "docker.io/library/redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0";   # queue only, no volume
+  redisImage = "docker.io/library/redis:8.10.2-alpine@sha256:9f8d2d789b9a1d1e3f283f979aa9cbf393373806472e1ccd460e2f9c869b833b";   # queue only, no volume
 
   # ml on mimir (hosts/mimir/modules/system/immich-ml.nix); when it's down
   # immich still runs, only smart search is gone
