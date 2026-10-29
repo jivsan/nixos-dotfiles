@@ -61,6 +61,7 @@
         tyr      = mkHost ./hosts/tyr/default.nix      ./hosts/tyr/home.nix;
         njord    = mkHost ./hosts/njord/default.nix    ./hosts/njord/home.nix;
         yggdrasil = mkHost ./hosts/yggdrasil/default.nix ./hosts/yggdrasil/home.nix;
+        elitebook = mkHost ./hosts/elitebook/default.nix ./hosts/elitebook/home.nix;
       };
     };
 }

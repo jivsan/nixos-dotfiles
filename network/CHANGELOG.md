@@ -5,6 +5,31 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-10-29 — Et19 for the elitebook (OctoPrint)
+
+**Why:** the old HP EliteBook 8540p now runs OctoPrint next to the Ender-3 V3 SE, by the rack.
+Et13 and up were unconfigured (default VLAN 1, no DHCP there).
+
+**Changed:** Et19 = access VLAN 20 + portfast, description `elitebook-octoprint`. Applied in a
+config session with a 5-minute commit timer, checked (link up at 1G, the laptop's MAC learned
+on VLAN 20, admin login still fine), then confirmed and `write memory`.
+
+### Commands applied (EOS)
+```
+enable
+configure session elitebook-et19
+interface Ethernet19
+   description elitebook-octoprint
+   switchport mode access
+   switchport access vlan 20
+   spanning-tree portfast
+commit timer 00:05:00
+configure session elitebook-et19 commit
+write memory
+```
+
+---
+
 ## 2026-10-19 — SSH locked down: key-only, from mjolnir + yggdrasil only
 
 **Why:** the fleet security audit (2026-10-19) flagged bifrost's OpenSSH 7.8 banner as

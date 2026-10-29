@@ -10,7 +10,8 @@ deploy [--dry | --boot] [host ...]
   --dry   build and list what would restart, change nothing
   --boot  use it from the next boot (a new nvidia driver on mjolnir or mimir)
 
-  hosts: mimir heimdall yggdrasil tyr njord mjolnir
+  hosts: mimir heimdall yggdrasil tyr njord elitebook mjolnir
+  elitebook (octoprint) is never in "every host": name it, and not while it prints
 EOF
 }
 
@@ -21,6 +22,7 @@ declare -A ip=(
   [yggdrasil]=10.0.20.21
   [tyr]=10.0.20.19
   [njord]=10.0.20.20
+  [elitebook]=10.0.20.22
 )
 servers=(mimir heimdall yggdrasil tyr njord)
 
@@ -58,17 +60,19 @@ if [ "$have" != "$want" ]; then
   echo "$host is at ${have:0:7}, mjolnir at ${want:0:7}: push from mjolnir first" >&2
   exit 1
 fi
-[ "$host" = njord ] && exit 0   # njord is rebuilt from mjolnir, see remote_njord
+case $host in njord | elitebook) exit 0 ;; esac   # rebuilt from mjolnir, see remote_small
 cd /tmp
 sudo nixos-rebuild "$action" --flake "$HOME/nixos-dotfiles#$host"
 EOF
 }
 
-# njord (1.9 gb ram) gets oom-killed evaluating the flake: mjolnir evaluates the pushed commit, njord only builds
-remote_njord() {
-  remote njord || return 1
-  (cd /tmp && nixos-rebuild "$action" --flake "git+file://$repo?rev=$head#njord" \
-    --build-host "christina@${ip[njord]}" --target-host "christina@${ip[njord]}" --sudo)
+# njord (1.9 gb ram) gets oom-killed evaluating the flake and the elitebook is old and small too:
+# mjolnir evaluates the pushed commit, the host only builds (downloads from the cache)
+remote_small() {
+  local host=$1
+  remote "$host" || return 1
+  (cd /tmp && nixos-rebuild "$action" --flake "git+file://$repo?rev=$head#$host" \
+    --build-host "christina@${ip[$host]}" --target-host "christina@${ip[$host]}" --sudo)
 }
 
 local_mjolnir() {
@@ -81,8 +85,8 @@ for h in "${hosts[@]}"; do
   printf '\n== %s (%s)\n' "$h" "$action"
   if [ "$h" = mjolnir ]; then
     if local_mjolnir; then ok+=("$h"); else failed+=("$h"); fi
-  elif [ "$h" = njord ]; then
-    if remote_njord; then ok+=("$h"); else failed+=("$h"); fi
+  elif [ "$h" = njord ] || [ "$h" = elitebook ]; then
+    if remote_small "$h"; then ok+=("$h"); else failed+=("$h"); fi
   else
     if remote "$h"; then ok+=("$h"); else failed+=("$h"); fi
   fi

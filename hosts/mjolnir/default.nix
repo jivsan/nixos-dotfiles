@@ -25,6 +25,7 @@
     ./modules/apps/wowexport.nix
     ../../modules/apps/blender.nix
     ./modules/apps/upscayl.nix
+    ./modules/apps/orca-slicer.nix       # slicer for the ender-3, g-code to /mnt/ratatoskr/3dprint
     ./modules/apps/quixel-bridge.nix
     ./modules/apps/remote-desktop.nix
     ../../modules/system/tailscale.nix

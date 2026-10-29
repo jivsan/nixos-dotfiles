@@ -46,7 +46,8 @@ Shared fleet behaviour lives in `modules/system/` and `modules/home/`.
 Two consequences worth internalising:
 
 - `modules/system/boot.nix` enables **systemd-boot** → every install in this
-  fleet is a **UEFI** install. No exceptions, no BIOS/MBR.
+  fleet is a **UEFI** install. One exception: the `elitebook` (2010 laptop,
+  old-style BIOS) uses GRUB on an msdos disk, see `hosts/elitebook/install.sh`.
 - `modules/system/users.nix` bakes in **christina + SSH key + passwordless
   sudo** → every host is SSH-able as christina from mjolnir on first boot.
 

@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: [heimdall, mimir, mjolnir, njord, tyr, yggdrasil]
+        host: [elitebook, heimdall, mimir, mjolnir, njord, tyr, yggdrasil]
     steps:
       - name: checkout
         env:

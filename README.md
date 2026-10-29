@@ -20,7 +20,8 @@ want to ssh into each one, and renovate opens pull requests for updates. all of 
 ## hosts
 
 everything sits on vlan 20 (`10.0.20.0/24`). heimdall, tyr and njord are vms on `hella` (proxmox). yggdrasil is its
-own little box, so my agents keep running even when hella is down.
+own little box, so my agents keep running even when hella is down. the elitebook is an old laptop that only
+runs octoprint for my 3d printer.
 
 | host        | ip            | what it does                                                                   | desktop                                                 |
 |-------------|---------------|--------------------------------------------------------------------------------|---------------------------------------------------------|
@@ -30,6 +31,7 @@ own little box, so my agents keep running even when hella is down.
 | `tyr`       | `10.0.20.19`  | agent workstation vm with claude code, codex and herdr, linked to the muninn vault | neon oxwm over xrdp, i connect from `mjolnir` with remmina |
 | `njord`     | `10.0.20.20`  | headless finance vm running [sure](https://github.com/we-promise/sure), walled off from everything else | none                    |
 | `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets, and my self hosted apps (forgejo) with their data on odyn | none |
+| `elitebook` | `10.0.20.22`  | my old hp elitebook 8540p next to the ender-3 v3 se. it only runs octoprint, i slice on mjolnir and save the g-code in `/mnt/ratatoskr/3dprint` | none |
 
 > these are only the nixos hosts. the switch, pfsense, truenas and a pihole lxc aren't nixos, they're in the
 > network part below.
@@ -70,6 +72,7 @@ everything, home assistant too, through pfsense's stateful return path, so the b
 | Et10        | `hella` onboard management       | access vlan 20                      |
 | Et11        | `odyn` management                | access vlan 20                      |
 | Et12        | `yggdrasil`                      | access vlan 20                      |
+| Et19        | `elitebook` (octoprint)          | access vlan 20                      |
 
 the switch is at `10.0.20.2` (ssh, eos), pfsense at `10.0.20.1` and proxmox on `hella` at
 `https://10.0.20.10:8006`.
