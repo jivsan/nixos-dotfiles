@@ -39,7 +39,7 @@ in
 
   virtualisation.oci-containers.containers.searxng = {
     # pinned by digest; update tag and digest together (hub.docker.com/r/searxng/searxng/tags, dated daily)
-    image = "docker.io/searxng/searxng:2026.10.19-81371861f@sha256:5ed0323b5f5f8701264ef65e239a2bd83cb57098f2b971fa30bf79c06eeae271";
+    image = "docker.io/searxng/searxng:2026.10.30-ffa88e3ba@sha256:f4aa660c54d062dedb268be84e821ea24e39f48c7a496af8dd02cc9eedb93847";
     autoStart = true;
     user = "977:977";                # it would run as root otherwise
     ports = [ "127.0.0.1:8888:8080" ];
