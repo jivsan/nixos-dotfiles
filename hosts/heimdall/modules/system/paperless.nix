@@ -30,7 +30,7 @@ in
 
   virtualisation.oci-containers.containers = {
     paperless-redis = {
-      image = "docker.io/library/redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499";
+      image = "docker.io/library/redis:7.4.11-alpine@sha256:d9436322172a5b482c187bf1f363d3c4fea086fcca6b9c8a94de8f0f39ed3193";
       autoStart = true;
       cmd = [ "redis-server" "--appendonly" "yes" ];
       volumes = [ "/var/lib/paperless/redis:/data" ];
