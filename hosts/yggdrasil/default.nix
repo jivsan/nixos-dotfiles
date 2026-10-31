@@ -25,6 +25,7 @@
     ../../modules/apps/herdr.nix
 
     ./modules/system/hermes-agent.nix
+    ./modules/system/grok.nix               # grok build (xai) in herdr, my mcp servers over the lan, locked down
     ./modules/system/exporters.nix          # node numbers for heimdall's prometheus (homarr host card)
 
     # self-hosted apps: they run here, their data and database live on odyn (docs/apps-on-odyn.md)

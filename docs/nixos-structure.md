@@ -19,7 +19,7 @@ the network these hosts sit on (vlans, the `bifrost` arista switch, pfsense, pih
 | `mimir`     | ai box: llm, embeddings, comfyui, immich ml, octane render node, agents' blender checks |
 | `tyr`       | agent workstation vm with the neon oxwm rice over xrdp |
 | `njord`     | finance vm running sure, walled off from the rest  |
-| `yggdrasil` | always-on mini pc for claude code, hermes and herdr |
+| `yggdrasil` | always-on mini pc for claude code, grok, hermes and herdr |
 
 ips and hardware are in the README.
 
@@ -77,7 +77,7 @@ changes the build, even though nothing else changed.
 | `oxwm`             | tony's X11 window manager configured in lua                     |
 | `helium`           | helium browser                                                   |
 | `claude-code`      | claude code, applied as an overlay                               |
-| `llm-agents`       | numtide's agent packages: codex and herdr, from their binary cache |
+| `llm-agents`       | numtide's agent packages: codex, herdr, grok and grok bot, from their binary cache |
 | `hermes-agent`     | hermes, its nixos module runs on yggdrasil                       |
 
 `mkHost hostPath homeFile` wraps `nixpkgs.lib.nixosSystem`: it passes `inputs` and `pkgs-unstable`

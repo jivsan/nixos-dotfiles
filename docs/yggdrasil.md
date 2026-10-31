@@ -17,7 +17,7 @@ from now on go the same way, see [`apps-on-odyn.md`](apps-on-odyn.md).
 | host | what lives there |
 |---|---|
 | heimdall `10.0.20.17` | the services above, plus traefik for *every* `*.oryxserver.org` name (forgejo's too) |
-| **yggdrasil `10.0.20.21`** | **forgejo** (git.oryxserver.org), **n8n** (n8n.oryxserver.org), hermes (my agent), claude code, codex + herdr |
+| **yggdrasil `10.0.20.21`** | **forgejo** (git.oryxserver.org), **n8n** (n8n.oryxserver.org), hermes (my agent), claude code, codex, grok + herdr |
 | odyn `10.0.20.6` | storage, **appdb** (postgres for the yggdrasil apps), dockge with the arr apps, plex/jellyfin |
 | mimir `10.0.20.18` | llm server, comfyui, immich machine learning, blender test node |
 | njord `10.0.20.20` | sure (finance), walled off |
@@ -63,7 +63,9 @@ forgejo has no push-to-create: make the repo in the web ui first (private is the
 | sshd | me (key only, no root, no passwords) | 22 | `default.nix` |
 | thermald, fstrim | keep the little box cool, trim the ssd weekly | — | `default.nix` |
 
-**tools for me and the agents** (no daemon): `claude` (claude code), `codex`, `herdr` (agent runner),
+**tools for me and the agents** (no daemon): `claude` (claude code), `codex`, `grok` (grok build, xai's
+agent: my mcp servers over the lan, telemetry and claude's setup off, no deletes or renders, its
+rules in `/etc/grok`, `hosts/yggdrasil/modules/system/grok.nix`), `herdr` (agent runner),
 `mimir-blender` (runs blender on mimir for agent checks), `capture` / `ask` (vault inbox and cheap
 answers from the knowledge graph, `modules/system/muninn.nix`).
 
@@ -101,6 +103,8 @@ only the local disk holds rebuildable things (logs, caches, forgejo's search ind
 | `/var/lib/secrets/` (root 0600) | appdb admin + backup passwords, forgejo's and n8n's database passwords, renovate's forgejo token |
 | `/etc/hermes/env` | hermes' api keys (kimi, openrouter, brave, homarr) |
 | `/var/lib/hermes-ssh/` | hermes' ssh key for its mcp servers (locked to forced commands on heimdall and mjolnir) |
+| `~/.config/grok/homarr-token` (0600) | grok's own homarr api key, i paste it in by hand |
+| `~/.grok/auth.json` | grok's login (`grok login --device-auth`) |
 
 ## deploy and admin
 
