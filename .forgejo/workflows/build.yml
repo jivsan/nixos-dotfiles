@@ -28,5 +28,7 @@ jobs:
           nix build --print-build-logs --no-link --print-out-paths \
             ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" > out-path
           cat out-path
+      # the builds and the cache share mimir's brunnr disks, so the cache can take longer to answer than the 5 s
+      # connect timeout every host has (modules/system/nix-cache.nix). the upload waits up to 60 s for it instead
       - name: upload to the nix cache
-        run: nix copy --to 'http://127.0.0.1:8501/upload?compression=zstd' "$(cat out-path)"
+        run: nix copy --option connect-timeout 60 --to 'http://127.0.0.1:8501/upload?compression=zstd' "$(cat out-path)"

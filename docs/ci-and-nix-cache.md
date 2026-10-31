@@ -195,6 +195,9 @@ when the cache stops answering.
 - **a rebuild wants to build or fetch something ci already put in the cache**: nix remembers "not in the cache"
   for an hour, from asking before ci was done. add `--option narinfo-cache-negative-ttl 0` to that rebuild, or
   wait the hour.
+- **a ci job fails at "upload to the nix cache" with `Timeout was reached` from `127.0.0.1:8501`**: the cache was too
+  slow to answer while ci built on the same disks. the upload step waits 60 s now; if it still happens, re-run that
+  one job when the run is done (its build is already in ci's store, so only the upload runs again).
 - **ncps won't start after a first deploy or a new pool** ("unable to open database file"): the folders got their
   owner before the datasets were mounted. `sudo systemd-tmpfiles --create && sudo systemctl restart ncps`.
 - **a disk in brunnr dies**: the pool is gone, nothing else. `sudo zpool destroy brunnr` if it's still listed, make
