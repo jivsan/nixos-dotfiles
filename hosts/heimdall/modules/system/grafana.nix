@@ -108,6 +108,8 @@ in
     ];
     extraOptions = [
       "--add-host=host.containers.internal:host-gateway"
+      # fixed address: loki.nix lets this one container reach :3100, not all of podman's network
+      "--ip=10.88.200.11"
     ];
   };
 

@@ -5,7 +5,7 @@ OpenRouter. It measures every request, Prometheus scrapes it, and Grafana shows 
 the **AI gateway** dashboard (`https://grafana.oryxserver.org/d/ai-gateway`).
 
 ```
-client ──▶ http://10.0.20.17:4000/v1   ai-gateway (heimdall)
+client ──▶ http://127.0.0.1:4000/v1   ai-gateway (heimdall)
                 │                          ├─ /metrics ◀── Prometheus (heimdall)
                 │                          └─ request log ──▶ Loki (heimdall)
                 ├─▶ http://10.0.20.18:8080/v1   llama-server on mimir (RTX 5070 Ti)
@@ -30,7 +30,7 @@ included) and the bridge's MiniMax floor. Jev, Codex, Claude and hermes do not.
 ## Using it
 
 ```sh
-curl http://10.0.20.17:4000/v1/chat/completions -H 'Content-Type: application/json' -d '{
+curl http://127.0.0.1:4000/v1/chat/completions -H 'Content-Type: application/json' -d '{
   "model": "auto", "stream": true,
   "messages": [{"role": "user", "content": "hello"}]}'
 ```
@@ -38,11 +38,12 @@ curl http://10.0.20.17:4000/v1/chat/completions -H 'Content-Type: application/js
 `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and `/v1/models` are served.
 Every answer carries `X-Request-Id`, `X-AIGW-Model` and `X-AIGW-Target`.
 
-A caller can name itself by using `http://10.0.20.17:4000/client/<name>/v1` as its base
+A caller can name itself by using `http://127.0.0.1:4000/client/<name>/v1` as its base
 URL. Its requests, tokens and cost are then counted under that name; without a name
 they are counted as `other`. The names are the `clients` list in `ai-gateway.nix`
 (`huginn`, `bridge`, `hermes`, `mjolnir`); any other name is a 404, so a typo shows.
-The name is a label for the dashboard, not a login.
+The name is a label for the dashboard, not a login. `hermes` and `mjolnir` can't reach
+the gateway while it listens on 127.0.0.1; their names stay for a later LAN listener.
 
 | model | served by | tier |
 |---|---|---|
@@ -56,22 +57,25 @@ than its `max_prompt_chars`; a model whose target failed its health check is tri
 last. If a model fails before anything was sent back (connection refused, a 5xx, or
 llama.cpp's "exceeds the available context size"), the next one gets the request.
 
-Until `llm.nix` is deployed on mimir, `auto` from heimdall goes to MiniMax, and from
-anywhere else it fails (see the next section).
+Until `llm.nix` is deployed on mimir, `auto` goes to MiniMax.
 
 ## Who may use what
 
+- The gateway listens on `127.0.0.1` only (since 2026-11-01): only heimdall itself can
+  call it. Nothing on the LAN or the tailnet used it. For another host, it would need
+  `0.0.0.0` again plus a raw-table chain for just that host, like `ntfy.nix`.
 - Models on mimir are open to the LAN, like mimir's other ports.
 - A target with an API key (OpenRouter) costs money. It answers only callers on heimdall
   itself, or callers that send a client key as `Authorization: Bearer <key>`. Client
-  keys are optional: put `AIGW_CLIENT_KEYS=key1,key2` in `/var/lib/secrets/ai-gateway.env`
-  on heimdall and restart `ai-gateway`.
+  keys are optional and only matter if the gateway listens beyond `127.0.0.1` again:
+  put `AIGW_CLIENT_KEYS=key1,key2` in `/var/lib/secrets/ai-gateway.env` on heimdall and
+  restart `ai-gateway`.
 - A request that arrives through a reverse proxy (it has `X-Forwarded-For`) is never
   treated as local.
 - The OpenRouter key is read from `/var/lib/secrets/graphify-openrouter.env`
   (`OPENAI_API_KEY`). No key is in this repo. Without that file the OpenRouter target is
   off and its models are not listed.
-- The port is open on `ens18` only.
+- No firewall port is open for it.
 
 ## One model in VRAM at a time
 
@@ -118,7 +122,7 @@ When the RTX 5070 Ti is installed:
    sudo curl -L -C - -O https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-IQ4_XS.gguf
    ```
 
-3. `curl http://10.0.20.17:4000/health` on heimdall should show `"mimir-chat": true`.
+3. `curl http://127.0.0.1:4000/health` on heimdall should show `"mimir-chat": true`.
    The first request to a model loads it, so its time to first token is long.
 
 Neither model is measured on the card yet. If the 27B does not fit, the fallback from
@@ -170,7 +174,7 @@ totals, **Cost and Callers**, mimir's GPU, and **Request Lookup**.
 
 ## Metrics
 
-All at `http://10.0.20.17:4000/metrics`, labelled `model` and `target` unless noted.
+All at `http://127.0.0.1:4000/metrics`, labelled `model` and `target` unless noted.
 The request, token and cost counters also carry `client`.
 
 | metric | what |

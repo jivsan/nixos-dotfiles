@@ -1,5 +1,5 @@
 { pkgs, lib, ... }:
-# one openai-style endpoint for my models at http://10.0.20.17:4000/v1, with metrics
+# one openai-style endpoint for my models at http://127.0.0.1:4000/v1 on heimdall, with metrics
 # for the "AI gateway" grafana dashboard. runbook: docs/misc/ai-gateway.md
 let
   port = 4000;
@@ -12,13 +12,17 @@ let
   python = pkgs.python3.withPackages (ps: [ ps.aiohttp ps.prometheus-client ]);
 
   config = pkgs.writeText "ai-gateway.json" (builtins.toJSON {
-    listen = { host = "0.0.0.0"; inherit port; };
+    # heimdall only: huginn, the bridge and prometheus call it on 127.0.0.1. nothing on the lan or the
+    # tailnet used it (checked 2026-11-01), and it spends my openrouter key. if another host needs it
+    # again: 0.0.0.0 plus a raw-table chain for just that host's ip, like ntfy.nix
+    listen = { host = "127.0.0.1"; inherit port; };
 
     # one line per request, for the dashboard's request id box; no prompt or answer text
     loki_url = "http://127.0.0.1:3100/loki/api/v1/push";
 
-    # callers can name themselves as http://10.0.20.17:4000/client/<name>/v1 and the dashboard
-    # splits requests, tokens and cost by name. huginn.nix and brain.nix use the first two
+    # callers can name themselves as http://127.0.0.1:4000/client/<name>/v1 and the dashboard
+    # splits requests, tokens and cost by name. huginn.nix and brain.nix use the first two.
+    # hermes and mjolnir can't reach it while it's on 127.0.0.1; i keep their names for a later lan listener
     clients = [ "huginn" "bridge" "hermes" "mjolnir" ];
 
     targets = lib.optionalAttrs localChat {
@@ -72,7 +76,7 @@ in
     serviceConfig = {
       ExecStart = "${python}/bin/python3 ${../../ai-gateway/gateway.py}";
       # both optional: without the first the openrouter target is off;
-      # the second can set AIGW_CLIENT_KEYS=key1,key2 so other hosts may use the gateway
+      # the second can set AIGW_CLIENT_KEYS=key1,key2, only useful if it listens beyond 127.0.0.1 again
       EnvironmentFile = [
         "-/var/lib/secrets/graphify-openrouter.env"
         "-/var/lib/secrets/ai-gateway.env"
@@ -87,6 +91,5 @@ in
     };
   };
 
-  # lan only (ens18), not tailscale or awg0
-  networking.firewall.interfaces.ens18.allowedTCPPorts = [ port ];
+  # no firewall port: it listens on 127.0.0.1 only
 }

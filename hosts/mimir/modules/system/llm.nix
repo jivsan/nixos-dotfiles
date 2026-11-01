@@ -28,8 +28,8 @@ in
 {
   # chat models for heimdall's ai-gateway, llama-server in router mode (swaps models on demand)
   # not imported: needs a 16 gb card, mimir's 4060 ti has 8 gb shared with comfyui and octane
-  # only call it through the gateway (http://10.0.20.17:4000/v1): a direct request for the
-  # unloaded model kills the running one. nothing scrapes its /metrics, that loads a model too
+  # only call it through the gateway (http://127.0.0.1:4000/v1 on heimdall, not open to the lan): a
+  # direct request for the unloaded model kills the running one. nothing scrapes its /metrics, that loads a model too
   # model files aren't in the store, download them once (docs/misc/ai-gateway.md)
   systemd.tmpfiles.rules = [
     "d ${models} 0755 root root -"

@@ -1,6 +1,7 @@
 { pkgs, inputs, ... }:
 # muninn brain: my dashboard (a 3d graph of the vault) and the services behind it, all on localhost
 # nginx 8090 (brain.oryxserver.org via traefik.nix, lan-only), capture 8091, api 8092, bridge 8093
+# every request through nginx needs a token or my login first: brain-auth.nix, check service on 8094
 let
   vault = "/mnt/nas/obsidian/muninn";
   www   = "/var/lib/muninn-brain/www";
@@ -190,14 +191,14 @@ if __name__ == "__main__": main()
 
   apiPy = pkgs.writeText "muninn-api.py" ''
 #!/usr/bin/env python3
-import hmac, json, os, re, time, datetime, sqlite3
+import json, os, re, time, datetime, sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
+# no login here: it listens on 127.0.0.1 only, and nginx checks every caller first (brain-auth.nix)
 VAULT = "/mnt/nas/obsidian/muninn"
 DB = "/var/lib/muninn-brain/index.db"
 WIKILINK = re.compile(r"\[\[([^\]|#]+)")
-TOKEN = os.environ.get("MUNINN_API_TOKEN", "").strip()
 
 def connect():
     if not os.path.exists(DB): raise FileNotFoundError(f"no index at {DB}")
@@ -229,13 +230,7 @@ class H(BaseHTTPRequestHandler):
         b = json.dumps(p, indent=2, default=str).encode()
         self.send_response(s); self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
-    def _auth(self):
-        if not TOKEN: return True
-        a = self.headers.get("Authorization", "")
-        if a.startswith("Bearer ") and hmac.compare_digest(a[7:].strip(), TOKEN): return True
-        self._j(401, {"error": "unauthorized"}); return False
     def do_GET(self):
-        if not self._auth(): return
         u = urlparse(self.path); p = u.path.rstrip("/") or "/"
         try:
             if p == "/health": return self._health()
@@ -247,7 +242,6 @@ class H(BaseHTTPRequestHandler):
             self._j(404, {"error": f"unknown: {p}"})
         except Exception as e: self._j(500, {"error": str(e)})
     def do_POST(self):
-        if not self._auth(): return
         p = urlparse(self.path).path.rstrip("/")
         if p != "/inbox": return self._j(404, {"error": f"unknown POST: {p}"})
         l = int(self.headers.get("content-length", 0) or 0)
@@ -342,6 +336,12 @@ if __name__ == "__main__": main()
 
 in
 {
+  imports = [ ./brain-auth.nix ];
+
+  # false only logs callers without a token (journalctl -u muninn-brain-auth), true refuses them.
+  # turn it on once each caller has its own token: docs/muninn-agentic-os.md, "login"
+  muninn.brain.auth.enforce = false;
+
   # claude-code is unfree and heimdall doesn't import modules/apps/unfree.nix, so allow just it here
   nixpkgs.config.allowUnfreePredicate = pkg:
     builtins.elem (pkgs.lib.getName pkg) [ "claude-code" ];
@@ -493,11 +493,14 @@ in
           location ~ /\. { return 404; }
         '';
       };
+      # the token and the login cookie stay at the door (brain-auth.nix): the services never get them
       locations."/api/" = {
         proxyPass = "http://127.0.0.1:8092/";
         extraConfig = ''
           proxy_http_version 1.1;
           proxy_set_header Host $host;
+          proxy_set_header Authorization "";
+          proxy_set_header Cookie "";
         '';
       };
       # voice uploads and model calls need the bigger body size and the long timeout
@@ -507,12 +510,16 @@ in
           proxy_http_version 1.1;
           proxy_read_timeout 180s;
           client_max_body_size 25m;
+          proxy_set_header Authorization "";
+          proxy_set_header Cookie "";
         '';
       };
       locations."/capture" = {
         proxyPass = "http://127.0.0.1:8091";
         extraConfig = ''
           proxy_http_version 1.1;
+          proxy_set_header Authorization "";
+          proxy_set_header Cookie "";
         '';
       };
     };

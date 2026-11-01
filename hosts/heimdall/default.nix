@@ -32,6 +32,7 @@
     ./modules/system/obsidian.nix
     ./modules/system/huginn.nix
     ./modules/system/brain.nix
+    ./modules/system/muninn-ro.nix        # read-only view of my vault + graphs: rest and mcp, no writes
     ./modules/system/ai-gateway.nix       # one openai-style endpoint for my models, with metrics
     ./modules/system/amneziawg.nix
     ./modules/system/vaultwarden.nix

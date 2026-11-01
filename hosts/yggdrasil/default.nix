@@ -13,6 +13,7 @@
     ../../modules/system/neovim.nix
     ../../modules/system/dotfiles-pull.nix
     ../../modules/system/muninn.nix
+    ../../modules/apps/muninn-ro.nix        # `muninn-ro`: my vault + graphs read-only from heimdall
     ../../modules/system/hermes-wowx.nix
     ../../modules/system/studio.nix
     ../../modules/apps/mimir-blender.nix

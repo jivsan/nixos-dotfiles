@@ -137,18 +137,46 @@ let
     '';
   };
 
+  # graphify (pypi package 'graphifyy') plus `mcp` (graphify-mcp) and `openai` (the minimax labeling),
+  # pinned: graphify-lock.txt has every package with its version and file hashes, so a boot never
+  # pulls something new from pypi. `uv tool install` ignores hashes, so it's a plain venv with
+  # `uv pip install --require-hashes`. one venv per lock: it's built once, later boots only check it
+  graphifyLock = ./graphify-lock.txt;
+
   graphifySetup = pkgs.writeShellApplication {
     name = "huginn-graphify-setup";
-    runtimeInputs = [ pkgs.uv pkgs.git pkgs.coreutils ];
+    runtimeInputs = [ pkgs.uv pkgs.git pkgs.coreutils pkgs.procps ];
     text = ''
       export HOME="${agentHome}"
       export PATH="${localBin}:$PATH"
-      # isolated install of the graphify CLI (PyPI package is 'graphifyy').
-      # Install `mcp` (graphify-mcp server) and `openai` (the OpenRouter/MiniMax
-      # labeling backend) explicitly with --with: the "graphifyy[...]" extras
-      # silently resolve to nothing on some versions, so graphify-mcp and
-      # `graphify label` would break.
-      uv tool install --force graphifyy --with mcp --with openai
+      base="${agentHome}/.local/share/graphify"
+      venv="$base/$(basename ${graphifyLock} | cut -d- -f1)"   # the lock's store hash
+      if [ ! -f "$venv/.done" ]; then
+        rm -rf "$venv"
+        mkdir -p "$base"
+        uv venv --quiet --python 3.14.6 "$venv"
+        uv pip install --python "$venv/bin/python" --require-hashes -r ${graphifyLock}
+        touch "$venv/.done"
+      fi
+      # claude, hermes and grok start ${localBin}/graphify-mcp over ssh, so the links keep that path.
+      # each one is swapped in one step, so a client never finds it missing
+      mkdir -p "${localBin}"
+      for exe in graphify graphify-mcp; do
+        ln -sfn "$venv/bin/$exe" "${localBin}/.$exe.new"
+        mv -fT "${localBin}/.$exe.new" "${localBin}/$exe"
+      done
+      # venvs from older locks, and the old unpinned `uv tool` install. one that a running
+      # graphify-mcp still uses stays until a later run (this runs at every boot)
+      for old in "$base"/* "${agentHome}/.local/share/uv/tools/graphifyy"; do
+        { [ -e "$old" ] && [ "$old" != "$venv" ]; } || continue
+        rc=0
+        pgrep -f "$old/" >/dev/null || rc=$?
+        if [ "$rc" -eq 1 ]; then
+          rm -rf "$old"
+        else
+          echo "keeping $old for now: a graphify process still uses it"
+        fi
+      done
       # register the /graphify Claude Code skill under $HOME/.claude/skills/graphify
       graphify install || true
     '';
@@ -764,6 +792,7 @@ in
       Group = "users";
       Environment = [ "HOME=${agentHome}" ];
       ExecStart = "${graphifySetup}/bin/huginn-graphify-setup";
+      NoNewPrivileges = true;   # nothing in it uses sudo; my user has passwordless sudo
     };
   };
 

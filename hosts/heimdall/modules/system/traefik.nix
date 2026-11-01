@@ -1,5 +1,13 @@
 { ... }:
 
+let
+  # my own devices on the tailnet, not the whole tailnet (100.64.0.0/10 let every device in).
+  # their tailnet ips from `tailscale status`; they stay the same unless a device is removed and added again
+  myTailnet = [
+    "100.69.226.108/32"   "fd7a:115c:a1e0::c83b:e26d/128"   # mjolnir
+    "100.119.155.76/32"   "fd7a:115c:a1e0::f73b:9b4d/128"   # my iphone
+  ];
+in
 {
   services.traefik = {
     enable = true;
@@ -369,10 +377,9 @@
             ipAllowList.sourceRange = [
               "10.0.20.0/24"
               "10.0.50.10/32"    # my phone (static lease on the iot vlan), just this one host
-              "100.64.0.0/10"
               "127.0.0.1/32"
               "10.88.200.10/32"  # homarr's container (homarr.nix), it checks the sites by their https names
-            ];
+            ] ++ myTailnet;
           };
 
           # lan-only plus heimdall's own podman networks: apps in containers here send to ntfy by its
@@ -381,11 +388,10 @@
             ipAllowList.sourceRange = [
               "10.0.20.0/24"
               "10.0.50.10/32"    # my phone
-              "100.64.0.0/10"
               "127.0.0.1/32"
               "10.88.0.0/16"     # podman's default network
               "10.89.0.0/16"     # the per-app networks (immich, paperless, changedetection)
-            ];
+            ] ++ myTailnet;
           };
 
           # pi-hole answers 403 on / for any name but pi.hole, so send / to the admin page
@@ -411,8 +417,7 @@
         middlewares.lan-only-tcp.ipAllowList.sourceRange = [
           "10.0.20.0/24"
           "10.0.50.10/32"    # my phone
-          "100.64.0.0/10"
-        ];
+        ] ++ myTailnet;
       };
     };
   };

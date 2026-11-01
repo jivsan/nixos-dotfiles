@@ -268,16 +268,23 @@ every synapse is one instanced mesh rather than a mesh per synapse.
 ## API and operations
 
 Dashboard: <https://brain.oryxserver.org>. Hosted Obsidian:
-<https://obsidian.oryxserver.org>. Traefik restricts access to LAN/Tailscale.
+<https://obsidian.oryxserver.org>. Traefik restricts access to LAN/Tailscale,
+and the brain wants a token or a login on top (see Login below).
+`muninn-brain-curl` is curl with one of the host's tokens, picked by
+`MUNINN_BRAIN_ROLE` (`usage` when unset). Each token only covers its own
+paths, so these need a token made for them: `ask` for talk, and a read token
+for the rest (`muninn-brain-get-token read /bridge/jobs /bridge/skills
+/bridge/health`; those three are GET only). Or open them in a browser that
+is logged in.
 
 ```bash
-curl -sS https://brain.oryxserver.org/bridge/talk \
+MUNINN_BRAIN_ROLE=ask muninn-brain-curl /bridge/talk \
   -H 'Content-Type: application/json' \
   -d '{"text":"Research my backup options and file a report","target":"auto"}'
-curl -sS https://brain.oryxserver.org/bridge/jobs
-curl -sS https://brain.oryxserver.org/bridge/jobs/JOB_ID
-curl -sS https://brain.oryxserver.org/bridge/skills
-curl -sS https://brain.oryxserver.org/bridge/health
+MUNINN_BRAIN_ROLE=read muninn-brain-curl /bridge/jobs
+MUNINN_BRAIN_ROLE=read muninn-brain-curl /bridge/jobs/JOB_ID
+MUNINN_BRAIN_ROLE=read muninn-brain-curl /bridge/skills
+MUNINN_BRAIN_ROLE=read muninn-brain-curl /bridge/health
 
 # On heimdall:
 sudo systemctl start huginn-inbox-sweep.service
@@ -287,6 +294,72 @@ sudo systemctl start huginn-graphify-repo.service
 systemctl list-timers 'huginn*' 'muninn*'
 journalctl -u muninn-bridge -u huginn-inbox-sweep -n 60
 ```
+
+### Login
+
+Every request that reaches nginx asks `muninn-brain-auth` first
+(`hosts/heimdall/modules/system/brain-auth.nix`, `muninn/brain/auth.py`,
+127.0.0.1:8094). Each caller has its own token, revocable alone:
+
+- Scripts send `Authorization: Bearer <token>`. `ask` and the usage reports
+  use `muninn-brain-curl`, which reads a token from
+  `~/.config/muninn/brain-token-<role>` (mode 600) and hands it to curl
+  through a pipe, never on its command line.
+- Each host gets a `usage` token by default, good for `/bridge/usage` only.
+  The usage reports and Claude's status line send it all the time, and any
+  program running as me on that host can read it, so it can't do more than
+  post usage numbers. `ask` has its own `ask` token for `/bridge/talk`, and
+  only if I make one: talk can start hermes, codex and claude jobs. Without
+  it `ask` goes over ssh to heimdall once the login is on.
+- Browsers log in once at `/_brain/login` with their own token. That sets the
+  `__Host-brain` cookie (HttpOnly, Secure, SameSite=Strict, one year).
+  `/_brain/logout` clears it. A link from a site outside `oryxserver.org`
+  shows the login page, since the cookie is not sent then; a bookmark or the
+  address bar gets in.
+- `/_brain/ping` answers `ok` without a login, for the blackbox probe and
+  Homarr's ping. Homarr's Brain app lives in Homarr's own database, not in
+  this repo: its ping URL must be `https://brain.oryxserver.org/_brain/ping`,
+  or its tile goes red once the login is on. The ping still goes through
+  the check, so with the login on a dead check fails the probe too.
+- Heimdall keeps only sha256 hashes, in `/var/lib/secrets/muninn-brain-tokens`
+  (root, 0600, never in git). A token can be limited to paths: then it only
+  works on plain paths under them (no `%`, `..`, `//` or `;`).
+- `muninn.brain.auth.allowFrom` lets addresses in without a token, as Traefik
+  saw them. It is empty: an address would let in every program on that device
+  and every website open in a browser there. And nginx can't tell Traefik
+  from any other program on heimdall, so anything running there (the
+  bridge's codex and claude workers too) could pass as an allowed address.
+- The services behind nginx (capture 8091, api 8092, bridge 8093) listen on
+  127.0.0.1 only and have no login of their own. Local callers on heimdall,
+  like the inbox sweep, still call the bridge directly.
+
+```bash
+# on heimdall: make, list and drop tokens. add and revoke reload the check service
+sudo muninn-brain-token add NAME [PATH...] [--qr]   # prints the token once
+sudo muninn-brain-token list
+sudo muninn-brain-token revoke NAME
+
+# on mjolnir, yggdrasil or any host with muninn.nix: from heimdall straight into
+# ~/.config/muninn/brain-token-<role>, named <host>-<role> on heimdall
+muninn-brain-get-token                  # role usage: /bridge/usage, for the usage reports
+muninn-brain-get-token ask              # role ask: /bridge/talk, only if ask should use the bridge
+muninn-brain-get-token ROLE PATH...     # any other role, limited to those paths
+
+# a browser token, shown once in my terminal to paste into /_brain/login
+ssh -t christina@10.0.20.17 sudo muninn-brain-token add mjolnir-browser
+# the phone: --qr draws it as a qr code; scan it, copy the text, paste it in Safari
+ssh -t christina@10.0.20.17 sudo muninn-brain-token add iphone --qr
+```
+
+`muninn.brain.auth.enforce` in `brain.nix` decides what happens to a caller
+without a valid token. `false` lets it in and logs it: `journalctl -u
+muninn-brain-auth` shows each new caller, method and path once (`would refuse
+10.0.20.21 POST /bridge/usage (no token)`, or `ok mjolnir-usage ...`), then
+counts per hour. Tokens, query strings and note names are never logged.
+`true` answers it with 401 and the login page. Turn it on only when the log
+shows no `would refuse` lines from anything that should keep working
+(`POST /bridge/talk` from `ask` without its own token is fine: it falls back
+to ssh).
 
 `GET /bridge/jobs` returns the latest 50 records. Job states remain `running`,
 `done` and `failed` for existing clients. Individual records include `route`,

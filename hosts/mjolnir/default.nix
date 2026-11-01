@@ -32,6 +32,7 @@
     ../../modules/system/tailscale.nix
     ./modules/system/hyprland.nix          # hyprland as a second session, oxwm stays
     ../../modules/system/muninn.nix        # ~/muninn vault mount + `capture`
+    ../../modules/apps/muninn-ro.nix       # `muninn-ro`: my vault + graphs read-only from heimdall
     ./modules/apps/obs.nix                 # obs, records to ~/OBS-recordings on odyn
     ./modules/apps/comfyui.nix             # comfyui in podman, models on odyn
     ./modules/system/yggdrasil-link.nix    # hermes on yggdrasil: blender + wowx mcp over ssh, `claude-to-yggdrasil`

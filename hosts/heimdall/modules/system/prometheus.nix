@@ -89,7 +89,7 @@
             "https://home.oryxserver.org"
             "https://paperless.oryxserver.org"
             "https://vault.oryxserver.org"
-            "https://brain.oryxserver.org"
+            "https://brain.oryxserver.org/_brain/ping"   # the rest needs a login; this still asks the login check (brain-auth.nix)
             "https://changedetection.oryxserver.org"
             "https://scrutiny.oryxserver.org/api/health"   # the scrutiny app on odyn, through traefik
             "https://search.oryxserver.org"

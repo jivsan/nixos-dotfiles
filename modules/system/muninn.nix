@@ -4,6 +4,87 @@
 let
   vault = "/home/christina/muninn";
 
+  # curl to https://brain.oryxserver.org<path> with one of this host's tokens, from
+  # ~/.config/muninn/brain-token-<role> (mode 600, made by muninn-brain-get-token: docs/muninn-agentic-os.md).
+  # the role is MUNINN_BRAIN_ROLE, usage when it's unset: the usage reports send that one, ask its own.
+  # the token reaches curl through a pipe, never its command line, so ps doesn't show it.
+  # no file: no token is sent, which works only while the brain still lets everyone in
+  brainCurl = pkgs.writeShellApplication {
+    name = "muninn-brain-curl";
+    runtimeInputs = [ pkgs.curl ];
+    text = ''
+      path="''${1:?usage: [MUNINN_BRAIN_ROLE=role] muninn-brain-curl /path [curl options]}"
+      shift
+      role="''${MUNINN_BRAIN_ROLE:-usage}"
+      if ! [[ "$role" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "muninn-brain-curl: MUNINN_BRAIN_ROLE is lowercase letters, digits and -" >&2
+        exit 2
+      fi
+      tokf="''${XDG_CONFIG_HOME:-$HOME/.config}/muninn/brain-token-$role"
+      tok=""
+      if [ -r "$tokf" ]; then
+        tok="$(< "$tokf")"
+        tok="''${tok//[[:space:]]/}"
+      fi
+      if [ -n "$tok" ]; then
+        exec curl -fsS "https://brain.oryxserver.org$path" -H @<(printf 'Authorization: Bearer %s\n' "$tok") "$@"
+      fi
+      exec curl -fsS "https://brain.oryxserver.org$path" "$@"
+    '';
+  };
+
+  # gets one of this host's tokens from heimdall straight into ~/.config/muninn/brain-token-<role>,
+  # over ssh: it never shows on the screen, a command line or in chat. on heimdall it's <host>-<role>.
+  #   muninn-brain-get-token               role usage: /bridge/usage only, for the usage reports
+  #   muninn-brain-get-token ask           role ask: /bridge/talk, for ask. only if i want ask on the
+  #                                        bridge: talk can start hermes, codex and claude jobs, and
+  #                                        anything running as me on this host can read the file
+  #   muninn-brain-get-token ROLE PATH...  any other role, limited to those paths
+  # a second run for the same role refuses: revoke the old one first
+  getToken = pkgs.writeShellApplication {
+    name = "muninn-brain-get-token";
+    runtimeInputs = [ pkgs.openssh pkgs.coreutils pkgs.hostname ];
+    text = ''
+      role="''${1:-usage}"
+      if [ "$#" -gt 0 ]; then shift; fi
+      if ! [[ "$role" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "role: lowercase letters, digits and -" >&2
+        exit 2
+      fi
+      if [ "$#" -eq 0 ]; then
+        case "$role" in
+          usage) set -- /bridge/usage ;;
+          ask) set -- /bridge/talk ;;
+          *) echo "usage: muninn-brain-get-token [usage | ask | ROLE PATH...]" >&2; exit 2 ;;
+        esac
+      fi
+      name="$(hostname)-$role"
+      dir="''${XDG_CONFIG_HOME:-$HOME/.config}/muninn"
+      f="$dir/brain-token-$role"
+      if [ -e "$f" ]; then
+        echo "$f is already there. to replace it: on heimdall sudo muninn-brain-token revoke $name, then rm $f" >&2
+        exit 1
+      fi
+      umask 077
+      mkdir -p "$dir"
+      tmp="$(mktemp "$dir/.brain-token.XXXXXX")"
+      trap 'rm -f "$tmp"' EXIT
+      rc=0
+      ssh -F /dev/null -o BatchMode=yes -o ConnectTimeout=8 christina@10.0.20.17 \
+        "sudo muninn-brain-token add $(printf '%q ' "$name" "$@")" > "$tmp" || rc=$?
+      # keep a token that came back whole even if ssh ended badly: heimdall has saved its hash by then
+      if ! [[ "$(< "$tmp")" =~ ^mb_[A-Za-z0-9_-]{43}$ ]]; then
+        echo "no token came back from heimdall (ssh ended with $rc)." >&2
+        echo "if sudo muninn-brain-token list there shows $name anyway, revoke it and run this again" >&2
+        exit 1
+      fi
+      mv "$tmp" "$f"
+      trap - EXIT
+      if [ "$rc" -ne 0 ]; then echo "ssh ended with $rc, but the token came back whole" >&2; fi
+      echo "saved the token for $name ($*) in $f"
+    '';
+  };
+
   capture = pkgs.writeShellApplication {
     name = "capture";
     runtimeInputs = [ pkgs.coreutils pkgs.openssh ];
@@ -25,15 +106,17 @@ let
   };
 
   # ask: answers from my knowledge graph on minimax, never claude
-  # brain bridge first (logged in the vault), ssh to heimdall's muninn-ask if the bridge is down
+  # brain bridge first (logged in the vault), ssh to heimdall's muninn-ask if the bridge is down.
+  # the bridge needs this host's ask token (muninn-brain-get-token ask), not the usage one: /bridge/talk
+  # can start agent jobs. without it the brain refuses ask once the login is on, and ask goes over ssh
   ask = pkgs.writeShellApplication {
     name = "ask";
-    runtimeInputs = [ pkgs.openssh pkgs.curl pkgs.jq ];
+    runtimeInputs = [ pkgs.openssh brainCurl pkgs.jq ];
     text = ''
       q="$*"
       [ -n "$q" ] || { echo "usage: ask <question about your homelab / notes>" >&2; exit 1; }
       if out="$(jq -n --arg t "$q" '{text: $t}' \
-           | curl -fsS -m 90 https://brain.oryxserver.org/bridge/talk -H 'Content-Type: application/json' -d @- 2>/dev/null)"; then
+           | MUNINN_BRAIN_ROLE=ask muninn-brain-curl /bridge/talk -m 90 -H 'Content-Type: application/json' -d @- 2>/dev/null)"; then
         printf '%s' "$out" | jq -r '
           (.answer // "no answer"),
           (if (.sources // []) | length > 0 then "\nsources: " + ([.sources[].title] | join(" · ")) else empty end),
@@ -47,7 +130,7 @@ let
   # codex's 5h and weekly usage for the brain's usage tab, from its newest session log
   codexUsage = pkgs.writeShellApplication {
     name = "muninn-codex-usage";
-    runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.hostname ];
+    runtimeInputs = [ pkgs.jq brainCurl pkgs.coreutils pkgs.findutils pkgs.gnugrep pkgs.hostname ];
     text = ''
       dir="''${CODEX_HOME:-$HOME/.codex}/sessions"
       [ -d "$dir" ] || exit 0
@@ -62,7 +145,7 @@ let
             five_hour: (.primary | if . then {used_percent, resets_at} else null end),
             seven_day: (.secondary | if . then {used_percent, resets_at} else null end) }' || true)"
       [ -n "$body" ] || exit 0
-      curl -fsS -m 10 https://brain.oryxserver.org/bridge/usage -H 'Content-Type: application/json' -d "$body" >/dev/null \
+      muninn-brain-curl /bridge/usage -m 10 -H 'Content-Type: application/json' -d "$body" >/dev/null \
         || echo "muninn-codex-usage: the brain did not accept the report" >&2
     '';
   };
@@ -72,7 +155,7 @@ let
   #   "statusLine": { "type": "command", "command": "muninn-usage-statusline" }
   usageStatusline = pkgs.writeShellApplication {
     name = "muninn-usage-statusline";
-    runtimeInputs = [ pkgs.jq pkgs.curl pkgs.coreutils pkgs.hostname ];
+    runtimeInputs = [ pkgs.jq brainCurl pkgs.coreutils pkgs.hostname ];
     text = ''
       input="$(cat)"
       printf '%s' "$input" | jq -r '
@@ -90,7 +173,7 @@ let
           seven_day: (.rate_limits.seven_day | if . then {used_percent: .used_percentage, resets_at: .resets_at} else null end) }')"
         if [ -n "$body" ]; then
           echo "$now" > "$stamp"
-          ( curl -fsS -m 5 https://brain.oryxserver.org/bridge/usage -H 'Content-Type: application/json' -d "$body" >/dev/null 2>&1 & )
+          ( muninn-brain-curl /bridge/usage -m 5 -H 'Content-Type: application/json' -d "$body" >/dev/null 2>&1 & )
         fi
       fi
     '';
@@ -116,7 +199,7 @@ in
     ];
   };
 
-  environment.systemPackages = [ capture ask usageStatusline codexUsage ];
+  environment.systemPackages = [ capture ask usageStatusline codexUsage brainCurl getToken ];
 
   systemd.user.services.muninn-codex-usage = {
     description = "report Codex usage to the muninn brain";
