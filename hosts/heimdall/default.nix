@@ -52,6 +52,10 @@
   networking.nameservers = [ "10.0.20.4" ];   # pi-hole, so the local *.oryxserver.org records resolve
   networking.firewall.enable = true;
 
+  # muninn-ro on my tailnet: tailscale serve https 8443. the tailnet policy (~/my-code/tailnet) gives every
+  # device but mjolnir and the iphone only this port on heimdall, and tailnet lock makes me sign each one
+  services.muninn-ro.tailscaleServe = true;
+
   services.openssh = {
     enable = true;
     settings = {
