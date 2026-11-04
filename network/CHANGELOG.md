@@ -5,6 +5,70 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-11-04 — Et13 for garm (access VLAN 20)
+
+**Why:** garm, the first helheim Proxmox node, gets its first 10G port (LAN3) on Et13, so the
+Proxmox installer can reach the network at 10.0.20.11. Et13 becomes a trunk (VLANs 20 and 50
+tagged, native off 20) once garm's `vmbr1` is set up.
+
+**Changed:** Et13 description `garm`, access VLAN 20, portfast, the same as Et12 (yggdrasil).
+Applied in session `garm-et13` with a 5-minute commit timer. A second login showed the new Et13
+config with the session pending; then confirmed and `write memory`. Et13 was `notconnect` at
+the time (garm not cabled yet).
+
+## 2026-11-02 — VLAN 10 (mgmt) for the BMCs on Et30-32
+
+**Why:** the Supermicro X10 boards (garm, fenrir and the X10SDV router) get their BMCs (IPMI)
+on their own VLAN with no internet. Only the firewall routes VLAN 10, and it lets only mjolnir
+reach a BMC, on 443 and 5900. 623 (IPMI) is blocked for everyone: the X10 BMC firmware 4.07
+has 623 flaws that won't be fixed.
+
+**Changed:** `vlan 10` named `mgmt`. Et30 `garm-ipmi`, Et31 `fenrir-ipmi`, Et32 `router-ipmi`
+= access VLAN 10 + portfast. Et1 (the pfSense trunk) now also allows VLAN 10. Applied in a
+config session with a 5-minute commit timer. Checked before the commit: from a second login
+Et1 showed `Trunking VLANs Enabled: 10,20,40,50` and Et30-32 `static access, VLAN 10 (mgmt)`;
+from mjolnir 1.1.1.1, Home Assistant (10.0.50.101), odyn (10.0.20.6) and pfSense (10.0.20.1)
+still answered. Then confirmed and `write memory`. A Supermicro BMC (MAC `0c:c4:7a:c8:72:9b`,
+garm's) showed up on Et32 right after, so garm's BMC is on Et32 for now (the labels may get
+swapped later).
+
+**Never:** an `interface Vlan10` on bifrost. `ip routing` is on, so it would route around the
+firewall.
+
+**Config file synced:** `bifrost-arista-core.cfg` now also has `vlan 40` (dmz) and the real
+allowed lists on Et1 (10,20,40,50) and Port-Channel1 (20,40,50), which it was missing. The date
+of the VLAN 40 change is not known.
+
+### Commands applied (EOS)
+```
+enable
+configure session mgmt-vlan10
+vlan 10
+   name mgmt
+interface Ethernet1
+   switchport trunk allowed vlan add 10
+interface Ethernet30
+   description garm-ipmi
+   switchport mode access
+   switchport access vlan 10
+   spanning-tree portfast
+interface Ethernet31
+   description fenrir-ipmi
+   switchport mode access
+   switchport access vlan 10
+   spanning-tree portfast
+interface Ethernet32
+   description router-ipmi
+   switchport mode access
+   switchport access vlan 10
+   spanning-tree portfast
+commit timer 00:05:00
+configure session mgmt-vlan10 commit
+write memory
+```
+
+---
+
 ## 2026-10-29 — Et19 for the elitebook (OctoPrint)
 
 **Why:** the old HP EliteBook 8540p now runs OctoPrint next to the Ender-3 V3 SE, by the rack.
