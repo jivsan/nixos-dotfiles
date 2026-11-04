@@ -310,7 +310,7 @@ let
     '';
   };
 
-  # inotify misses captures from other nfs clients (mjolnir, tyr, yggdrasil) and ones landing mid-sweep,
+  # inotify misses captures from other nfs clients (mjolnir, yggdrasil) and ones landing mid-sweep,
   # so this looks every 20 s; a failed capture stays seen and gets the 15 min retry, not one every 20 s
   inboxPoll = pkgs.writeShellApplication {
     name = "huginn-inbox-poll";

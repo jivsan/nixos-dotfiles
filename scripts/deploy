@@ -10,7 +10,7 @@ deploy [--dry | --boot] [host ...]
   --dry   build and list what would restart, change nothing
   --boot  use it from the next boot (a new nvidia driver on mjolnir or mimir)
 
-  hosts: mimir heimdall yggdrasil tyr njord elitebook mjolnir
+  hosts: mimir heimdall yggdrasil njord elitebook mjolnir
   elitebook (octoprint) is never in "every host": name it, and not while it prints
 EOF
 }
@@ -20,11 +20,10 @@ declare -A ip=(
   [mimir]=10.0.20.18
   [heimdall]=10.0.20.17
   [yggdrasil]=10.0.20.21
-  [tyr]=10.0.20.19
   [njord]=10.0.20.20
   [elitebook]=10.0.20.22
 )
-servers=(mimir heimdall yggdrasil tyr njord)
+servers=(mimir heimdall yggdrasil njord)
 
 action=switch
 case "${1:-}" in

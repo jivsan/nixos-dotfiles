@@ -35,7 +35,7 @@ themselves, mjolnir only gives the command. the script is `scripts/deploy`, inst
 `hosts/mjolnir/modules/system/deploy.nix` (before mjolnir has that rebuild: `~/nixos-dotfiles/scripts/deploy`).
 
 ```sh
-deploy                     # every host except mjolnir, one after the other: mimir heimdall yggdrasil tyr njord
+deploy                     # every host except mjolnir, one after the other: mimir heimdall yggdrasil njord
 deploy heimdall mimir      # only these
 deploy --dry heimdall      # build and list what would restart, change nothing
 deploy --boot mimir        # use it from the next boot (a new nvidia driver)
@@ -128,7 +128,7 @@ never in git.
   hard stop.
 - it takes uploads (PUT), but only on localhost: that's how ci fills it.
 - **nginx** on `10.0.20.18:5000` in front: only GET and HEAD go through, so nobody on the lan can put anything in it.
-- **firewall**: port 5000 only from mjolnir, heimdall, tyr, njord and yggdrasil. nginx listens on the lan address
+- **firewall**: port 5000 only from mjolnir, heimdall, njord and yggdrasil. nginx listens on the lan address
   alone, so tailscale (which skips nixos-fw) can't reach it.
 - what ci uploads gets signed by ncps with the same key, so the runner never needs the key.
 

@@ -19,7 +19,7 @@ want to ssh into each one, and renovate opens pull requests for updates. all of 
 
 ## hosts
 
-everything sits on vlan 20 (`10.0.20.0/24`). heimdall, tyr and njord are vms on `hella` (proxmox). yggdrasil is its
+everything sits on vlan 20 (`10.0.20.0/24`). heimdall and njord are vms on `hella` (proxmox). yggdrasil is its
 own little box, so my agents keep running even when hella is down. the elitebook is an old laptop that only
 runs octoprint for my 3d printer.
 
@@ -28,7 +28,6 @@ runs octoprint for my 3d printer.
 | `mjolnir`   | `10.0.20.100` | my workstation and daily driver (5900X, RTX 5070 Ti)                           | oxwm on X11 by default and Hyprland too, picked in `ly` |
 | `heimdall`  | `10.0.20.17`  | headless services vm with traefik, immich, paperless, vaultwarden, homarr, grafana and huginn | none                                     |
 | `mimir`     | `10.0.20.18`  | headless ai box (5950X, RTX 4060 Ti) with llm, comfyui and immich ml            | none                                                    |
-| `tyr`       | `10.0.20.19`  | agent workstation vm with claude code, codex and herdr, linked to the muninn vault | neon oxwm over xrdp, i connect from `mjolnir` with remmina |
 | `njord`     | `10.0.20.20`  | headless finance vm running [sure](https://github.com/we-promise/sure), walled off from everything else | none                    |
 | `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets, and my self hosted apps (forgejo) with their data on odyn | none |
 | `elitebook` | `10.0.20.22`  | my old hp elitebook 8540p next to the ender-3 v3 se. it only runs octoprint, i slice on mjolnir and save the g-code in `/mnt/ratatoskr/3dprint` | none |
@@ -122,7 +121,7 @@ the full breakdown is in [`docs/nixos-structure.md`](docs/nixos-structure.md).
 **two desktops on the workstation.** oxwm (X11) and Hyprland (Wayland) live side by side as `ly` sessions, fully
 separate, and switching between them has no side effects.
 
-**Hyprland in lua** (0.55) riced in the same neon look as tyr. the configs are out of store symlinks, so i edit
+**Hyprland in lua** (0.55) riced in my neon look, pink and cyan. the configs are out of store symlinks, so i edit
 and it hot reloads without a rebuild.
 
 **bleeding edge gpu stack on `mjolnir`.** it takes `boot.kernelPackages`, and with it the nvidia driver, from

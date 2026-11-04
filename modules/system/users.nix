@@ -11,8 +11,6 @@
     ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB1csspUrW5PNLgmMxv/eMWVnnBWqmSEDlE4OemZGfDQ jivsan"
-      # tyr, my agent workstation: reaches the whole fleet like mjolnir does
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ6bnnGGpBRPpHocQbpv/EfXM550646mUUCLAaoLeuhk tyr"
     ];
   };
 

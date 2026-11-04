@@ -1,16 +1,16 @@
 #!/bin/sh
-# tyr's wallpaper, drawn with ImageMagick so no binary lives in the repo:
+# my neon wallpaper, drawn with ImageMagick so no binary lives in the repo:
 # a neon eclipse with HUD rings over a cyber grid, in the fleet palette
 # (pink #ff4fa3, cyan #2de2e6). Kept dark in the middle so text stays readable
 # through transparent terminals.
 #
-#   wallpaper.sh OUT.png [WIDTH HEIGHT]
+#   wallpaper-draw.sh OUT.png [WIDTH HEIGHT]
 #
-# rice.nix runs this at build time. To try a change without rebuilding:
-#   nix shell nixpkgs#imagemagick -c sh wallpaper.sh /tmp/w.png && feh /tmp/w.png
+# wallpaper.sh next to it runs this for both screens. To try a change on its own:
+#   sh wallpaper-draw.sh /tmp/w.png
 set -eu
 
-out=${1:?usage: wallpaper.sh OUT.png [WIDTH HEIGHT]}
+out=${1:?usage: wallpaper-draw.sh OUT.png [WIDTH HEIGHT]}
 W=${2:-2560}
 H=${3:-1440}
 

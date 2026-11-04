@@ -58,7 +58,6 @@
         mjolnir  = mkHost ./hosts/mjolnir/default.nix  ./hosts/mjolnir/home.nix;
         heimdall = mkHost ./hosts/heimdall/default.nix ./hosts/heimdall/home.nix;
         mimir    = mkHost ./hosts/mimir/default.nix    ./hosts/mimir/home.nix;
-        tyr      = mkHost ./hosts/tyr/default.nix      ./hosts/tyr/home.nix;
         njord    = mkHost ./hosts/njord/default.nix    ./hosts/njord/home.nix;
         yggdrasil = mkHost ./hosts/yggdrasil/default.nix ./hosts/yggdrasil/home.nix;
         elitebook = mkHost ./hosts/elitebook/default.nix ./hosts/elitebook/home.nix;

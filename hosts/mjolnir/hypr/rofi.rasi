@@ -1,6 +1,6 @@
-/* mjolnir — tyr's neon rofi theme (hosts/tyr/modules/home/rice/rofi/neon.rasi).
-   Used by Super+D, Alt+Tab and the bar's power menu. On mjolnir the panel is
-   glass as well: hyprland.lua blurs what is behind it. */
+/* mjolnir — the neon rofi theme.
+   Used by Super+D, Alt+Tab and the bar's power menu. The panel is glass:
+   hyprland.lua blurs what is behind it. */
 
 * {
     bg:       #0b0d17e0;

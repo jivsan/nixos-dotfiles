@@ -1,7 +1,7 @@
 {
   "layer": "top",
   "position": "top",
-  // tyr's bar: square, across the whole screen. The window is 14px taller
+  // square bar across the whole screen. The window is 14px taller
   // than the bar you see: that strip holds the pink underlight (style.css),
   // and hyprland.lua has a smaller top gap to make up for it.
   "height": 42,
@@ -14,7 +14,7 @@
 
   "hyprland/workspaces": {
     "format": "{icon}",
-    // tyr's tags: terminal, code, agents, git, web, files, monitor, chat, misc
+    // one icon per workspace: terminal, code, agents, git, web, files, monitor, chat, misc
     "format-icons": {
       "1": "", "2": "", "3": "󰚩", "4": "", "5": "",
       "6": "", "7": "", "8": "", "9": "", "default": ""
@@ -57,7 +57,7 @@
     "tooltip": false
   },
 
-  // running agent sessions (claude, codex, hermes), as on tyr's bar
+  // running agent sessions (claude, codex, hermes)
   "custom/agents": {
     "exec": "/home/christina/.config/waybar/agents.sh",
     "return-type": "json",

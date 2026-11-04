@@ -77,7 +77,6 @@ SYSTEM_CONTEXT = """Christina's system (work with it, never ask for these specs)
 - heimdall (10.0.20.17): services VM, no GPU — the muninn brain/bridge, huginn vault agents, Grafana, Immich.
 - odyn (10.0.20.6): TrueNAS storage; the vault dataset lives here, NFS-mounted by the fleet.
 - yggdrasil (10.0.20.21): always-on mini PC (ThinkCentre M93p, 16 GB) outside hella, no GPU — the hermes gateway.
-- tyr (10.0.20.19): minimal agent-workstation VM, no GPU.
 Tailor every recommendation to this reality (16 GB VRAM targets, FP8/quantized where it matters, CPU-only on the VMs, NFS model storage is fine)."""
 
 AGENT_BRIEF = ("You are working for muninn, Christina's agentic OS. Her Obsidian vault (her second brain) is at "

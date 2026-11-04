@@ -1,4 +1,4 @@
-# mako — neon notifications in tyr's look (the layer is blurred by hyprland.lua)
+# mako — neon notifications (the layer is blurred by hyprland.lua)
 # pink border = normal, cyan = low, yellow = urgent (stays until dismissed)
 sort=-time
 layer=overlay

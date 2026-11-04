@@ -17,7 +17,6 @@ the network these hosts sit on (vlans, the `bifrost` arista switch, pfsense, pih
 | `mjolnir`   | my desktop, oxwm (X11) and Hyprland, blender + octane |
 | `heimdall`  | services vm: traefik, immich, paperless, vaultwarden, homarr, monitoring, huginn |
 | `mimir`     | ai box: llm, embeddings, comfyui, immich ml, octane render node, agents' blender checks |
-| `tyr`       | agent workstation vm with the neon oxwm rice over xrdp |
 | `njord`     | finance vm running sure, walled off from the rest  |
 | `yggdrasil` | always-on mini pc for claude code, grok, hermes and herdr |
 
@@ -89,7 +88,6 @@ nixosConfigurations = {
   mjolnir   = mkHost ./hosts/mjolnir/default.nix   ./hosts/mjolnir/home.nix;
   heimdall  = mkHost ./hosts/heimdall/default.nix  ./hosts/heimdall/home.nix;
   mimir     = mkHost ./hosts/mimir/default.nix     ./hosts/mimir/home.nix;
-  tyr       = mkHost ./hosts/tyr/default.nix       ./hosts/tyr/home.nix;
   njord     = mkHost ./hosts/njord/default.nix     ./hosts/njord/home.nix;
   yggdrasil = mkHost ./hosts/yggdrasil/default.nix ./hosts/yggdrasil/home.nix;
 };
@@ -141,7 +139,7 @@ annoying.
 
 ## conventions
 
-- norse names for everything: `mjolnir`, `heimdall`, `mimir`, `tyr`, `njord`, `yggdrasil`, the switch
+- norse names for everything: `mjolnir`, `heimdall`, `mimir`, `njord`, `yggdrasil`, the switch
   `bifrost`, the proxmox host `hella`, the nas `odyn`
 - don't make Hyprland follow nixpkgs: that loses the cachix cache and risks mesa/egl mismatches
 - live-edited configs use `mkOutOfStoreSymlink` into `~/nixos-dotfiles`

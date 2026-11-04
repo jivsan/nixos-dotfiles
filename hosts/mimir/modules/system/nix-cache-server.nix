@@ -68,10 +68,10 @@ in
     after = [ "network-online.target" ];
   };
 
-  # my hosts only: mjolnir, heimdall, tyr, njord, yggdrasil. nginx listens on the lan address alone,
+  # my hosts only: mjolnir, heimdall, njord, yggdrasil. nginx listens on the lan address alone,
   # so tailscale (which skips nixos-fw) can't reach it on mimir's 100.x address
   networking.firewall.extraCommands = ''
-    for ip in 10.0.20.100 10.0.20.17 10.0.20.19 10.0.20.20 10.0.20.21; do
+    for ip in 10.0.20.100 10.0.20.17 10.0.20.20 10.0.20.21; do
       iptables -A nixos-fw -p tcp -s $ip --dport 5000 -j nixos-fw-accept
     done
   '';

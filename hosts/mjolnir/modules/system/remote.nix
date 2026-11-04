@@ -1,6 +1,6 @@
 { config, pkgs, ... }:
 
-# key-only sshd, no remote desktop here (tyr is my rdp box)
+# key-only sshd, no remote desktop here
 {
   services.openssh = {
     enable = true;

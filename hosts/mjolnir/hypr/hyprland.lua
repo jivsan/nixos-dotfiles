@@ -33,7 +33,7 @@ if main_output then hl.config({ cursor = { default_monitor = main_output } }) en
 ---------------------
 ---- MY PROGRAMS ----
 ---------------------
--- See-through terminals like on tyr (0.86). The flag keeps it to this session:
+-- See-through terminals (0.86). The flag keeps it to this session:
 -- oxwm still gets the 0.94 from modules/home/terminal.nix.
 local terminal    = "alacritty -o window.opacity=0.86"
 local fileManager = "thunar"
@@ -54,7 +54,7 @@ hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
 ---- AUTOSTART ----
 -------------------
 -- One eclipse per screen (drawn by hypr/wallpaper.sh), each growing out of
--- its own centre: tyr's pink one on the main screen, the cyan twin on the left.
+-- its own centre: the pink one on the main screen, the cyan twin on the left.
 local walls = "/home/christina/.config/hypr/"
 local grow  = " --transition-type grow --transition-pos 0.5,0.64 --transition-fps 60"
 
@@ -94,11 +94,11 @@ hl.layer_rule({ match = { namespace = "notifications" }, blur = true, ignore_alp
 -----------------------
 ---- LOOK AND FEEL ----
 -----------------------
--- tyr's neon rice (hosts/tyr/modules/home/rice), on a real GPU: pink round the
+-- The neon rice: pink round the
 -- window you work in, cyan round the rest, and real frosted glass behind it.
 hl.config({
     general = {
-        gaps_in          = 6,   -- 12 between two windows, as on tyr
+        gaps_in          = 6,   -- 12 between two windows
         -- The first 14px under the bar belong to its pink underlight, so the
         -- top gap is smaller: windows still start 18px below the bar.
         gaps_out         = { top = 4, right = 16, bottom = 16, left = 16 },

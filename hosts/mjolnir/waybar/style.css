@@ -1,8 +1,8 @@
-/* mjolnir — waybar in tyr's neon look (hosts/tyr/modules/home/rice/oxwm).
+/* mjolnir — waybar in the neon look.
  *
  * A square bar across the screen. Every block has one colour and a line
  * under it; workspace icons are pink (shown), cyan (has windows) or grey.
- * Unlike tyr's bar this one is real glass: hyprland.lua blurs what is behind
+ * The bar is real glass: hyprland.lua blurs what is behind
  * it. Saving this file restyles the running bar.
  */
 

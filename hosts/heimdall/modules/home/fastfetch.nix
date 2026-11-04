@@ -1,7 +1,7 @@
 { ... }:
 
 let
-  # neon accents, same as mimir and tyr
+  # neon accents, same as mimir
   pink = "38;2;255;79;163";   # #ff4fa3
   cyan = "38;2;45;226;230";   # #2de2e6
   dim  = "38;2;99;99;125";    # muted steel
