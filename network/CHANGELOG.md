@@ -5,6 +5,21 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-11-04 — Et13 for garm becomes a trunk (VLANs 20 and 50)
+
+**Why:** garm's guests need VLAN 20 (servers) and VLAN 50 (Home Assistant), the same as on
+hella's Port-Channel1. garm's own address moved to `vmbr1.20` (tagged) on a VLAN-aware `vmbr1`
+on its first 10G port, so VMs move from hella with the same network settings. VLAN 40 is left
+off: no guest on hella uses it, and hella's own bridge only carries 20 and 50.
+
+**Changed:** Et13 `switchport mode trunk`, allowed VLANs `20,50`, the access VLAN line removed.
+The native VLAN stays 1, which is not allowed, so untagged frames from garm are dropped. Applied
+in session `garm-trunk` with an 8-minute commit timer, together with a timed switch of garm's
+network file that had its own 9-minute rollback. Checked before the commit: garm came back on
+10.0.20.11 (tagged 20) about 75 s later; from garm the gateway, DNS, the internet and its web
+page answered, and from yggdrasil garm answered ping and https on 8006. Then garm's rollback
+was cancelled, the session confirmed and `write memory`.
+
 ## 2026-11-04 — Et13 for garm (access VLAN 20)
 
 **Why:** garm, the first helheim Proxmox node, gets its first 10G port (LAN3) on Et13, so the
