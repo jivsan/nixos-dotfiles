@@ -28,6 +28,7 @@
     ./modules/system/hermes-agent.nix
     ./modules/system/grok.nix               # grok build (xai) in herdr, my mcp servers over the lan, locked down
     ./modules/system/exporters.nix          # node numbers for heimdall's prometheus (homarr host card)
+    ./modules/system/rack-status.nix        # pings the rack for the rack leds, to home assistant over mqtt
 
     # self-hosted apps: they run here, their data and database live on odyn (docs/apps-on-odyn.md)
     ./modules/system/appdata.nix            # /mnt/appdata/<app> shares + nightly appdb dumps

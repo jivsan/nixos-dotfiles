@@ -7,12 +7,15 @@
     displayManager.startx.enable = true;
     windowManager.oxwm.enable = true;
 
+    # the 5070 Ti renamed the ports (dell DP-0 -> DP-4), so i find the screens
+    # by port type: dell on displayport, benq on hdmi
     displayManager.sessionCommands = ''
-      ${pkgs.xrandr}/bin/xrandr --output HDMI-0 --off
-      ${pkgs.xrandr}/bin/xrandr --output DP-0 --off
-      ${pkgs.xrandr}/bin/xrandr --fb 4480x1440 \
-        --output DP-0 --primary --mode 2560x1440 --rate 120 --pos 1920x0 --rotate normal \
-        --output HDMI-0 --mode 1920x1080 --rate 60 --pos 0x180 --rotate normal
+      xr=${pkgs.xrandr}/bin/xrandr
+      dell=$($xr | ${pkgs.gawk}/bin/awk '/^DP-[0-9]+ connected/ {print $1; exit}')
+      benq=$($xr | ${pkgs.gawk}/bin/awk '/^HDMI-[0-9]+ connected/ {print $1; exit}')
+      $xr --fb 4480x1440 \
+        --output "$dell" --primary --mode 2560x1440 --rate 120 --pos 1920x0 --rotate normal \
+        --output "$benq" --mode 1920x1080 --rate 60 --pos 0x180 --rotate normal
 
       ${pkgs.feh}/bin/feh --bg-fill /home/christina/pictures/wallpapers/bg1.png
     '';
