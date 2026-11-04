@@ -5,6 +5,20 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-11-04 — Et21 and Et22 for the BMCs (access VLAN 10)
+
+**Why:** I redid some cables and plugged garm's BMC into Et21, and want Et21 and Et22 as the
+BMC ports (Et21 garm, Et22 fenrir later). Et21 was unconfigured, so the BMC sat in VLAN 1 and
+answered nowhere.
+
+**Changed:** Et21 description `garm-ipmi`, Et22 `fenrir-ipmi`, both access VLAN 10 + portfast,
+the same as Et30-32. Applied in session `bmc-21-22` with a 5-minute commit timer. Checked before
+the commit: garm's BMC MAC `0c:c4:7a:c8:72:9b` was on Et21 (VLAN 1 before the change), a second
+login showed Et21 and Et22 in VLAN 10, and the BMC page answered from mjolnir (HTTP 200) through
+the firewall. Then confirmed and `write memory`; the BMC's MAC then showed in VLAN 10 on Et21.
+Et30-32 are unchanged (VLAN 10, nothing plugged in), so `garm-ipmi` and `fenrir-ipmi` are each
+on two ports for now.
+
 ## 2026-11-04 — Et13 for garm becomes a trunk (VLANs 20 and 50)
 
 **Why:** garm's guests need VLAN 20 (servers) and VLAN 50 (Home Assistant), the same as on
