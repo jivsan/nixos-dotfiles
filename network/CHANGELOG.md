@@ -5,6 +5,40 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-11-04 — Et2, Et3 and Et10 become spare VLAN 20 ports (hella retired)
+
+**Why:** hella is shut down for good and out of the helheim cluster (22:40), so its bond
+(Et2 + Et3, Port-Channel1) and its management port (Et10) are free. My words: "change the free
+ports that was populated to vlan 20, so i can just plug something into there on a short notice".
+
+**Changed:** `default interface Ethernet2-3`, `no interface Port-Channel1`, then Et2, Et3 and
+Et10 described `spare-vlan20`, access VLAN 20, portfast (Et10 already was VLAN 20). VLAN 40 (dmz)
+was only on hella's bond; now only pfSense's trunk carries it, and no switch port uses it.
+Applied in session `spare-vlan20` with a 5-minute commit timer; a second login showed the three
+ports in VLAN 20, Port-Channel1 gone and every connected port still up. Then confirmed and
+`write memory`.
+
+## 2026-11-04 — patch panel re-cabling (evening), and a bad patch cable on Et11
+
+**Why:** the panel plan in my vault ("Patch panel and switch re-cabling plan"): panel port =
+switch port, every device keeps its switch port, so the switch config stays the same.
+
+**Moved through the panel (no config change):** Et1 pfSense, Et4 odyn 10G, Et6 mimir, Et9 Wi-Fi
+box, Et11 odyn management, Et12 yggdrasil, Et13 garm. Each came back at its old speed (10G on
+Et4, Et6 and Et13; 1G on the rest).
+
+**Bad cable:** Et11 (odyn management) linked for 8 s and 20 s around 23:20-23:23 and then stayed
+down; odyn's own port showed no carrier either. odyn's default route goes out that port, so odyn
+had no internet for about 30 minutes (its shares were fine, they use the 10G link). I swapped the
+short front patch cable and Et11 came straight up at 1G (23:52:58), odyn's internet with it. The
+old cable is bad: don't reuse it.
+
+**Also seen:** something linked on Et14 from 23:22 to 23:44 (nothing is meant to be there yet),
+most likely a cable in the wrong port for a while.
+
+**Still to do:** Et19 elitebook, Et21 garm's BMC and Et8 mjolnir through the panel, and hella's
+three cables out of the rack. Times in this entry are local (the switch logs in UTC).
+
 ## 2026-11-04 — Et30 and Et31 cleared
 
 **Why:** the BMCs now use Et21 (garm) and Et22 (fenrir), so Et30 and Et31 had the same names
