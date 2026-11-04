@@ -5,6 +5,16 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-11-04 — Et30 and Et31 cleared
+
+**Why:** the BMCs now use Et21 (garm) and Et22 (fenrir), so Et30 and Et31 had the same names
+as those ports and nothing plugged in. My words: "clear them, i dont need eth 30 and 31".
+
+**Changed:** `default interface Ethernet30-31` (no description, back to VLAN 1, no portfast).
+Et32 `router-ipmi` stays as it was (access VLAN 10). Applied in session `clear-et30-31` with a
+5-minute commit timer; a second login showed Et30-31 empty, Et32 unchanged and Et21 (garm's
+BMC, mid-firmware-update) still up in VLAN 10. Then confirmed and `write memory`.
+
 ## 2026-11-04 — Et21 and Et22 for the BMCs (access VLAN 10)
 
 **Why:** I redid some cables and plugged garm's BMC into Et21, and want Et21 and Et22 as the
