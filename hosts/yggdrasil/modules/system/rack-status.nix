@@ -22,15 +22,15 @@ let
     { name = "bifrost";   address = "10.0.20.2"; }    # the switch
     { name = "pfsense";   address = "10.0.20.1"; }
     { name = "mimir";     address = "10.0.20.18"; }
-    { name = "garm";      address = "10.0.20.11"; }   # new node, down till it's built
-    # fenrir gets hella's address when hella retires. off till then, or it would show hella.
-    # that day: enabled = false on hella, and take enabled = false off fenrir.
+    { name = "garm";      address = "10.0.20.11"; }   # helheim node 1
+    # fenrir gets hella's old address once it's built. off till then.
+    # that day: take enabled = false off fenrir.
     # never delete or rename a line, set enabled = false: only that removes the old entity in home assistant
     { name = "fenrir";    address = "10.0.20.10"; enabled = false; }
     { name = "odyn";      address = "10.0.20.6"; }
     { name = "yggdrasil"; address = "10.0.20.21"; }   # this box, so always on while it runs
-    { name = "hella";     address = "10.0.20.10"; }
-    { name = "heimdall";  address = "10.0.20.17"; }   # vm on hella
+    { name = "hella";     address = "10.0.20.10"; enabled = false; }   # retired 2026-11-04
+    { name = "heimdall";  address = "10.0.20.17"; }   # vm on garm
   ];
 
   # the internet is up when any of these answers
@@ -104,9 +104,11 @@ in
       SystemCallFilter = [ "@system-service" "~@privileged" "~@resources" ];
       SystemCallErrorNumber = "EPERM";
       UMask = "0077";
-      # it only ever talks to the broker and the addresses it pings
+      # it only ever talks to the broker, the addresses it pings, and itself: the mqtt library
+      # opens a small connection to 127.0.0.1 at start to wake its own thread. without localhost
+      # here it hangs for good right after the "pinging ..." line and ignores stop (2026-11-05)
       IPAddressDeny = "any";
-      IPAddressAllow = [ broker.host ] ++ pinged;
+      IPAddressAllow = [ "localhost" broker.host ] ++ pinged;
     };
   };
 }
