@@ -80,6 +80,9 @@
   environment.systemPackages = with pkgs; [
     git curl wget btop tree jq rsync
     python3   # for scripts hermes writes and runs from its terminal (the cli's PATH)
+    # my helheim talos cluster. talosctl from unstable, so it matches the cluster's talos (1.14)
+    pkgs-unstable.talosctl
+    kubectl
   ];
   # python on the gateway's PATH too; its code-execution tool brings its own
   services.hermes-agent.extraPackages = [ pkgs.python3 ];
