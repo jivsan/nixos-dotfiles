@@ -5,6 +5,35 @@ is kept in sync with the switch; this log records **what changed and why**.
 
 ---
 
+## 2026-11-10 — Et14 (fenrir) becomes a trunk like Et13
+
+**Why:** Proxmox is installed on fenrir, so its 10G port moves to the same layout as garm's:
+VLANs 20 and 50 tagged for the guests, fenrir's own address on `vmbr1.20`. My words: "go" (for
+the switchover), after Claude laid out the steps.
+
+**Changed:** Et14 `switchport mode trunk`, `switchport trunk allowed vlan 20,50`, access VLAN
+removed; native VLAN left at 1 and not allowed, like Et13. Description and portfast unchanged.
+
+**How checked:** fenrir got its new network file at the same time, with an 8-minute timer on
+fenrir that would have put the old file back. Switch change in session `fenrir-trunk` with a
+5-minute commit timer. After the switchover fenrir answered on 10.0.20.10 (ping, SSH, web page
+on 8006), reached the gateway, and pinged garm over the direct cable (10.10.10.1). Et1, Et4,
+Et6, Et12, Et13 and Et22 were still up. Then confirmed and `write memory`, and fenrir's timer
+was cancelled.
+
+## 2026-11-10 — Et14 = fenrir (VLAN 20 for the Proxmox install)
+
+**Why:** fenrir, the second helheim node, is built and its BMC is on Et22. Its first 10G port
+needs a VLAN 20 port for the Proxmox install, like garm's Et13 had before it became a trunk.
+My words: "do eth14", then "make sure to include descriptions and changelog entry".
+
+**Changed:** Et14 described `fenrir`, access VLAN 20, portfast. It was empty before (no link, no
+MAC, no LLDP neighbour). Once Proxmox is on, it becomes a trunk (20, 50) like Et13.
+
+**How checked:** applied in session `fenrir-et14` with a 5-minute commit timer; a second login
+showed Et14 in VLAN 20 with its description, and Et1, Et4, Et6, Et12, Et13 and Et22 still up.
+Then confirmed and `write memory`.
+
 ## 2026-11-04 — Et2, Et3 and Et10 become spare VLAN 20 ports (hella retired)
 
 **Why:** hella is shut down for good and out of the helheim cluster (22:40), so its bond

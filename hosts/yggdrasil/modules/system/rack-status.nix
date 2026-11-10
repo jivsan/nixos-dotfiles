@@ -23,10 +23,9 @@ let
     { name = "pfsense";   address = "10.0.20.1"; }
     { name = "mimir";     address = "10.0.20.18"; }
     { name = "garm";      address = "10.0.20.11"; }   # helheim node 1
-    # fenrir gets hella's old address once it's built. off till then.
-    # that day: take enabled = false off fenrir.
+    # fenrir took hella's old address on 2026-11-10.
     # never delete or rename a line, set enabled = false: only that removes the old entity in home assistant
-    { name = "fenrir";    address = "10.0.20.10"; enabled = false; }
+    { name = "fenrir";    address = "10.0.20.10"; }
     { name = "odyn";      address = "10.0.20.6"; }
     { name = "yggdrasil"; address = "10.0.20.21"; }   # this box, so always on while it runs
     { name = "hella";     address = "10.0.20.10"; enabled = false; }   # retired 2026-11-04
