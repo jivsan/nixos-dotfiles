@@ -12,7 +12,7 @@
       platform = "forgejo";
       endpoint = "https://git.oryxserver.org/api/v1/";
       gitAuthor = "renovate <renovate@oryxserver.org>";
-      repositories = [ "jivsan/nixos-dotfiles" "jivsan/modgud-vps-nix" ];
+      repositories = [ "jivsan/nixos-dotfiles" "jivsan/modgud-vps-nix" "jivsan/talos-helheim" ];
       onboarding = false;
       requireConfig = "required";
       persistRepoData = true;
