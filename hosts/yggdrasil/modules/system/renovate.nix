@@ -1,8 +1,9 @@
-{ pkgs, ... }:
+{ pkgs, pkgs-unstable, lib, ... }:
 
 # renovate opens pull requests on git.oryxserver.org when a pinned image or a flake input is behind.
 # its rules are in .forgejo/renovate.json. it never merges and can't push to main (branch protection)
 {
+  systemd.services.renovate.path = lib.mkBefore [ pkgs-unstable.git ];
   services.renovate = {
     enable = true;
     schedule = "*-*-* 00/3:20:00";
