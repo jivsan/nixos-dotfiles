@@ -198,22 +198,6 @@ in
             middlewares = [ "lan-only" ];
           };
 
-          changedetection = {
-            rule = "Host(`changedetection.oryxserver.org`)";
-            entryPoints = [ "websecure" ];
-            service = "changedetection";
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
-          searxng = {
-            rule = "Host(`search.oryxserver.org`)";
-            entryPoints = [ "websecure" ];
-            service = "searxng";
-            tls = {};
-            middlewares = [ "lan-only" ];
-          };
-
           forgejo = {
             rule = "Host(`git.oryxserver.org`)";
             entryPoints = [ "websecure" ];
@@ -348,14 +332,12 @@ in
             };
           };
 
-          # pfsense web ui, self-signed cert; its hostname is pfsense.oryxserver.org,
-          # so its dns-rebind and referer checks accept this name
-          changedetection.loadBalancer.servers = [ { url = "http://127.0.0.1:5000"; } ];
-          searxng.loadBalancer.servers = [ { url = "http://127.0.0.1:8888"; } ];
           # forgejo on yggdrasil, whose firewall only lets heimdall reach :3000 and :2222
           forgejo.loadBalancer.servers = [ { url = "http://10.0.20.21:3000"; } ];
           n8n.loadBalancer.servers = [ { url = "http://10.0.20.21:5678"; } ];
 
+          # pfsense web ui, self-signed cert; its hostname is pfsense.oryxserver.org,
+          # so its dns-rebind and referer checks accept this name
           pfsense = {
             loadBalancer = {
               servers = [
@@ -390,7 +372,7 @@ in
               "10.0.50.10/32"    # my phone
               "127.0.0.1/32"
               "10.88.0.0/16"     # podman's default network
-              "10.89.0.0/16"     # the per-app networks (immich, paperless, changedetection)
+              "10.89.0.0/16"     # the per-app networks (immich, paperless)
             ] ++ myTailnet;
           };
 

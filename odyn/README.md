@@ -28,7 +28,7 @@ Also on odyn but not kept here: the catalog apps `dockge` (the arr stacks in `/m
 | `vault/appdata/n8n` | n8n 3012, 750 | NFS share 20, 10.0.20.21 only, mapall n8n | n8n on yggdrasil |
 | `vault/appdata/backups` | appdb 3010, 700 | NFS share 19, 10.0.20.21 only, mapall appdb | nightly dumps from yggdrasil |
 | `vault/appdata/paperless` | paperless 3014, 750 | NFS share 22, 10.0.20.17 only, mapall paperless | Paperless's documents (heimdall) |
-| `vault/appdata/changedetection` | changedetection 3015, 700 | NFS share 23, 10.0.20.17 only, mapall changedetection | changedetection's watches (heimdall) |
+| `vault/appdata/changedetection` | changedetection 3015, 700 | NFS share 23, 10.0.20.17 only, mapall changedetection (unused since 2026-11-11) | the original of changedetection's watches. it runs on the helheim cluster now, with its copy in `vault/appdata/k8s/changedetection` |
 | `vault/appdata/scrutiny` | scrutiny 3016, 700 | no (share 24 only for the copy from heimdall, then deleted) | the `scrutiny` app here |
 | `vault/appdata/immichdb` | immichdb 3017, 700, recordsize 16K | no (a share only for the copy from heimdall, then deleted) | the `immichdb` app here (`data/`, `tls/`) |
 

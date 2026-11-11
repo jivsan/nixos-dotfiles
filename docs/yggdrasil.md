@@ -6,9 +6,9 @@ my git server keep running when the proxmox host is down. `hosts/yggdrasil/`.
 ## what runs where (so i don't forget)
 
 **almost every self-hosted service is on heimdall** (`10.0.20.17`, a vm on hella): traefik, immich,
-paperless, vaultwarden, homarr, grafana/prometheus/alertmanager, ntfy, changedetection, searxng,
-the muninn vault's huginn agents and the brain dashboard (scrutiny is an odyn app since 2026-10-22, crafty is
-archived). see
+paperless, vaultwarden, homarr, grafana/prometheus/alertmanager, ntfy,
+the muninn vault's huginn agents and the brain dashboard (scrutiny is an odyn app since 2026-10-22; searxng,
+crafty and changedetection run on the helheim cluster since 2026-11-11, ~/my-code/talos-helheim). see
 [`heimdall-docs.md`](heimdall-docs.md).
 
 **forgejo and n8n are the exception: they run on yggdrasil**, with their files and databases on odyn. new apps

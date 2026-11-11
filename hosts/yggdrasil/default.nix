@@ -30,6 +30,7 @@
     ./modules/system/exporters.nix          # node numbers for heimdall's prometheus (homarr host card)
     ./modules/system/rack-status.nix        # pings the rack for the rack leds, to home assistant over mqtt
     ./modules/system/qnetd.nix              # third vote for the helheim cluster (garm + fenrir)
+    ./modules/system/dns-same.nix           # my two dns servers answer the same, or this unit fails (the alert)
 
     # self-hosted apps: they run here, their data and database live on odyn (docs/apps-on-odyn.md)
     ./modules/system/appdata.nix            # /mnt/appdata/<app> shares + nightly appdb dumps

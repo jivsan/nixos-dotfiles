@@ -52,12 +52,22 @@ let
           for = "3m";
           annotations.summary = "Pi-hole (10.0.20.4) is not answering DNS, so *.oryxserver.org stops resolving";
         }
-        # huginn's own units push through huginn-notify (huginn.nix) with their log lines, so not twice
+        # huginn's own units push through huginn-notify (huginn.nix) with their log lines, so not twice.
+        # dns-same has its own rule below
         {
           alert = "UnitFailed";
-          expr = ''node_systemd_unit_state{state="failed", name!~"huginn-.*"} == 1'';
+          expr = ''node_systemd_unit_state{state="failed", name!~"huginn-.*|dns-same.service"} == 1'';
           for = "5m";
           annotations.summary = "{{ $labels.name }} failed on {{ $labels.host }}";
+        }
+        # dns-same on yggdrasil looks again every 15 minutes, and while it looks its unit isn't "failed".
+        # this holds the alert over that gap, so i don't get "resolved" while a dns server is still down.
+        # it clears 20 minutes after the unit is good again
+        {
+          alert = "DnsDiffer";
+          expr = ''max_over_time(node_systemd_unit_state{state="failed", name="dns-same.service"}[20m]) == 1'';
+          for = "5m";
+          annotations.summary = "my two dns servers (10.0.20.4, 10.0.20.53) differ, or one doesn't answer (journalctl -u dns-same -n 20 on yggdrasil)";
         }
         {
           alert = "DiskAlmostFull";

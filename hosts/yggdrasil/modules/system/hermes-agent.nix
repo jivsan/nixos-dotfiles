@@ -58,7 +58,7 @@ in
     settings.skills.external_dirs = [ "/var/lib/hermes/claude/skills" ];
     # the index of claude's notes (~26 KB) goes into every session, the notes are read on demand
     settings.skills.auto_load = [ "claude-memory" ];
-    # search through my own searxng on heimdall (search.oryxserver.org, its json api): no key, no monthly
+    # search through my own searxng on the helheim cluster (search.oryxserver.org, its json api): no key, no monthly
     # limit, nothing leaves the house but the searches themselves. search only (can't read pages); a failed
     # call is retried on the free keyless backends. brave's key stays in /etc/hermes/env for going back
     settings.web.search_backend = "searxng";
