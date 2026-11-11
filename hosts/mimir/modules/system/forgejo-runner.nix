@@ -11,7 +11,8 @@ let
   # runner -> its token file (TOKEN=<registration token>, root 0600)
   runners = {
     mimir = "/var/lib/secrets/forgejo-runner-token";                    # jivsan/nixos-dotfiles
-    modgud = "/var/lib/secrets/forgejo-runner-token-modgud-vps-nix";    # jivsan/modgud-vps-nix
+    modgud = "/var/lib/secrets/forgejo-runner-token-modgud-vps-nix";
+    helheim = "/var/lib/secrets/forgejo-runner-token-talos-helheim";
   };
 in
 {
