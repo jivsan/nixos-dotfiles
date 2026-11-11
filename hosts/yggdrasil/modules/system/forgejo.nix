@@ -91,5 +91,6 @@ in
   # extraCommands runs before nixos-fw's final refuse rule (this box has no tailscale to get around it)
   networking.firewall.extraCommands = ''
     iptables -A nixos-fw -p tcp -s 10.0.20.17 -m multiport --dports 3000,2222 -j nixos-fw-accept
+    iptables -A nixos-fw -p tcp -m iprange --src-range 10.0.20.31-10.0.20.39 --dport 2222 -j nixos-fw-accept
   '';
 }
