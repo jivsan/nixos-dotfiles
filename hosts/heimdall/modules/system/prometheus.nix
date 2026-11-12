@@ -109,8 +109,12 @@
   # grafana's container reaches prometheus, loki and influxdb on the host over podman0
   networking.firewall.trustedInterfaces = [ "podman0" ];
 
-  # n8n on yggdrasil reads metrics for its morning report
+  # n8n on yggdrasil reads metrics for its morning report.
+  # homarr in kubernetes (helheim) reads them for its host cards, its network widget and its prometheus
+  # integration. a pod leaves with the address of the worker it runs on (cilium masquerades), and it can
+  # run on any of the six: talos-w1..w6, 10.0.20.34-39 (nodes.yaml in the talos-helheim repo). only 9090
   networking.firewall.extraCommands = ''
     iptables -A nixos-fw -p tcp -s 10.0.20.21 --dport 9090 -j nixos-fw-accept
+    iptables -A nixos-fw -p tcp -m iprange --src-range 10.0.20.34-10.0.20.39 --dport 9090 -j nixos-fw-accept
   '';
 }

@@ -31,7 +31,8 @@ in
   virtualisation.oci-containers.containers = {
     paperless-redis = {
       image = "docker.io/library/redis:7.4.11-alpine@sha256:d9436322172a5b482c187bf1f363d3c4fea086fcca6b9c8a94de8f0f39ed3193";
-      autoStart = true;
+      # not by itself, like paperless-web below: starting paperless-web brings it along
+      autoStart = false;
       cmd = [ "redis-server" "--appendonly" "yes" ];
       volumes = [ "/var/lib/paperless/redis:/data" ];
       extraOptions = [ "--network=paperless" ];
@@ -39,7 +40,14 @@ in
 
     paperless-web = {
       image = "ghcr.io/paperless-ngx/paperless-ngx:3.3.3@sha256:dba0242c1df1843643df4eb50ce5639f3a7900f414879088fd5bed8eaf2d456d";
-      autoStart = true;
+      # not started by itself any more, also not at boot: paperless moves to kubernetes
+      # (talos-helheim). once i stop it on the move day, no deploy and no reboot brings this copy
+      # back next to the cluster's (two paperlesses on one database, with different files). a plain
+      # systemctl stop doesn't hold: every deploy starts what multi-user.target wants again. the
+      # deploy with this line restarts it once, after that deploys leave it alone. a reboot before
+      # the move leaves it off: sudo systemctl start podman-paperless-web (it brings redis). that
+      # is also the way back
+      autoStart = false;
       ports = [ "127.0.0.1:8010:8000" ];
 
       # PAPERLESS_SECRET_KEY (the same as before the move) and PAPERLESS_DBPASS (its appdb role)

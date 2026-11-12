@@ -53,11 +53,20 @@ configs:
       # one line per app: its own database and role, only from the host it runs on
       hostssl forgejo   forgejo    10.0.20.21/32  scram-sha-256
       hostssl n8n       n8n        10.0.20.21/32  scram-sha-256
-      # heimdall's apps, each only from heimdall. they check the certificate (verify-full, server.crt here)
+      # heimdall's apps, each only from heimdall. they check the certificate (verify-full, server.crt here).
+      # paperless and homarr move to kubernetes (below): their heimdall lines are the way back until
+      # then, and go once both run there
       hostssl paperless    paperless    10.0.20.17/32  scram-sha-256
       hostssl grafana      grafana      10.0.20.17/32  scram-sha-256
       hostssl homarr       homarr       10.0.20.17/32  scram-sha-256
       hostssl vaultwarden  vaultwarden  10.0.20.17/32  scram-sha-256
+      # apps in kubernetes (talos-helheim): a pod leaves with the address of the worker it runs on
+      # (cilium masquerades), and that can be any of the six, talos-w1..w6 = 10.0.20.34-39.
+      # pg_hba knows no ranges, so two blocks per app: .34-.35 and .36-.39
+      hostssl paperless    paperless    10.0.20.34/31  scram-sha-256
+      hostssl paperless    paperless    10.0.20.36/30  scram-sha-256
+      hostssl homarr       homarr       10.0.20.34/31  scram-sha-256
+      hostssl homarr       homarr       10.0.20.36/30  scram-sha-256
       # coming later, from yggdrasil: databasus (backups), pgadmin (read-only) and my own login
       hostssl all       databasus  10.0.20.21/32  scram-sha-256
       hostssl all       pgadmin_ro 10.0.20.21/32  scram-sha-256

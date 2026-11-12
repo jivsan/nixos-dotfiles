@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   # influxdb 1.x for pfsense's telegraf and pfsense-geoip.nix, read by grafana (influxql)
   # pfsense keeps no history itself, these 90 days are all there is
@@ -59,6 +59,54 @@
     iptables -t raw -F influx-only 2>/dev/null || true
     iptables -t raw -X influx-only 2>/dev/null || true
   '';
+
+  # influx.oryxserver.org: a way in that can only read, for homarr's network widget. homarr moves to
+  # kubernetes, and 8086 itself stays closed to it (the raw rule above). traefik reaches influxdb on
+  # 127.0.0.1, like pfsense-geoip does.
+  # influxdb can't make this read-only by itself: there is no login, and a GET /query runs every
+  # statement it gets, a DROP DATABASE too. it only adds a warning to the answer
+  # (1.12.4, coordinator/statement_executor.go). so the rule only lets through what can't write:
+  # - GET /query, nothing else: no /write, /api/v2, /debug, /ping
+  # - no "into" anywhere in q: SELECT ... INTO writes its result into a measurement
+  # - every statement in q starts with select or show, the first one and each one after a ;
+  #   (a ; inside a quoted string counts too, that only refuses more)
+  # traefik looks at every q in the url and influxdb takes the first, so each one has to fit.
+  # with no q in the url influxdb reads it from a multipart body, a GET too. without a Content-Type
+  # header it never looks at the body, so traefik takes that header off.
+  # anything else gets traefik's 404. who: the six workers of helheim (a pod leaves with its node's
+  # address), and homarr's container here until homarr has moved
+  services.traefik.dynamicConfigOptions.http = {
+    routers.influx-read = {
+      rule = lib.concatStringsSep " && " [
+        "Host(`influx.oryxserver.org`)"
+        "Method(`GET`)"
+        "Path(`/query`)"
+        "!QueryRegexp(`q`, `(?i)into`)"
+        # a statement that starts with anything but select or show. letter by letter, because go's
+        # regexp has no "not followed by"
+        "!QueryRegexp(`q`, `(?i)(^|;)\\s*([^s\\s;]|s($|[^eh])|se($|[^l])|sel($|[^e])|sele($|[^c])|selec($|[^t])|sh($|[^o])|sho($|[^w]))`)"
+      ];
+      entryPoints = [ "websecure" ];
+      service = "influx-read";
+      tls = { };
+      middlewares = [ "influx-read-clients" "influx-read-url-only" ];
+    };
+    services.influx-read.loadBalancer.servers = [ { url = "http://127.0.0.1:8086"; } ];
+    middlewares = {
+      influx-read-clients.ipAllowList.sourceRange = [
+        "10.0.20.34/31"     # talos-w1, w2
+        "10.0.20.36/30"     # talos-w3 to w6
+        "10.88.200.10/32"   # homarr's container (homarr.nix), until homarr has moved
+      ];
+      # an empty value takes the header off. Content-Type: see above. Origin: without it influxdb
+      # sends no cors header, so a web page that a browser in a pod opens (changedetection's chrome
+      # opens any site) can't read the answer. homarr asks from its server and sends none
+      influx-read-url-only.headers.customRequestHeaders = {
+        "Content-Type" = "";
+        "Origin" = "";
+      };
+    };
+  };
 
   # nightly backup to odyn (since 2026-10-22): the data stays here, but a portable backup of the
   # pfsense database goes to vault/backups/influxdb-pfsense (odyn user backups 3013, share 25),

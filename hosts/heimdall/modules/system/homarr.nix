@@ -15,7 +15,13 @@ in
     # pinned by tag + digest: to update, put the new ones here and rebuild.
     # it migrates its database by itself on start, so a new major wants a fresh dump first
     image = "ghcr.io/homarr-labs/homarr:v2.7.0@sha256:f532ce7cb2a388096d6dce30b7ee41ff4b413b48ddc219ad2321dedb758cd772";
-    autoStart = true;
+    # not started by itself any more, also not at boot: homarr moves to kubernetes (talos-helheim).
+    # once i stop it on the move day, no deploy and no reboot brings this copy back next to the
+    # cluster's (two homarrs on one database). a plain systemctl stop doesn't hold: every deploy
+    # starts what multi-user.target wants again. the deploy with this line restarts it once, after
+    # that deploys leave it alone. a reboot before the move leaves it off:
+    # sudo systemctl start podman-homarr. that is also the way back
+    autoStart = false;
     ports = [ "127.0.0.1:7575:7575" ];
     extraOptions = [
       # fixed address: traefik's lan-only lets this one container in, not all of podman's network
