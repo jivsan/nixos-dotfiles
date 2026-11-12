@@ -72,8 +72,14 @@ in
   }) runners;
 
   # leftovers from cancelled jobs (a new push cancels the old run) go after 2 days.
-  # jobs time out after 6h, so a running build is never touched
-  systemd.tmpfiles.rules = [ "d ${builds} 0700 gitea-runner gitea-runner 2d" ];
+  # jobs time out after 6h, so a running build is never touched.
+  # the same for ci's temp folder and the old build folder on brunnr (nix built there before build-dir).
+  # "e" only cleans, it never makes the folder, so nothing lands on the boot disk if brunnr isn't mounted
+  systemd.tmpfiles.rules = [
+    "d ${builds} 0700 gitea-runner gitea-runner 2d"
+    "e ${ci}/tmp - - - 2d"
+    "e ${ci}/nix/var/nix/builds - - - 2d"
+  ];
 
   nix.settings = {
     max-jobs = 4;
