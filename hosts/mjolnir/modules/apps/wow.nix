@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, pkgs-unstable, ... }:
 let
   protonGE = "/home/christina/.local/share/Steam/compatibilitytools.d/GE-Proton10-34";
   prefixPath = "/home/christina/Games/battlenet";
@@ -7,7 +7,7 @@ let
 in
 {
   environment.systemPackages = with pkgs; [
-    wowup-cf
+    pkgs-unstable.wowup-cf
 
     (writeShellScriptBin "wow-launch" ''
       export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"
