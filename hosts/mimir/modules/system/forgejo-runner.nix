@@ -3,9 +3,12 @@
 # the forgejo actions runners for git.oryxserver.org (yggdrasil). jobs from .forgejo/workflows run as a
 # plain user straight on this box: they build the hosts and upload the result to the nix cache.
 # one runner per repo, each registered with its own token, so a token only reaches its own repo.
-# ci has its own nix store on brunnr, with its temp files and caches, so none of it lands on the boot disk
+# ci has its own nix store on brunnr, with its temp files and caches. only the build folders are on the
+# boot disk (nvme): unpacking and compiling is lots of small files, slow on the spinning disks, and nix
+# deletes each folder when its build ends
 let
   ci = "/srv/ci-store";
+  builds = "/var/lib/ci-builds";   # on the nvme: nix unpacks and compiles here, the result goes into ci's store
   gib = n: toString (n * 1024 * 1024 * 1024);
 
   # runner -> its token file (TOKEN=<registration token>, root 0600)
@@ -43,7 +46,7 @@ in
         runner.timeout = "6h";
         runner.envs = {
           # brunnr/ci-store has a 300G quota: nix cleans it when less than 60G is free, down to 120G free
-          NIX_CONFIG = "store = ${ci}\nmin-free = ${gib 60}\nmax-free = ${gib 120}";
+          NIX_CONFIG = "store = ${ci}\nmin-free = ${gib 60}\nmax-free = ${gib 120}\nbuild-dir = ${builds}";
           TMPDIR = "${ci}/tmp";
           XDG_CACHE_HOME = "${ci}/cache";
         };
@@ -57,13 +60,20 @@ in
     serviceConfig = {
       DynamicUser = lib.mkForce false;
       PrivateTmp = true;
-      ReadWritePaths = [ ci ];
-      ExecStartPre = [ "+${pkgs.coreutils}/bin/install -d -o gitea-runner -g gitea-runner ${ci} ${ci}/tmp ${ci}/cache" ];
+      ReadWritePaths = [ ci builds ];
+      ExecStartPre = [
+        "+${pkgs.coreutils}/bin/install -d -o gitea-runner -g gitea-runner ${ci} ${ci}/tmp ${ci}/cache"
+        "+${pkgs.coreutils}/bin/install -d -m 0700 -o gitea-runner -g gitea-runner ${builds}"
+      ];
       # idle priority, so comfyui, the llms and octane keep the box
       CPUSchedulingPolicy = "idle";
       IOSchedulingClass = "idle";
     };
   }) runners;
+
+  # leftovers from cancelled jobs (a new push cancels the old run) go after 2 days.
+  # jobs time out after 6h, so a running build is never touched
+  systemd.tmpfiles.rules = [ "d ${builds} 0700 gitea-runner gitea-runner 2d" ];
 
   nix.settings = {
     max-jobs = 4;
