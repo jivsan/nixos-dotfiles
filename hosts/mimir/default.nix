@@ -29,6 +29,7 @@
 #   ./modules/system/llm.nix              # chat models for heimdall's ai-gateway, needs a 16 gb card
     ./modules/system/octane-node.nix    # octane render node for mjolnir
     ./modules/system/test-node.nix        # the agents' blender test node (mimir-blender runs blender-job here)
+    ./modules/system/krig-miner.nix       # pearl mining for kryptex, pauses while anything else uses the card
 #    ./modules/system/discordbot.nix      # off until /var/lib/discordbot/.env exists
   ];
 
