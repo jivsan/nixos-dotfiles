@@ -14,9 +14,9 @@
         "type": "textbox",
         "name": "price",
         "label": "kr per kWh (what I pay, grid fee included)",
-        "query": "2.2",
-        "current": { "selected": false, "text": "2.2", "value": "2.2" },
-        "options": [ { "selected": true, "text": "2.2", "value": "2.2" } ],
+        "query": "0.50",
+        "current": { "selected": false, "text": "0.50", "value": "0.50" },
+        "options": [ { "selected": true, "text": "0.50", "value": "0.50" } ],
         "hide": 0
       }
     ]
