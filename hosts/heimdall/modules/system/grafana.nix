@@ -62,6 +62,8 @@ let
     cp ${./switch-dashboard.json} $out/dashboards-json/switch.json
     cp ${./pfsense-geomap-dashboard.json} $out/dashboards-json/pfsense-geomap.json
     cp ${./ai-gateway-dashboard.json} $out/dashboards-json/ai-gateway.json
+    # pearl mining on mimir (hosts/mimir/modules/system/krig-miner.nix)
+    cp ${./mimir-mining-dashboard.json} $out/dashboards-json/mimir-mining.json
     # these two were made in the web page; saved as files 2026-10-22 when grafana moved to appdb
     cp ${./node-exporter-full-dashboard.json} $out/dashboards-json/node-exporter-full.json
     cp ${./pfsense-system-dashboard.json} $out/dashboards-json/pfsense-system.json

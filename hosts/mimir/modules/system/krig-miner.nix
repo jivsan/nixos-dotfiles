@@ -37,7 +37,38 @@ let
   '';
 
   smi = "${config.hardware.nvidia.package.bin}/bin/nvidia-smi";
+  # numbers for heimdall's prometheus (mimir mining dashboard in grafana), served by the node exporter
+  textDir = "/var/lib/krig-metrics";
   yield = pkgs.writeShellScript "krig-yield" ''
+    # mining or not, card busy or not, and the miner's own hashrate and shares from its api
+    metrics() {
+      local mining=0 rate=0 acc="" stale="" rej="" j
+      if systemctl is-active -q krig-miner; then
+        mining=1
+        if j=$(curl -fsS -m 2 http://127.0.0.1:12000/); then
+          read -r rate acc stale rej < <(jq -r '[.devices[].algorithms[]] | [(map(.hashrate) | add // 0), (map(.shares.accepted) | add // 0), (map(.shares.stale) | add // 0), (map(.shares.rejected) | add // 0)] | @tsv' <<<"$j")
+        fi
+      fi
+      {
+        echo "# HELP krig_mining 1 while the pearl miner runs, 0 while it waits for the card"
+        echo "# TYPE krig_mining gauge"
+        echo "krig_mining $mining"
+        echo "# HELP krig_card_busy 1 while something else uses the card"
+        echo "# TYPE krig_card_busy gauge"
+        echo "krig_card_busy $([ -n "$busy" ] && echo 1 || echo 0)"
+        echo "# HELP krig_hashrate_hashes_per_second the miner's own hashrate"
+        echo "# TYPE krig_hashrate_hashes_per_second gauge"
+        echo "krig_hashrate_hashes_per_second $rate"
+        if [ -n "$acc" ]; then
+          echo "# HELP krig_shares_total shares since the miner last started"
+          echo "# TYPE krig_shares_total counter"
+          echo "krig_shares_total{result=\"accepted\"} $acc"
+          echo "krig_shares_total{result=\"stale\"} $stale"
+          echo "krig_shares_total{result=\"rejected\"} $rej"
+        fi
+      } > ${textDir}/krig.prom.tmp && mv ${textDir}/krig.prom.tmp ${textDir}/krig.prom
+    }
+
     last=$(date +%s)   # after a boot or restart the card has to be free for the idle time first
     warned=""
     while true; do
@@ -74,6 +105,7 @@ let
           systemctl start krig-miner
         fi
       fi
+      metrics
       sleep 10
     done
   '';
@@ -124,12 +156,17 @@ in
     wants = [ "network-online.target" ];
     # no kryptex username yet: nothing to mine for
     unitConfig.ConditionPathExists = userFile;
-    path = [ pkgs.coreutils pkgs.gnugrep pkgs.procps config.systemd.package ];
+    path = [ pkgs.coreutils pkgs.gnugrep pkgs.procps pkgs.curl pkgs.jq config.systemd.package ];
     serviceConfig = {
       ExecStartPre = "-${config.systemd.package}/bin/systemctl reset-failed krig-miner.service";
       ExecStart = yield;
+      # stopped on purpose: no numbers, so the dashboard says stopped instead of showing old ones
+      ExecStopPost = "${pkgs.coreutils}/bin/rm -f ${textDir}/krig.prom";
       Restart = "always";
       RestartSec = 30;
     };
   };
+
+  systemd.tmpfiles.rules = [ "d ${textDir} 0755 root root -" ];
+  services.prometheus.exporters.node.extraFlags = [ "--collector.textfile.directory=${textDir}" ];
 }
