@@ -23,6 +23,7 @@
     ../../modules/apps/herdr.nix
     ./modules/apps/grok-bot.nix          # grok bot, xai desktop app for my bot team (no mcp, no lan)
     ./modules/apps/telegram.nix
+    ./modules/apps/exodus.nix            # crypto wallet, kryptex payouts land here
     ./modules/apps/wowexport.nix
     ../../modules/apps/blender.nix
     ./modules/apps/upscayl.nix
