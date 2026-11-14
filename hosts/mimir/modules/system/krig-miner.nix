@@ -11,6 +11,9 @@ let
   pool = "stratum+ssl://prl.kryptex.network:8048";
   worker = "mimir";
   idleMinutes = 5;
+  # measured 11-14: stock was 93.6 TH/s at 160 W, 72 °C. with the memory at 810 MHz (pearl hardly uses it, krig's
+  # release notes say so too) and 125 W it does 91.3 TH/s at 66 °C: 35 W less heat and a bit more money after power
+  powerLimit = 125;
 
   # new release: bump the version, set hash = lib.fakeHash, the first build prints the right one
   krig = pkgs.stdenv.mkDerivation rec {
@@ -33,8 +36,9 @@ let
   start = pkgs.writeShellScript "krig-miner-start" ''
     user=$(${pkgs.coreutils}/bin/tr -d ' \n' < "$CREDENTIALS_DIRECTORY/user")
     exec ${krig}/bin/krig-miner --url ${pool} --user "$user/${worker}" \
-      --no-rocm --no-intel --no-tui --api-port 12000 --api-host 127.0.0.1
+      --no-rocm --no-intel --no-tui --no-telemetry --api-port 12000 --api-host 127.0.0.1
   '';
+  # --no-telemetry: otherwise krig sends gpu startup errors to kryptex
 
   smi = "${config.hardware.nvidia.package.bin}/bin/nvidia-smi";
   # numbers for heimdall's prometheus (mimir mining dashboard in grafana), served by the node exporter
@@ -119,6 +123,11 @@ in
     wants = [ "network-online.target" ];
     serviceConfig = {
       ExecStart = start;
+      # memory clock and power limit only while mining, set as root ("+") since krig has no rights to do it.
+      # back to stock when it stops, so comfyui, octane and llama-server get the full card.
+      # "-": if nvidia-smi fails it still mines, and a failed reset doesn't mark the miner failed
+      ExecStartPre = [ "-+${smi} -lmc 810" "-+${smi} -pl ${toString powerLimit}" ];
+      ExecStopPost = [ "-+${smi} -rmc" "-+${smi} -pl 160" ];
       DynamicUser = true;
       LoadCredential = "user:${userFile}";
       StateDirectory = "krig-miner";
