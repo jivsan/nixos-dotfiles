@@ -63,6 +63,9 @@ before a heimdall switch that changes the brain bridge, check it has no running 
   a collaborator with write access on this repo only. it keeps one "dependency dashboard" issue with everything it
   sees.
 - ci builds every pull request too, so green means all six hosts still build with it.
+- my own images (wowsims-image, built by ci in its own repo) are in forgejo's registry, which wants a login like
+  everything on forgejo. renovate gets one from `/var/lib/secrets/renovate-registry.env` on yggdrasil
+  (`renovate.nix` says how it's made).
 
 merging one:
 
@@ -170,6 +173,15 @@ my private repo `modgud-vps-nix` (the modgud vps) has its own runner, `gitea-run
 in forgejo), with its own token in `/var/lib/secrets/forgejo-runner-token-modgud-vps-nix`. same box, same ci store,
 same cache, but each token only reaches its own repo. same steps with `--scope jivsan/modgud-vps-nix`, that file and
 `sudo systemctl restart gitea-runner-modgud`.
+
+`wowsims-image` (my image of wowsims forever, built from wowsims' source) has its own runner too,
+`gitea-runner-wowsims` (`mimir-wowsims` in forgejo), token in `/var/lib/secrets/forgejo-runner-token-wowsims-image`,
+the same steps with `--scope jivsan/wowsims-image`. it is the first repo here whose build runs code that isn't mine
+(wowsims' makefile and its npm and go packages, a new master every week), and every runner is the same user
+`gitea-runner`: that user can upload to ncps on localhost, write ci's store and read the other runners' tokens. so
+that repo's `scripts/build.sh` runs all of wowsims' code in a bubblewrap sandbox with no network, no tokens and
+nothing but its own work folder, and the push is a step of its own that runs nothing of wowsims. its work folder
+(about 2.5 GB per build, lots of small files) is in `/var/lib/ci-builds` on the nvme and deleted at the end.
 
 ## checks
 

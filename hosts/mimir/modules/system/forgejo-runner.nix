@@ -16,6 +16,11 @@ let
     mimir = "/var/lib/secrets/forgejo-runner-token";                    # jivsan/nixos-dotfiles
     modgud = "/var/lib/secrets/forgejo-runner-token-modgud-vps-nix";
     helheim = "/var/lib/secrets/forgejo-runner-token-talos-helheim";
+    # jivsan/wowsims-image. its build runs wowsims' code (a new upstream commit every week), only ever
+    # inside a bubblewrap sandbox: no network, no tokens, nothing of this box but its own work folder,
+    # so it can't reach ncps' uploads on localhost, ci's store or the other runners' files (that repo's
+    # scripts/build.sh). its push is a step of its own that runs nothing of wowsims
+    wowsims = "/var/lib/secrets/forgejo-runner-token-wowsims-image";
   };
 in
 {
