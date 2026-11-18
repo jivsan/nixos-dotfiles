@@ -16,7 +16,7 @@ the network these hosts sit on (vlans, the `bifrost` arista switch, pfsense, pih
 |-------------|----------------------------------------------------|
 | `mjolnir`   | my desktop, oxwm (X11) and Hyprland, blender + octane |
 | `heimdall`  | services vm: traefik, immich, paperless, vaultwarden, homarr, monitoring, huginn |
-| `mimir`     | ai box: llm, embeddings, comfyui, immich ml, octane render node, agents' blender checks |
+| `mimir`     | ai box: llm, embeddings, comfyui, immich ml, octane render node, agents' blender checks, the wowsims engine |
 | `njord`     | finance vm running sure, walled off from the rest  |
 | `yggdrasil` | always-on mini pc for claude code, grok, hermes and herdr |
 

@@ -90,6 +90,20 @@
       "versioning": "regex:^v?(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-ls(?<build>\\d+)$"
     },
     {
+      "description": "wowsims: my own image, built by ci in jivsan/wowsims-image from wowsims' source. here it's the engine on mimir (hosts/mimir/modules/system/wowsims.nix), in talos-helheim the page (kubernetes/apps/wowsims), and both have to be the same build: renovate opens a pull request there too for each new tag, and both titles say so. its tag is the build's time and wowsims' commit, like 2026.11.13-184628-be13cfb: read as date and time, or renovate would never see a newer one. it never merges by itself",
+      "matchPackageNames": [
+        "git.oryxserver.org/jivsan/wowsims-image"
+      ],
+      "versioning": "regex:^(?<major>\\d{4})\\.(?<minor>\\d+)\\.(?<patch>\\d+)-(?<build>\\d{6})-[0-9a-f]+$",
+      "commitMessageSuffix": "(with the page in talos-helheim)",
+      "prBodyNotes": [
+        "the engine here and the page in talos-helheim have to be the same build. this one first, the same day: merge it, on mjolnir `git pull && git push origin main` (the hosts pull from github), `deploy mimir` once ci is green, then merge the pull request with the same tag in jivsan/talos-helheim (flux rolls the pod a minute later). not this one alone. a sim that runs while one of them changes is lost, i start it again.",
+        "after both, they must name the same wowsims commit (it prints `same build: <the new tag>`):\n```sh\np=$(curl -s https://sims.oryxserver.org/forever/version.json | grep -o '[0-9a-f]\\{40\\}' | cut -c1-7)\ne=$(curl -s https://sims.oryxserver.org/version | grep -o '\"version\": *\"[^\"]*\"' | cut -d'\"' -f4)\n[ -n \"$p\" ] && [ \"${e##*-}\" = \"$p\" ] && echo \"same build: $e\" || echo \"not the same: page $p, engine $e\"\n```",
+        "the engine's memory: after the first big batch with a new build, `sudo podman stats --no-stream wowsims-engine` on mimir. near 2.5 GB, --memory and GOMEMLIMIT in wowsims.nix go up together."
+      ],
+      "automerge": false
+    },
+    {
       "description": "scrutiny's influxdb stays on 2.8: 2.9 turns on token hashing, which can't be undone",
       "matchFileNames": [
         "odyn/apps/scrutiny/compose.yaml"

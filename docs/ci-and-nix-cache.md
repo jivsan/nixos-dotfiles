@@ -66,6 +66,9 @@ before a heimdall switch that changes the brain bridge, check it has no running 
 - my own images (wowsims-image, built by ci in its own repo) are in forgejo's registry, which wants a login like
   everything on forgejo. renovate gets one from `/var/lib/secrets/renovate-registry.env` on yggdrasil
   (`renovate.nix` says how it's made).
+- a new wowsims build is two pull requests with the same tag, here (the engine on mimir, `wowsims.nix`) and in
+  talos-helheim (the page): this one first, `git pull && git push origin main` on mjolnir and `deploy mimir`, then
+  that one, the same day. their descriptions have the check that both run the same build.
 
 merging one:
 

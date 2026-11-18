@@ -93,6 +93,8 @@
             "https://changedetection.oryxserver.org"
             "https://scrutiny.oryxserver.org/api/health"   # the scrutiny app on odyn, through traefik
             "https://search.oryxserver.org"
+            "https://sims.oryxserver.org/forever/"   # the wowsims page, in the cluster
+            "https://sims.oryxserver.org/version"    # its engine on mimir, through the cluster's route: down -> the switch (talos-helheim, apps/wowsims)
             "https://git.oryxserver.org"
             "https://n8n.oryxserver.org/healthz/readiness"
             "http://10.0.20.18:5000/nix-cache-info"   # the nix cache on mimir

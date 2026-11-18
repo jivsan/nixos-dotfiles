@@ -27,7 +27,7 @@ runs octoprint for my 3d printer.
 |-------------|---------------|--------------------------------------------------------------------------------|---------------------------------------------------------|
 | `mjolnir`   | `10.0.20.100` | my workstation and daily driver (5900X, RTX 5070 Ti)                           | oxwm on X11 by default and Hyprland too, picked in `ly` |
 | `heimdall`  | `10.0.20.17`  | headless services vm with traefik, immich, paperless, vaultwarden, homarr, grafana and huginn | none                                     |
-| `mimir`     | `10.0.20.18`  | headless ai box (5950X, RTX 4060 Ti) with llm, comfyui and immich ml            | none                                                    |
+| `mimir`     | `10.0.20.18`  | headless ai box (5950X, RTX 4060 Ti) with llm, comfyui, immich ml and the engine for my wowsims page (sims.oryxserver.org, the page itself is in my cluster) | none |
 | `njord`     | `10.0.20.20`  | headless finance vm running [sure](https://github.com/we-promise/sure), walled off from everything else | none                    |
 | `yggdrasil` | `10.0.20.21`  | lenovo thinkcentre m93p mini pc, always on and outside hella. it runs hermes on kimi k3 with tools for the vault, blender and wow assets, and my self hosted apps (forgejo) with their data on odyn | none |
 | `elitebook` | `10.0.20.22`  | my old hp elitebook 8540p next to the ender-3 v3 se. it only runs octoprint, i slice on mjolnir and save the g-code in `/mnt/ratatoskr/3dprint` | none |
