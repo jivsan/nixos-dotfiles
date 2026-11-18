@@ -46,6 +46,7 @@
     ./modules/system/exporters.nix         # node + gpu numbers for heimdall's prometheus (homarr host card)
     ../../modules/system/nix-cache.nix     # mimir's nix cache first, then cache.nixos.org
     ./modules/system/deploy.nix            # `deploy`: pull + rebuild the other hosts from here
+    ./modules/system/wowsims-upgrade.nix   # the wowsims update by itself, twice a day (engine on mimir, page in the cluster)
   ];
 
   networking.hostName = "mjolnir";
