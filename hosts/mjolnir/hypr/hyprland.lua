@@ -64,6 +64,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("mako")
     hl.exec_cmd("hypridle")
+    -- my equalizer. home-manager starts it with the graphical session, which only oxwm brings up,
+    -- so here it is started by hand (the first command hands systemd this session's display)
+    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP; systemctl --user start easyeffects")
     local main, side = output_of(MAIN) or "DP-3", output_of(SIDE) or "HDMI-A-1"
     hl.exec_cmd(
         "awww-daemon & sleep 1 && awww img -o " .. main .. " " .. walls .. "wall.png" .. grow ..
