@@ -184,6 +184,7 @@ hl.bind(main_mod .. " + SHIFT + Q",
     hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(main_mod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(main_mod .. " + F", hl.dsp.window.float({ action = "toggle" }))
+hl.bind(main_mod .. " + SHIFT + F", hl.dsp.window.fullscreen())   -- as in oxwm: a game fills the whole screen
 hl.bind(main_mod .. " + D", hl.dsp.exec_cmd(menu))
 hl.bind(main_mod .. " + P", hl.dsp.window.pseudo())
 hl.bind(main_mod .. " + L", hl.dsp.exec_cmd("hyprlock"))
