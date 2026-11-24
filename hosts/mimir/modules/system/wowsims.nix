@@ -14,7 +14,7 @@ let
   # FILL-IN before the first deploy: the step "pushed" of the ci run in wowsims-image prints the
   # whole git.oryxserver.org/jivsan/wowsims-image:<tag>@sha256:<digest>. until then the check at
   # the bottom stops every build of mimir, ci's too
-  image = "git.oryxserver.org/jivsan/wowsims-image:2026.11.23-173250-57df2a7@sha256:c998ba99ffde0a114e8bb6e6d218eaa92ef56d6dc56af8f24ca80d6f571605f7";
+  image = "git.oryxserver.org/jivsan/wowsims-image:2026.11.24-053118-a8bd7fd@sha256:cfe2cc71b1ed9ebce8bbce10a8ff7182a0c52e5c7adc07cc79e1f641119f5548";
 
   # wowsims' own docker-compose.yml uses it too, and nothing else on mimir does
   port = 18790;
